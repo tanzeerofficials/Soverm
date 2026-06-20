@@ -1,0 +1,28 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "description": "Express API for the Sovrn personal CFO app",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon index.js",
+    "start": "node index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.2",
+    "@clerk/express": "^2.1.27",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "node-cron": "^4.2.1",
+    "pg": "^8.21.0",
+    "plaid": "^42.2.0",
+    "svix": "^1.95.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}

@@ -1,0 +1,18 @@
+Before writing any new function, API call, or piece of logic, 
+always explain in plain English:
+1. What this code is about to do
+2. Why it's needed (what problem it solves)
+3. How it fits into the bigger picture of the app
+4. Any important concepts the user should understand 
+   (e.g. async/await, middleware, environment variables, etc.)
+
+After explaining, then write the code.
+
+Keep explanations beginner-friendly but not oversimplified — 
+the user is learning full-stack development by building this 
+project and wants to understand every function they use, 
+not just copy-paste working code.
+
+When the user asks a question about existing code, always 
+explain concepts from first principles before diving into 
+specifics.
