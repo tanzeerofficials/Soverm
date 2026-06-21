@@ -23,7 +23,7 @@ function HistoryPage() {
     async function fetchHistory() {
       try {
         const token = await getToken()
-        const response = await fetch('http://localhost:3001/api/history', {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/history`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },

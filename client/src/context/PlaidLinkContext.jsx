@@ -20,7 +20,7 @@ export function PlaidLinkProvider({ children }) {
   useEffect(() => {
     onSuccessRef.current = async (public_token) => {
       const token = await getToken()
-      const response = await fetch('http://localhost:3001/api/plaid/exchange-public-token', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/plaid/exchange-public-token`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -43,7 +43,7 @@ export function PlaidLinkProvider({ children }) {
 
     async function fetchLinkToken() {
       const token = await getToken()
-      const response = await fetch('http://localhost:3001/api/plaid/create-link-token', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/plaid/create-link-token`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,

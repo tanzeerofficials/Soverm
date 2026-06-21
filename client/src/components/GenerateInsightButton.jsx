@@ -50,7 +50,7 @@ function GenerateInsightButton({
 
     try {
       const token = await getToken()
-      const response = await fetch('http://localhost:3001/api/insights/generate', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/insights/generate`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -64,7 +64,15 @@ function GenerateInsightButton({
       }
 
       setInsight(data.insight)
-      onInsightGenerated?.(data.insight)
+      const insightWithActions = {
+        ...data.insight,
+        actions: (data.insight.actions ?? []).map((description, index) => ({
+          id: data.actionIds?.[index],
+          description,
+          completed: false,
+        })),
+      }
+      onInsightGenerated?.(insightWithActions)
       showToast?.('Financial summary generated', 'success')
       onSyncComplete?.()
     } catch (err) {

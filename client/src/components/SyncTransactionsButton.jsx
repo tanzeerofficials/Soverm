@@ -37,7 +37,7 @@ function SyncTransactionsButton({ className = '', showToast, onSyncComplete }) {
 
     try {
       const token = await getToken()
-      const response = await fetch('http://localhost:3001/api/plaid/sync-transactions', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/plaid/sync-transactions`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,

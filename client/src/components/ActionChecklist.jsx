@@ -8,15 +8,36 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@clerk/clerk-react'
 
+function normalizeActions(actions) {
+  return (actions ?? []).map((action, index) => {
+    if (typeof action === 'string') {
+      return {
+        id: `pending-${index}-${action}`,
+        description: action,
+        completed: false,
+      }
+    }
+
+    return {
+      id: action.id ?? `pending-${index}-${action.description ?? ''}`,
+      description: action.description ?? '',
+      completed: Boolean(action.completed),
+    }
+  })
+}
+
 function ActionChecklist({ actions, onUpdate }) {
   const { getToken } = useAuth()
-  const [localActions, setLocalActions] = useState(actions)
+  const [localActions, setLocalActions] = useState(() => normalizeActions(actions))
 
   useEffect(() => {
-    setLocalActions(actions)
+    setLocalActions(normalizeActions(actions))
   }, [actions])
 
   async function handleToggle(actionId, currentCompleted) {
+    if (String(actionId).startsWith('pending-')) {
+      return
+    }
     const nextCompleted = !currentCompleted
 
     setLocalActions((prev) =>
@@ -27,7 +48,7 @@ function ActionChecklist({ actions, onUpdate }) {
 
     try {
       const token = await getToken()
-      const response = await fetch(`http://localhost:3001/api/actions/${actionId}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/actions/${actionId}`, {
         method: 'PATCH',
         headers: {
           Authorization: `Bearer ${token}`,

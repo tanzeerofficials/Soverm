@@ -53,7 +53,7 @@ function DashboardPage() {
   async function fetchDashboardData() {
     try {
       const token = await getToken()
-      const response = await fetch('http://localhost:3001/api/dashboard/summary', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/summary`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -286,7 +286,7 @@ function DashboardPage() {
           try {
             const token = await getToken()
             const response = await fetch(
-              `http://localhost:3001/api/plaid/accounts/${accountId}`,
+              `${import.meta.env.VITE_API_URL}/api/plaid/accounts/${accountId}`,
               {
                 method: 'DELETE',
                 headers: {

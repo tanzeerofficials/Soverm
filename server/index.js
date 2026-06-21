@@ -53,8 +53,16 @@ const { startSyncJob } = await import('./jobs/syncAllUsers.js')
 const app = express()
 const port = Number(process.env.PORT) || 5000
 
-// cors lets our React app (running on a different port) talk to this server.
-app.use(cors())
+// cors lets our React app (running on a different origin) talk to this server.
+app.use(
+  cors({
+    origin: [
+      'http://localhost:5173',
+      'https://soverm.vercel.app',
+    ],
+    credentials: true,
+  })
+)
 
 // Webhooks must read the raw body (not JSON) so signatures can be verified.
 // That is why this route comes BEFORE express.json().
