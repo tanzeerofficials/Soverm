@@ -39,6 +39,20 @@ function isBalanceWarning(account) {
   return balance < 0
 }
 
+const RANGE_OPTIONS = [
+  { value: '7d', label: '7D' },
+  { value: '30d', label: '30D' },
+  { value: '3m', label: '3M' },
+  { value: '1y', label: '1Y' },
+]
+
+const RANGE_LABELS = {
+  '7d': 'in the last 7 days',
+  '30d': 'in the last 30 days',
+  '3m': 'in the last 3 months',
+  '1y': 'in the last year',
+}
+
 function DashboardPage() {
   const { user } = useUser()
   const { getToken } = useAuth()
@@ -48,6 +62,7 @@ function DashboardPage() {
 
   const [insightError, setInsightError] = useState(null)
   const [insightLoading, setInsightLoading] = useState(false)
+  const [selectedRange, setSelectedRange] = useState('30d')
   const { toast, showToast } = useToast()
   const [accountToDelete, setAccountToDelete] = useState(null)
 
@@ -58,12 +73,15 @@ function DashboardPage() {
     isError,
     refetch,
   } = useQuery({
-    queryKey: dashboardQueryKey,
+    queryKey: ['dashboard', selectedRange],
     queryFn: async () => {
       const token = await getToken()
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/summary`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/dashboard/summary?range=${selectedRange}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      )
       if (!res.ok) {
         throw new Error(`Dashboard fetch failed: ${res.status}`)
       }
@@ -199,12 +217,30 @@ function DashboardPage() {
                   {formatDistanceToNow(new Date(dashboardData.lastSyncedAt))} ago
                 </p>
               )}
-              <div className="mt-5 flex flex-wrap items-center justify-center gap-4 sm:gap-8">
+              <div className="mt-5 mb-2 flex justify-center gap-2">
+                {RANGE_OPTIONS.map(({ value, label }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setSelectedRange(value)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                      selectedRange === value
+                        ? 'bg-emerald-500 text-slate-950'
+                        : 'bg-[#1A2236] text-[#9CA3AF] hover:text-white'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-8">
                 <span className="text-sm text-[#10B981]">
-                  ↑ {formatCurrency(dashboardData?.income ?? 0)} income this period
+                  ↑ {formatCurrency(dashboardData?.income ?? 0)} income{' '}
+                  {RANGE_LABELS[selectedRange]}
                 </span>
                 <span className="text-sm text-[#EF4444]">
-                  ↓ {formatCurrency(dashboardData?.spent ?? 0)} spent this period
+                  ↓ {formatCurrency(dashboardData?.spent ?? 0)} spent{' '}
+                  {RANGE_LABELS[selectedRange]}
                 </span>
               </div>
             </section>

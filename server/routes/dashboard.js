@@ -27,6 +27,22 @@ function parseLatestInsight(row) {
   return { ...parsedContent, id: row.id, created_at: row.created_at }
 }
 
+const DEFAULT_RANGE = '30d'
+
+const RANGE_INTERVALS = {
+  '7d': '7 days',
+  '30d': '30 days',
+  '3m': '3 months',
+  '1y': '1 year',
+}
+
+function resolveRange(rangeParam) {
+  if (typeof rangeParam === 'string' && rangeParam in RANGE_INTERVALS) {
+    return rangeParam
+  }
+  return DEFAULT_RANGE
+}
+
 function calculateTotalBalance(accounts) {
   return accounts.reduce((total, account) => {
     const balance = Number(account.balance_available) || 0
@@ -41,7 +57,8 @@ function calculateTotalBalance(accounts) {
  * GET /api/dashboard/summary
  *
  * What it does:
- * - Loads accounts, 30-day income/spend totals, and latest insight
+ * - Loads accounts, income/spend totals for a time range, and latest insight
+ * - Accepts ?range=7d|30d|3m|1y (defaults to 30d)
  * - Returns everything the dashboard needs in one JSON payload
  *
  * Why one route:
@@ -55,6 +72,9 @@ router.get('/summary', async (req, res) => {
   }
 
   try {
+    const appliedRange = resolveRange(req.query.range)
+    const interval = RANGE_INTERVALS[appliedRange]
+
     const accountsResult = await db.query(
       `SELECT id, bank_name, account_name, account_type,
               balance_current, balance_available, currency
@@ -71,8 +91,8 @@ router.get('/summary', async (req, res) => {
        FROM transactions
        WHERE user_id = $1
          AND amount < 0
-         AND date >= NOW() - INTERVAL '30 days'`,
-      [userId]
+         AND date >= NOW() - $2::interval`,
+      [userId, interval]
     )
 
     const spentResult = await db.query(
@@ -80,8 +100,8 @@ router.get('/summary', async (req, res) => {
        FROM transactions
        WHERE user_id = $1
          AND amount > 0
-         AND date >= NOW() - INTERVAL '30 days'`,
-      [userId]
+         AND date >= NOW() - $2::interval`,
+      [userId, interval]
     )
 
     const insightResult = await db.query(
@@ -129,6 +149,7 @@ router.get('/summary', async (req, res) => {
       accounts,
       latestInsight,
       lastSyncedAt,
+      appliedRange,
     })
   } catch (err) {
     console.error('Failed to load dashboard summary:', err.message)
