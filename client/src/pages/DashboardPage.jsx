@@ -135,9 +135,55 @@ function DashboardPage() {
 
       <main className="mx-auto max-w-6xl px-4 pb-16 pt-24 sm:px-6 sm:pt-28">
         {loading ? (
-          <div className="flex min-h-[50vh] items-center justify-center">
-            <p className="text-sm text-[#9CA3AF]">Loading your finances...</p>
-          </div>
+          <>
+            <section className="text-center">
+              <div
+                className="mx-auto h-4 w-32 animate-pulse rounded bg-[#1A2236]"
+                aria-hidden="true"
+              />
+              <div
+                className="mx-auto mt-3 h-16 w-64 animate-pulse rounded bg-[#1A2236]"
+                aria-hidden="true"
+              />
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-4 sm:gap-8">
+                <div
+                  className="h-4 w-40 animate-pulse rounded bg-[#1A2236]"
+                  aria-hidden="true"
+                />
+                <div
+                  className="h-4 w-40 animate-pulse rounded bg-[#1A2236]"
+                  aria-hidden="true"
+                />
+              </div>
+            </section>
+
+            <section className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <div
+                className="h-12 w-36 animate-pulse rounded-lg bg-[#1A2236]"
+                aria-hidden="true"
+              />
+              <div
+                className="h-12 w-36 animate-pulse rounded-lg bg-[#1A2236]"
+                aria-hidden="true"
+              />
+              <div
+                className="h-12 w-36 animate-pulse rounded-lg bg-[#1A2236]"
+                aria-hidden="true"
+              />
+            </section>
+
+            <section className="mt-12">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {[0, 1, 2, 3].map((index) => (
+                  <div
+                    key={index}
+                    className="h-32 animate-pulse rounded-xl bg-[#1A2236]"
+                    aria-hidden="true"
+                  />
+                ))}
+              </div>
+            </section>
+          </>
         ) : (
           <>
             {/* Hero */}
@@ -174,7 +220,10 @@ function DashboardPage() {
             {/* Action row */}
             <section className="mt-10 flex flex-col gap-3 sm:flex-row sm:justify-center">
               <div className="w-full sm:max-w-[200px] sm:flex-1">
-                <ConnectBankButton className="w-full" />
+                <ConnectBankButton
+                  className="w-full"
+                  onSyncComplete={fetchDashboardData}
+                />
               </div>
               <div className="w-full sm:max-w-[200px] sm:flex-1">
                 <SyncTransactionsButton
@@ -201,13 +250,13 @@ function DashboardPage() {
               <h2 className="text-xs font-semibold uppercase tracking-[0.3em] text-[#9CA3AF]">
                 Your Accounts
               </h2>
-              <div className="mt-4 flex gap-4 overflow-x-auto pb-2">
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {(dashboardData?.accounts ?? []).map((account) => {
                   const balanceIsWarning = isBalanceWarning(account)
                   return (
                     <article
                       key={account.id}
-                      className="relative min-w-[240px] flex-shrink-0 rounded-xl border border-[#1E2D45] bg-[#111827] p-5 transition hover:border-[#10B981]/40 hover:bg-[#1A2236]"
+                      className="relative rounded-xl border border-[#1E2D45] bg-[#111827] p-5 transition hover:border-[#10B981]/40 hover:bg-[#1A2236]"
                     >
                       <button
                         type="button"

@@ -12,11 +12,12 @@
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { ClerkProvider } from '@clerk/clerk-react'
+import { ClerkLoaded, ClerkLoading, ClerkProvider } from '@clerk/clerk-react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.jsx'
+import AppLoadingScreen from './components/AppLoadingScreen.jsx'
 import { PlaidLinkProvider } from './context/PlaidLinkContext.jsx'
 
 const queryClient = new QueryClient()
@@ -27,13 +28,18 @@ const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ClerkProvider publishableKey={clerkPublishableKey}>
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <PlaidLinkProvider>
-            <App />
-          </PlaidLinkProvider>
-        </BrowserRouter>
-      </QueryClientProvider>
+      <ClerkLoading>
+        <AppLoadingScreen />
+      </ClerkLoading>
+      <ClerkLoaded>
+        <QueryClientProvider client={queryClient}>
+          <BrowserRouter>
+            <PlaidLinkProvider>
+              <App />
+            </PlaidLinkProvider>
+          </BrowserRouter>
+        </QueryClientProvider>
+      </ClerkLoaded>
     </ClerkProvider>
   </StrictMode>,
 )

@@ -5,7 +5,7 @@
  * Plaid's script must only be embedded once per page.
  */
 
-import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { usePlaidLink } from 'react-plaid-link'
 import { useAuth } from '@clerk/clerk-react'
 
@@ -16,6 +16,7 @@ export function PlaidLinkProvider({ children }) {
   const [linkToken, setLinkToken] = useState(null)
 
   const onSuccessRef = useRef(null)
+  const onSyncCompleteRef = useRef(null)
 
   useEffect(() => {
     onSuccessRef.current = async (public_token) => {
@@ -29,7 +30,12 @@ export function PlaidLinkProvider({ children }) {
         body: JSON.stringify({ public_token }),
       })
       const data = await response.json()
-      console.log(data)
+
+      if (response.ok && data.success) {
+        onSyncCompleteRef.current?.()
+      } else {
+        console.error('Failed to connect bank account:', data.error || response.status)
+      }
     }
   }, [getToken])
 
@@ -67,8 +73,18 @@ export function PlaidLinkProvider({ children }) {
     onSuccess: (public_token) => onSuccessRef.current?.(public_token),
   })
 
+  const setOnSyncComplete = useCallback((callback) => {
+    onSyncCompleteRef.current = callback
+  }, [])
+
   return (
-    <PlaidLinkContext.Provider value={{ open, ready: ready && !!linkToken }}>
+    <PlaidLinkContext.Provider
+      value={{
+        open,
+        ready: ready && !!linkToken,
+        setOnSyncComplete,
+      }}
+    >
       {children}
     </PlaidLinkContext.Provider>
   )

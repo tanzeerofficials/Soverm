@@ -7,6 +7,7 @@
 
 import { SignedIn, SignedOut, SignInButton, SignUpButton } from '@clerk/clerk-react'
 import { Navigate } from 'react-router-dom'
+import AppLoadingScreen from '../components/AppLoadingScreen.jsx'
 
 /*
  * LandingPage
@@ -25,6 +26,7 @@ function LandingPage() {
   return (
     <>
       <SignedIn>
+        <AppLoadingScreen message="Taking you to your dashboard…" />
         <Navigate to="/dashboard" replace />
       </SignedIn>
       <SignedOut>

@@ -10,10 +10,23 @@
 
 import { SignedIn, SignedOut } from '@clerk/clerk-react'
 import { Navigate, Route, Routes } from 'react-router-dom'
+import AppLoadingScreen from './components/AppLoadingScreen.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
 import HistoryPage from './pages/HistoryPage.jsx'
 import LandingPage from './pages/LandingPage.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
+
+function ProtectedRoute({ children }) {
+  return (
+    <>
+      <SignedIn>{children}</SignedIn>
+      <SignedOut>
+        <AppLoadingScreen message="Signing you out…" />
+        <Navigate to="/" replace />
+      </SignedOut>
+    </>
+  )
+}
 
 /*
  * App
@@ -26,36 +39,28 @@ import NotFoundPage from './pages/NotFoundPage.jsx'
  */
 function App() {
   return (
-    <Routes>
-      <Route path="/" element={<LandingPage />} />
-      <Route
-        path="/dashboard"
-        element={
-          <>
-            <SignedIn>
+    <div className="min-h-screen bg-[#0A0F1C]">
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
               <DashboardPage />
-            </SignedIn>
-            <SignedOut>
-              <Navigate to="/" replace />
-            </SignedOut>
-          </>
-        }
-      />
-      <Route
-        path="/history"
-        element={
-          <>
-            <SignedIn>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/history"
+          element={
+            <ProtectedRoute>
               <HistoryPage />
-            </SignedIn>
-            <SignedOut>
-              <Navigate to="/" replace />
-            </SignedOut>
-          </>
-        }
-      />
-      <Route path="*" element={<NotFoundPage />} />
-    </Routes>
+            </ProtectedRoute>
+          }
+        />
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </div>
   )
 }
 
