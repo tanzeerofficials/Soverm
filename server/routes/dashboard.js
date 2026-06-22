@@ -29,7 +29,7 @@ function parseLatestInsight(row) {
 
 function calculateTotalBalance(accounts) {
   return accounts.reduce((total, account) => {
-    const balance = Number(account.balance_current) || 0
+    const balance = Number(account.balance_available) || 0
     if (account.account_type?.toLowerCase().includes('credit')) {
       return total - balance
     }

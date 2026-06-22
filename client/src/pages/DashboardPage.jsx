@@ -32,7 +32,7 @@ function isCreditAccount(account) {
 }
 
 function isBalanceWarning(account) {
-  const balance = Number(account.balance_current) || 0
+  const balance = Number(account.balance_available) || 0
   if (isCreditAccount(account)) {
     return balance > 0
   }
@@ -267,7 +267,7 @@ function DashboardPage() {
                           balanceIsWarning ? 'text-[#EF4444]' : 'text-[#10B981]'
                         }`}
                       >
-                        {formatCurrency(account.balance_current)}
+                        {formatCurrency(account.balance_available)}
                       </p>
                     </article>
                   )
