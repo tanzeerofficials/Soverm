@@ -5,18 +5,20 @@
  * Plaid's script must only be embedded once per page.
  */
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { usePlaidLink } from 'react-plaid-link'
 import { useAuth } from '@clerk/clerk-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { dashboardQueryKey } from '../lib/queryKeys.js'
 
 const PlaidLinkContext = createContext(null)
 
 export function PlaidLinkProvider({ children }) {
   const { getToken, isSignedIn } = useAuth()
+  const queryClient = useQueryClient()
   const [linkToken, setLinkToken] = useState(null)
 
   const onSuccessRef = useRef(null)
-  const onSyncCompleteRef = useRef(null)
 
   useEffect(() => {
     onSuccessRef.current = async (public_token) => {
@@ -32,12 +34,12 @@ export function PlaidLinkProvider({ children }) {
       const data = await response.json()
 
       if (response.ok && data.success) {
-        onSyncCompleteRef.current?.()
+        await queryClient.invalidateQueries({ queryKey: dashboardQueryKey })
       } else {
         console.error('Failed to connect bank account:', data.error || response.status)
       }
     }
-  }, [getToken])
+  }, [getToken, queryClient])
 
   useEffect(() => {
     if (!isSignedIn) {
@@ -73,18 +75,8 @@ export function PlaidLinkProvider({ children }) {
     onSuccess: (public_token) => onSuccessRef.current?.(public_token),
   })
 
-  const setOnSyncComplete = useCallback((callback) => {
-    onSyncCompleteRef.current = callback
-  }, [])
-
   return (
-    <PlaidLinkContext.Provider
-      value={{
-        open,
-        ready: ready && !!linkToken,
-        setOnSyncComplete,
-      }}
-    >
+    <PlaidLinkContext.Provider value={{ open, ready: ready && !!linkToken }}>
       {children}
     </PlaidLinkContext.Provider>
   )

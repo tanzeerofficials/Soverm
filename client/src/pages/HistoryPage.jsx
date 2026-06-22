@@ -4,11 +4,12 @@
  * Lists all past AI financial insights and their action items.
  */
 
-import { useEffect, useState } from 'react'
 import { SignOutButton, useAuth, useUser } from '@clerk/clerk-react'
+import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import InsightCard from '../components/InsightCard'
 import ActionChecklist from '../components/ActionChecklist'
+import { historyQueryKey } from '../lib/queryKeys.js'
 
 function HistoryPage() {
   const { user } = useUser()
@@ -16,31 +17,21 @@ function HistoryPage() {
   const firstName = user?.firstName ?? 'there'
   const initials = firstName.charAt(0).toUpperCase()
 
-  const [insights, setInsights] = useState([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    async function fetchHistory() {
-      try {
-        const token = await getToken()
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/history`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
-        const data = await response.json()
-        if (response.ok) {
-          setInsights(data.insights)
-        }
-      } catch (err) {
-        console.error('Failed to fetch insight history:', err)
-      } finally {
-        setLoading(false)
+  const { data: historyData, isLoading: historyLoading } = useQuery({
+    queryKey: historyQueryKey,
+    queryFn: async () => {
+      const token = await getToken()
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/history`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) {
+        throw new Error(`History fetch failed: ${res.status}`)
       }
-    }
+      return res.json()
+    },
+  })
 
-    fetchHistory()
-  }, [getToken])
+  const insights = historyData?.insights ?? []
 
   return (
     <div className="min-h-screen bg-[#0A0F1C] text-[#F9FAFB]">
@@ -86,7 +77,7 @@ function HistoryPage() {
           </p>
         </div>
 
-        {loading ? (
+        {historyLoading && !historyData ? (
           <div className="flex min-h-[40vh] items-center justify-center">
             <p className="text-sm text-[#9CA3AF]">Loading your history...</p>
           </div>

@@ -5,16 +5,10 @@
  * usePlaidLink lives in one place only — Plaid requires a single embed per page.
  */
 
-import { useEffect } from 'react'
 import { usePlaidLinkContext } from '../context/PlaidLinkContext.jsx'
 
-function ConnectBankButton({ className = '', onSyncComplete }) {
-  const { open, ready, setOnSyncComplete } = usePlaidLinkContext()
-
-  useEffect(() => {
-    setOnSyncComplete(onSyncComplete ?? null)
-    return () => setOnSyncComplete(null)
-  }, [onSyncComplete, setOnSyncComplete])
+function ConnectBankButton({ className = '' }) {
+  const { open, ready } = usePlaidLinkContext()
 
   return (
     <div className="flex w-full flex-col items-center">

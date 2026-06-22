@@ -5,8 +5,9 @@
  * action buttons, and AI-generated financial insight.
  */
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { SignOutButton, useAuth, useUser } from '@clerk/clerk-react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { formatDistanceToNow } from 'date-fns'
 import { Link } from 'react-router-dom'
 import ConnectBankButton from '../components/ConnectBankButton.jsx'
@@ -17,6 +18,7 @@ import ActionChecklist from '../components/ActionChecklist'
 import SecurityNote from '../components/SecurityNote'
 import { useToast, Toast } from '../components/Toast'
 import ConfirmModal from '../components/ConfirmModal'
+import { dashboardQueryKey } from '../lib/queryKeys.js'
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-US', {
@@ -40,63 +42,38 @@ function isBalanceWarning(account) {
 function DashboardPage() {
   const { user } = useUser()
   const { getToken } = useAuth()
+  const queryClient = useQueryClient()
   const firstName = user?.firstName ?? 'there'
   const initials = firstName.charAt(0).toUpperCase()
 
-  const [dashboardData, setDashboardData] = useState(null)
-  const [loading, setLoading] = useState(true)
   const [insightError, setInsightError] = useState(null)
   const [insightLoading, setInsightLoading] = useState(false)
   const { toast, showToast } = useToast()
   const [accountToDelete, setAccountToDelete] = useState(null)
 
-  async function fetchDashboardData() {
-    try {
+  const {
+    data: dashboardData,
+    isPending,
+    isFetching,
+    isError,
+    refetch,
+  } = useQuery({
+    queryKey: dashboardQueryKey,
+    queryFn: async () => {
       const token = await getToken()
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/summary`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/summary`, {
+        headers: { Authorization: `Bearer ${token}` },
       })
-      const data = await response.json()
-      console.log('Dashboard summary response:', data)
-      console.log('latestInsight.actions:', data?.latestInsight?.actions)
-      if (response.ok) {
-        setDashboardData(data)
-      } else {
-        console.error('Dashboard summary request failed:', data.error || response.status)
+      if (!res.ok) {
+        throw new Error(`Dashboard fetch failed: ${res.status}`)
       }
-    } catch (err) {
-      console.error('Failed to fetch dashboard summary:', err.message)
-    } finally {
-      setLoading(false)
-    }
-  }
+      return res.json()
+    },
+    refetchInterval: 60_000,
+  })
 
-  useEffect(() => {
-    fetchDashboardData()
-  }, [getToken])
-
-  function handleInsightGenerated(insightObject) {
-    setInsightError(null)
-    setDashboardData((prev) => ({
-      ...(prev ?? {}),
-      latestInsight: {
-        ...insightObject,
-        created_at: new Date().toISOString(),
-      },
-    }))
-  }
-
-  function calculateTotalBalance(accounts) {
-    return accounts.reduce((total, account) => {
-      const balance = Number(account.balance_current) || 0
-      if (isCreditAccount(account)) {
-        return total - balance
-      }
-      return total + balance
-    }, 0)
-  }
+  const showSkeleton = isPending && dashboardData === undefined
+  const showFailedState = isError && dashboardData === undefined && !isPending
 
   return (
     <div className="min-h-screen bg-[#0A0F1C] text-[#F9FAFB]">
@@ -134,7 +111,13 @@ function DashboardPage() {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 pb-16 pt-24 sm:px-6 sm:pt-28">
-        {loading ? (
+        {isError && isFetching && dashboardData && (
+          <p className="mb-4 text-center text-sm text-[#9CA3AF]" role="status">
+            Couldn&apos;t refresh — retrying...
+          </p>
+        )}
+
+        {showSkeleton ? (
           <>
             <section className="text-center">
               <div
@@ -184,7 +167,20 @@ function DashboardPage() {
               </div>
             </section>
           </>
-        ) : (
+        ) : showFailedState ? (
+          <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center">
+            <p className="text-sm text-[#EF4444]" role="alert">
+              Couldn&apos;t load your dashboard. Check your connection and try again.
+            </p>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-600"
+            >
+              Try again
+            </button>
+          </div>
+        ) : dashboardData ? (
           <>
             {/* Hero */}
             <section className="text-center">
@@ -220,25 +216,16 @@ function DashboardPage() {
             {/* Action row */}
             <section className="mt-10 flex flex-col gap-3 sm:flex-row sm:justify-center">
               <div className="w-full sm:max-w-[200px] sm:flex-1">
-                <ConnectBankButton
-                  className="w-full"
-                  onSyncComplete={fetchDashboardData}
-                />
+                <ConnectBankButton className="w-full" />
               </div>
               <div className="w-full sm:max-w-[200px] sm:flex-1">
-                <SyncTransactionsButton
-                  className="w-full"
-                  showToast={showToast}
-                  onSyncComplete={fetchDashboardData}
-                />
+                <SyncTransactionsButton className="w-full" showToast={showToast} />
               </div>
               <div className="w-full sm:max-w-[200px] sm:flex-1">
                 <GenerateInsightButton
                   className="w-full"
                   showCard={false}
                   showToast={showToast}
-                  onSyncComplete={fetchDashboardData}
-                  onInsightGenerated={handleInsightGenerated}
                   onError={setInsightError}
                   onLoadingChange={setInsightLoading}
                 />
@@ -317,7 +304,7 @@ function DashboardPage() {
               )}
             </section>
           </>
-        )}
+        ) : null}
       </main>
       <Toast toast={toast} />
       <ConfirmModal
@@ -349,18 +336,9 @@ function DashboardPage() {
               throw new Error(data.error || 'Failed to disconnect account')
             }
 
-            setDashboardData((prev) => {
-              const accounts = (prev?.accounts ?? []).filter(
-                (account) => account.id !== accountId
-              )
-              return {
-                ...prev,
-                accounts,
-                totalBalance: calculateTotalBalance(accounts),
-              }
-            })
             setAccountToDelete(null)
             showToast(`"${accountName}" disconnected`, 'success')
+            await queryClient.invalidateQueries({ queryKey: dashboardQueryKey })
           } catch (err) {
             console.error('Failed to disconnect account:', err.message)
             showToast('Failed to disconnect account — please try again', 'error')

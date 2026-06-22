@@ -20,7 +20,14 @@ import App from './App.jsx'
 import AppLoadingScreen from './components/AppLoadingScreen.jsx'
 import { PlaidLinkProvider } from './context/PlaidLinkContext.jsx'
 
-const queryClient = new QueryClient()
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: true,
+      retry: 1,
+    },
+  },
+})
 
 // VITE_ prefix means this value comes from client/.env and is safe for frontend use.
 const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY

@@ -3,33 +3,16 @@
  *
  * This button asks our backend to pull the latest transactions
  * from Plaid for every bank account the user has connected.
- *
- * Big picture steps:
- * 1) Get Clerk login token (proves who you are)
- * 2) POST to /api/plaid/sync-transactions
- * 3) Backend syncs each account and inserts new transactions
  */
 
 import { useState } from 'react'
 import { useAuth } from '@clerk/clerk-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { dashboardQueryKey } from '../lib/queryKeys.js'
 
-/*
- * SyncTransactionsButton
- *
- * What it does:
- * - Shows a "Sync Transactions" button on the dashboard.
- *
- * Why we need getToken() (same as ConnectBankButton):
- * - Our backend route checks getAuth(req) and returns 401 without a valid token.
- * - Clerk's getToken() gives us the JWT to send as Authorization: Bearer ...
- * - That lets the server know which userId owns the accounts to sync.
- *
- * Important concepts:
- * - useState: tracks loading so we can disable the button while syncing
- * - async/await: network requests take time; await waits for the response
- */
-function SyncTransactionsButton({ className = '', showToast, onSyncComplete }) {
+function SyncTransactionsButton({ className = '', showToast }) {
   const { getToken } = useAuth()
+  const queryClient = useQueryClient()
   const [loading, setLoading] = useState(false)
 
   async function handleSync() {
@@ -54,7 +37,7 @@ function SyncTransactionsButton({ className = '', showToast, onSyncComplete }) {
         `Synced ${data.added} new, ${data.modified} updated, ${data.removed} removed`,
         'success'
       )
-      onSyncComplete?.()
+      await queryClient.invalidateQueries({ queryKey: dashboardQueryKey })
     } catch (err) {
       console.error('Sync failed:', err.message)
       showToast?.('Sync failed — please try again', 'error')

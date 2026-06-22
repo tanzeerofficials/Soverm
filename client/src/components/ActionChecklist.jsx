@@ -7,6 +7,8 @@
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@clerk/clerk-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { dashboardQueryKey } from '../lib/queryKeys.js'
 
 function normalizeActions(actions) {
   return (actions ?? []).map((action, index) => {
@@ -28,6 +30,7 @@ function normalizeActions(actions) {
 
 function ActionChecklist({ actions, onUpdate }) {
   const { getToken } = useAuth()
+  const queryClient = useQueryClient()
   const [localActions, setLocalActions] = useState(() => normalizeActions(actions))
 
   useEffect(() => {
@@ -66,6 +69,7 @@ function ActionChecklist({ actions, onUpdate }) {
         onUpdate?.(prev)
         return prev
       })
+      await queryClient.invalidateQueries({ queryKey: dashboardQueryKey })
     } catch (err) {
       console.error('Failed to toggle action:', err.message)
       setLocalActions((prev) =>

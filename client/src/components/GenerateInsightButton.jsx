@@ -3,42 +3,23 @@
  *
  * This button asks our backend to analyze recent transactions
  * with Claude and return a plain-English financial summary.
- *
- * Big picture steps:
- * 1) Get Clerk login token (proves who you are)
- * 2) POST to /api/insights/generate
- * 3) Display the AI summary in a card below the button
  */
 
 import { useState } from 'react'
 import { useAuth } from '@clerk/clerk-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { dashboardQueryKey, historyQueryKey } from '../lib/queryKeys.js'
 
-/*
- * GenerateInsightButton
- *
- * What it does:
- * - Triggers AI financial summary generation
- * - Shows loading, error, and success states
- *
- * Why we need getToken() (same as ConnectBankButton / SyncTransactionsButton):
- * - POST /api/insights/generate uses getAuth(req) on the server
- * - Without Authorization: Bearer, the route returns 401
- * - getToken() turns the Clerk browser session into that JWT
- *
- * Important concepts:
- * - useState: holds insight text, loading flag, and error message
- * - async/await: Claude takes a few seconds; we wait for the full response
- */
 function GenerateInsightButton({
   className = '',
   showCard = true,
   showToast,
-  onSyncComplete,
   onInsightGenerated,
   onError,
   onLoadingChange,
 }) {
   const { getToken } = useAuth()
+  const queryClient = useQueryClient()
   const [loading, setLoading] = useState(false)
   const [insight, setInsight] = useState(null)
   const [error, setError] = useState(null)
@@ -63,7 +44,6 @@ function GenerateInsightButton({
         throw new Error(data.error || 'Failed to generate insight')
       }
 
-      setInsight(data.insight)
       const insightWithActions = {
         ...data.insight,
         actions: (data.insight.actions ?? []).map((description, index) => ({
@@ -72,9 +52,15 @@ function GenerateInsightButton({
           completed: false,
         })),
       }
+
+      setInsight(data.insight)
       onInsightGenerated?.(insightWithActions)
+      onError?.(null)
       showToast?.('Financial summary generated', 'success')
-      onSyncComplete?.()
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: dashboardQueryKey }),
+        queryClient.invalidateQueries({ queryKey: historyQueryKey }),
+      ])
     } catch (err) {
       console.error('Insight generation failed:', err.message)
       setError(err.message)

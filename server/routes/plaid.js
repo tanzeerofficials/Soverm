@@ -153,11 +153,11 @@ router.post('/sync-transactions', async (req, res) => {
  * DELETE /api/plaid/accounts/:accountId
  *
  * What it does:
- * - Removes a connected bank account from the user's profile
- * - Stops future syncs for that account (access token row is deleted)
+ * - Unlinks transactions from the account (account_id -> NULL)
+ * - Removes the connected bank account row (stops future syncs)
  *
  * Why we need it:
- * - Users must be able to revoke access to their financial data
+ * - Users must be able to revoke access while keeping transaction history
  */
 router.delete('/accounts/:accountId', async (req, res) => {
   const { userId } = getAuth(req)
@@ -165,10 +165,12 @@ router.delete('/accounts/:accountId', async (req, res) => {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
+  const client = await db.connect()
+
   try {
     const { accountId } = req.params
 
-    const accountResult = await db.query(
+    const accountResult = await client.query(
       'SELECT id FROM accounts WHERE id = $1 AND user_id = $2',
       [accountId, userId]
     )
@@ -177,15 +179,27 @@ router.delete('/accounts/:accountId', async (req, res) => {
       return res.status(404).json({ error: 'Account not found' })
     }
 
-    await db.query('DELETE FROM accounts WHERE id = $1 AND user_id = $2', [
+    await client.query('BEGIN')
+
+    await client.query(
+      'UPDATE transactions SET account_id = NULL WHERE account_id = $1 AND user_id = $2',
+      [accountId, userId]
+    )
+
+    await client.query('DELETE FROM accounts WHERE id = $1 AND user_id = $2', [
       accountId,
       userId,
     ])
 
+    await client.query('COMMIT')
+
     res.json({ success: true })
   } catch (err) {
+    await client.query('ROLLBACK')
     console.error('Failed to disconnect account:', err.message)
     res.status(500).json({ error: err.message })
+  } finally {
+    client.release()
   }
 })
 
