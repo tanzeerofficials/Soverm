@@ -9,6 +9,7 @@ import { useState } from 'react'
 import { useAuth } from '@clerk/clerk-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { dashboardQueryKey } from '../lib/queryKeys.js'
+import { syncTransactions } from '../lib/syncTransactions.js'
 
 function SyncTransactionsButton({ className = '', showToast }) {
   const { getToken } = useAuth()
@@ -19,19 +20,7 @@ function SyncTransactionsButton({ className = '', showToast }) {
     setLoading(true)
 
     try {
-      const token = await getToken()
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/plaid/sync-transactions`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to sync transactions')
-      }
+      const data = await syncTransactions(getToken)
 
       showToast?.(
         `Synced ${data.added} new, ${data.modified} updated, ${data.removed} removed`,

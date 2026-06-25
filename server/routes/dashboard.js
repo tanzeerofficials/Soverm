@@ -8,6 +8,7 @@
 import { Router } from 'express'
 import { getAuth } from '@clerk/express'
 import db from '../db/index.js'
+import { calculateTotalBalance, getDisplayBalance } from '../lib/balances.js'
 
 const router = Router()
 
@@ -43,16 +44,6 @@ function resolveRange(rangeParam) {
   return DEFAULT_RANGE
 }
 
-function calculateTotalBalance(accounts) {
-  return accounts.reduce((total, account) => {
-    const balance = Number(account.balance_available) || 0
-    if (account.account_type?.toLowerCase().includes('credit')) {
-      return total - balance
-    }
-    return total + balance
-  }, 0)
-}
-
 /*
  * GET /api/dashboard/summary
  *
@@ -83,7 +74,10 @@ router.get('/summary', async (req, res) => {
       [userId]
     )
 
-    const accounts = accountsResult.rows
+    const accounts = accountsResult.rows.map((account) => ({
+      ...account,
+      displayBalance: getDisplayBalance(account),
+    }))
     const totalBalance = calculateTotalBalance(accounts)
 
     const incomeResult = await db.query(

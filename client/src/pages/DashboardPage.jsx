@@ -5,7 +5,7 @@
  * action buttons, and AI-generated financial insight.
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { SignOutButton, useAuth, useUser } from '@clerk/clerk-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { formatDistanceToNow } from 'date-fns'
@@ -19,6 +19,7 @@ import SecurityNote from '../components/SecurityNote'
 import { useToast, Toast } from '../components/Toast'
 import ConfirmModal from '../components/ConfirmModal'
 import { dashboardQueryKey } from '../lib/queryKeys.js'
+import { syncTransactions } from '../lib/syncTransactions.js'
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-US', {
@@ -31,8 +32,21 @@ function isCreditAccount(account) {
   return account.account_type?.toLowerCase().includes('credit') ?? false
 }
 
+function getDisplayBalance(account) {
+  if (account.displayBalance != null) {
+    return Number(account.displayBalance) || 0
+  }
+  if (isCreditAccount(account)) {
+    return Number(account.balance_current) || 0
+  }
+  if (account.balance_available != null) {
+    return Number(account.balance_available) || 0
+  }
+  return Number(account.balance_current) || 0
+}
+
 function isBalanceWarning(account) {
-  const balance = Number(account.balance_available) || 0
+  const balance = getDisplayBalance(account)
   if (isCreditAccount(account)) {
     return balance > 0
   }
@@ -89,6 +103,20 @@ function DashboardPage() {
     },
     refetchInterval: 60_000,
   })
+
+  useEffect(() => {
+    async function backgroundSync() {
+      try {
+        await syncTransactions(getToken)
+      } catch (err) {
+        console.error('Background sync failed:', err.message)
+      } finally {
+        await queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      }
+    }
+
+    backgroundSync()
+  }, [])
 
   const showSkeleton = isPending && dashboardData === undefined
   const showFailedState = isError && dashboardData === undefined && !isPending
@@ -209,13 +237,18 @@ function DashboardPage() {
                 {formatCurrency(dashboardData?.totalBalance ?? 0)}
               </p>
               {dashboardData?.lastSyncedAt && (
-                <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-[#9CA3AF]">
-                  <span className="text-emerald-500" aria-hidden="true">
-                    ●
-                  </span>
-                  Last synced{' '}
-                  {formatDistanceToNow(new Date(dashboardData.lastSyncedAt))} ago
-                </p>
+                <>
+                  <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-[#9CA3AF]">
+                    <span className="text-emerald-500" aria-hidden="true">
+                      ●
+                    </span>
+                    Last synced{' '}
+                    {formatDistanceToNow(new Date(dashboardData.lastSyncedAt))} ago
+                  </p>
+                  <p className="mt-1 text-center text-xs text-[#6B7280]">
+                    Recent transactions may take a few minutes to appear
+                  </p>
+                </>
               )}
               <div className="mt-5 mb-2 flex justify-center gap-2">
                 {RANGE_OPTIONS.map(({ value, label }) => (
@@ -303,7 +336,7 @@ function DashboardPage() {
                           balanceIsWarning ? 'text-[#EF4444]' : 'text-[#10B981]'
                         }`}
                       >
-                        {formatCurrency(account.balance_available)}
+                        {formatCurrency(getDisplayBalance(account))}
                       </p>
                     </article>
                   )

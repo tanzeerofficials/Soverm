@@ -83,7 +83,7 @@ router.post('/exchange-public-token', async (req, res) => {
     const exchangeResponse = await plaidClient.itemPublicTokenExchange({ public_token })
     const { access_token } = exchangeResponse.data
 
-    const accountsResponse = await plaidClient.accountsGet({ access_token })
+    const accountsResponse = await plaidClient.accountsBalanceGet({ access_token })
     const { accounts, item } = accountsResponse.data
     const bankName = item.institution_name ?? item.institution_id ?? null
 
