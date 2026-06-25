@@ -76,7 +76,7 @@ export async function syncTransactionsForAccount(accessToken, cursor) {
  * What it does:
  * - Syncs transactions for every bank account belonging to one user
  * - Applies added, modified, and removed changes from Plaid
- * - Refreshes account balances via accountsGet
+ * - Refreshes account balances via accountsBalanceGet
  * - Updates each account's plaid_cursor and last_synced_at
  *
  * Why we need it:
@@ -175,14 +175,9 @@ export async function syncAllAccountsForUser(userId) {
           counts.added += insertResult.rowCount
         }
 
-        const accountsResponse = await plaidClient.accountsGet({
+        const accountsResponse = await plaidClient.accountsBalanceGet({
           access_token: account.plaid_access_token,
         })
-
-        console.log(
-          '[Plaid accountsGet raw]',
-          JSON.stringify(accountsResponse.data.accounts, null, 2)
-        )
 
         for (const plaidAccount of accountsResponse.data.accounts) {
           await db.query(
