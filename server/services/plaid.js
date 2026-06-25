@@ -179,6 +179,11 @@ export async function syncAllAccountsForUser(userId) {
           access_token: account.plaid_access_token,
         })
 
+        console.log(
+          '[Plaid accountsGet raw]',
+          JSON.stringify(accountsResponse.data.accounts, null, 2)
+        )
+
         for (const plaidAccount of accountsResponse.data.accounts) {
           await db.query(
             `UPDATE accounts
