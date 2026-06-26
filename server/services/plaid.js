@@ -74,42 +74,72 @@ export async function syncTransactionsForAccount(accessToken, cursor) {
  * syncAllAccountsForUser(userId)
  *
  * What it does:
- * - Syncs transactions for every bank account belonging to one user
- * - Applies added, modified, and removed changes from Plaid
- * - Refreshes account balances via accountsBalanceGet
- * - Updates each account's plaid_cursor and last_synced_at
+ * - Groups DB account rows by plaid_access_token (one Plaid Item per token)
+ * - Syncs transactions once per Item, not once per sub-account row
+ * - Applies added, modified, and removed changes for all sub-accounts in that Item
+ * - Refreshes balances via one accountsBalanceGet call per Item
+ * - Writes the same plaid_cursor to every sibling row sharing that token
  *
  * Why we need it:
  * - Shared by the /sync-transactions route and scheduled cron jobs
- * - Keeps sync logic in one place instead of duplicating it in routes
+ * - Plaid's transactionsSync and accountsBalanceGet are Item-scoped APIs
  *
  * How it fits the app:
  * - Called when a user clicks Sync or when a nightly job runs for all users
  */
+function groupAccountsByPlaidItem(accounts) {
+  const groups = new Map()
+
+  for (const account of accounts) {
+    const itemKey = account.plaid_item_id ?? account.plaid_access_token
+    if (!groups.has(itemKey)) {
+      groups.set(itemKey, {
+        plaidItemId: account.plaid_item_id,
+        accessToken: account.plaid_access_token,
+        cursor: account.plaid_cursor,
+        accounts: [],
+      })
+    }
+    groups.get(itemKey).accounts.push(account)
+  }
+
+  return groups
+}
+
 export async function syncAllAccountsForUser(userId) {
   const counts = { added: 0, modified: 0, removed: 0 }
 
   try {
     const accountsResult = await db.query(
-      `SELECT id, plaid_access_token, plaid_cursor, plaid_account_id
-       FROM accounts
-       WHERE user_id = $1`,
+      `SELECT a.id, a.plaid_account_id,
+              COALESCE(pi.plaid_access_token, a.plaid_access_token) AS plaid_access_token,
+              COALESCE(pi.plaid_cursor, a.plaid_cursor) AS plaid_cursor,
+              pi.id AS plaid_item_id
+       FROM accounts a
+       LEFT JOIN plaid_items pi ON a.plaid_item_id = pi.id
+       WHERE a.user_id = $1`,
       [userId]
     )
 
-    for (const account of accountsResult.rows) {
+    const itemGroups = groupAccountsByPlaidItem(accountsResult.rows)
+
+    for (const [, itemGroup] of itemGroups) {
+      const { plaidItemId, accessToken, accounts: groupAccounts } = itemGroup
+      const cursor = itemGroup.cursor ?? null
+
       try {
-        let syncResult = await syncTransactionsForAccount(
-          account.plaid_access_token,
-          account.plaid_cursor
+        const accountByPlaidId = new Map(
+          groupAccounts.map((account) => [account.plaid_account_id, account])
         )
+
+        let syncResult = await syncTransactionsForAccount(accessToken, cursor)
         const allRemoved = [...syncResult.removed]
         const allModified = [...syncResult.modified]
         const allAdded = [...syncResult.added]
 
         while (syncResult.hasMore) {
           syncResult = await syncTransactionsForAccount(
-            account.plaid_access_token,
+            accessToken,
             syncResult.nextCursor
           )
           allRemoved.push(...syncResult.removed)
@@ -127,7 +157,8 @@ export async function syncAllAccountsForUser(userId) {
         }
 
         for (const transaction of allModified) {
-          if (transaction.account_id !== account.plaid_account_id) {
+          const dbAccount = accountByPlaidId.get(transaction.account_id)
+          if (!dbAccount) {
             continue
           }
 
@@ -149,7 +180,8 @@ export async function syncAllAccountsForUser(userId) {
         }
 
         for (const transaction of allAdded) {
-          if (transaction.account_id !== account.plaid_account_id) {
+          const dbAccount = accountByPlaidId.get(transaction.account_id)
+          if (!dbAccount) {
             continue
           }
 
@@ -163,7 +195,7 @@ export async function syncAllAccountsForUser(userId) {
             ON CONFLICT (plaid_transaction_id) DO NOTHING`,
             [
               userId,
-              account.id,
+              dbAccount.id,
               transaction.transaction_id,
               transaction.amount,
               transaction.name,
@@ -176,7 +208,7 @@ export async function syncAllAccountsForUser(userId) {
         }
 
         const accountsResponse = await plaidClient.accountsBalanceGet({
-          access_token: account.plaid_access_token,
+          access_token: accessToken,
         })
 
         for (const plaidAccount of accountsResponse.data.accounts) {
@@ -195,14 +227,25 @@ export async function syncAllAccountsForUser(userId) {
           )
         }
 
+        if (plaidItemId) {
+          await db.query(
+            `UPDATE plaid_items
+             SET plaid_cursor = $1, last_synced_at = NOW()
+             WHERE id = $2 AND user_id = $3`,
+            [syncResult.nextCursor, plaidItemId, userId]
+          )
+        }
+
         await db.query(
-          'UPDATE accounts SET plaid_cursor = $1, last_synced_at = NOW() WHERE id = $2',
-          [syncResult.nextCursor, account.id]
+          `UPDATE accounts
+           SET plaid_cursor = $1, last_synced_at = NOW()
+           WHERE user_id = $2 AND plaid_access_token = $3`,
+          [syncResult.nextCursor, userId, accessToken]
         )
-      } catch (accountErr) {
+      } catch (itemErr) {
         console.error(
-          `Failed to sync account ${account.id} for user ${userId}:`,
-          accountErr.message
+          `Failed to sync Plaid item for user ${userId} (${groupAccounts.length} account(s)):`,
+          itemErr.message
         )
       }
     }

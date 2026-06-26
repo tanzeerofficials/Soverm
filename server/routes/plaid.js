@@ -4,34 +4,16 @@
  * Plaid is the service that safely connects to banks.
  * Our frontend never touches bank passwords directly.
  * Instead, Plaid opens a secure popup, and our backend talks to Plaid's API.
- *
- * Main routes:
- * 1) create-link-token -> gives frontend permission to open Plaid popup
- * 2) exchange-public-token -> turns temporary token into real bank access
- * 3) sync-transactions -> pulls new transactions from Plaid into our database
- * 4) DELETE accounts/:accountId -> disconnect a bank account
  */
 
 import { Router } from 'express'
 import { getAuth } from '@clerk/express'
 import { plaidClient, syncAllAccountsForUser } from '../services/plaid.js'
 import db from '../db/index.js'
+import { ensureUserExists } from '../utils/ensureUser.js'
 
 const router = Router()
 
-/*
- * POST /api/plaid/create-link-token
- *
- * What it does:
- * - Checks if the user is logged in
- * - Asks Plaid for a short-lived "link token"
- *
- * Why we need it:
- * - The React button needs this token before it can open Plaid Link.
- *
- * How it fits the app:
- * - ConnectBankButton calls this route when the dashboard loads.
- */
 router.post('/create-link-token', async (req, res) => {
   const { userId } = getAuth(req)
   if (!userId) {
@@ -41,7 +23,7 @@ router.post('/create-link-token', async (req, res) => {
   try {
     const response = await plaidClient.linkTokenCreate({
       user: { client_user_id: userId },
-      client_name: 'Sovrm',
+      client_name: 'Soverm',
       products: ['transactions'],
       country_codes: ['US'],
       language: 'en',
@@ -53,25 +35,6 @@ router.post('/create-link-token', async (req, res) => {
   }
 })
 
-/*
- * POST /api/plaid/exchange-public-token
- *
- * What it does:
- * - Takes the temporary public_token from Plaid popup success
- * - Exchanges it for a long-lived access_token
- * - Fetches bank accounts from Plaid
- * - Saves each account in our database
- *
- * Why we need it:
- * - public_token is temporary and useless by itself.
- * - access_token is what lets us read account balances and transactions later.
- *
- * How it fits the app:
- * - User clicks "Connect Your Bank"
- * - Plaid popup succeeds
- * - Frontend sends public_token here
- * - Backend stores accounts for that logged-in user
- */
 router.post('/exchange-public-token', async (req, res) => {
   const { userId } = getAuth(req)
   if (!userId) {
@@ -79,6 +42,8 @@ router.post('/exchange-public-token', async (req, res) => {
   }
 
   try {
+    await ensureUserExists(userId)
+
     const { public_token } = req.body
     const exchangeResponse = await plaidClient.itemPublicTokenExchange({ public_token })
     const { access_token } = exchangeResponse.data
@@ -87,17 +52,45 @@ router.post('/exchange-public-token', async (req, res) => {
     const { accounts, item } = accountsResponse.data
     const bankName = item.institution_name ?? item.institution_id ?? null
 
+    const itemResult = await db.query(
+      `INSERT INTO plaid_items (user_id, plaid_access_token, institution_name, last_synced_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (plaid_access_token) DO UPDATE
+         SET institution_name = EXCLUDED.institution_name,
+             user_id = EXCLUDED.user_id,
+             last_synced_at = NOW()
+       RETURNING id`,
+      [userId, access_token, bankName]
+    )
+    const plaidItemId = itemResult.rows[0].id
+
     for (const account of accounts) {
       await db.query(
         `INSERT INTO accounts (
-          id, user_id, plaid_account_id, plaid_access_token,
+          id, user_id, plaid_item_id, plaid_account_id, plaid_access_token,
           bank_name, account_name, account_type,
           balance_current, balance_available, currency
         ) VALUES (
-          gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9
-        )`,
+          gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+        )
+        ON CONFLICT (plaid_account_id) DO UPDATE SET
+          user_id = EXCLUDED.user_id,
+          plaid_item_id = EXCLUDED.plaid_item_id,
+          plaid_access_token = EXCLUDED.plaid_access_token,
+          bank_name = EXCLUDED.bank_name,
+          account_name = EXCLUDED.account_name,
+          account_type = EXCLUDED.account_type,
+          balance_current = EXCLUDED.balance_current,
+          balance_available = EXCLUDED.balance_available,
+          currency = EXCLUDED.currency,
+          plaid_cursor = CASE
+            WHEN accounts.plaid_access_token IS DISTINCT FROM EXCLUDED.plaid_access_token
+              THEN NULL
+            ELSE accounts.plaid_cursor
+          END`,
         [
           userId,
+          plaidItemId,
           account.account_id,
           access_token,
           bankName,
@@ -110,7 +103,13 @@ router.post('/exchange-public-token', async (req, res) => {
       )
     }
 
-    res.json({ success: true, accountsConnected: accounts.length })
+    const { added, modified, removed } = await syncAllAccountsForUser(userId)
+
+    res.json({
+      success: true,
+      accountsConnected: accounts.length,
+      synced: { added, modified, removed },
+    })
   } catch (err) {
     console.error('Failed to exchange public token and save accounts:', err.message)
     if (err.response?.data) {
@@ -120,20 +119,6 @@ router.post('/exchange-public-token', async (req, res) => {
   }
 })
 
-/*
- * POST /api/plaid/sync-transactions
- *
- * What it does:
- * - Loads every bank account for the logged-in user
- * - Calls Plaid transactionsSync for each account (with pagination)
- * - Inserts new transactions and saves the updated sync cursor
- *
- * Why we need it:
- * - Connecting a bank only stores accounts; this route fills the transactions table
- *
- * How it fits the app:
- * - Dashboard or a cron job can call this to refresh spending data
- */
 router.post('/sync-transactions', async (req, res) => {
   const { userId } = getAuth(req)
   if (!userId) {
@@ -149,16 +134,6 @@ router.post('/sync-transactions', async (req, res) => {
   }
 })
 
-/*
- * DELETE /api/plaid/accounts/:accountId
- *
- * What it does:
- * - Unlinks transactions from the account (account_id -> NULL)
- * - Removes the connected bank account row (stops future syncs)
- *
- * Why we need it:
- * - Users must be able to revoke access while keeping transaction history
- */
 router.delete('/accounts/:accountId', async (req, res) => {
   const { userId } = getAuth(req)
   if (!userId) {
@@ -171,13 +146,19 @@ router.delete('/accounts/:accountId', async (req, res) => {
     const { accountId } = req.params
 
     const accountResult = await client.query(
-      'SELECT id FROM accounts WHERE id = $1 AND user_id = $2',
+      `SELECT a.id, a.plaid_item_id, pi.plaid_access_token
+       FROM accounts a
+       LEFT JOIN plaid_items pi ON a.plaid_item_id = pi.id
+       WHERE a.id = $1 AND a.user_id = $2`,
       [accountId, userId]
     )
 
     if (accountResult.rows.length === 0) {
       return res.status(404).json({ error: 'Account not found' })
     }
+
+    const { plaid_item_id: plaidItemId, plaid_access_token: accessToken } =
+      accountResult.rows[0]
 
     await client.query('BEGIN')
 
@@ -190,6 +171,28 @@ router.delete('/accounts/:accountId', async (req, res) => {
       accountId,
       userId,
     ])
+
+    if (plaidItemId) {
+      const remainingResult = await client.query(
+        'SELECT COUNT(*)::int AS count FROM accounts WHERE plaid_item_id = $1',
+        [plaidItemId]
+      )
+
+      if (remainingResult.rows[0].count === 0) {
+        if (accessToken) {
+          try {
+            await plaidClient.itemRemove({ access_token: accessToken })
+          } catch (removeErr) {
+            console.error('Plaid itemRemove failed (account still disconnected):', removeErr.message)
+          }
+        }
+
+        await client.query('DELETE FROM plaid_items WHERE id = $1 AND user_id = $2', [
+          plaidItemId,
+          userId,
+        ])
+      }
+    }
 
     await client.query('COMMIT')
 

@@ -7,9 +7,20 @@ CREATE TABLE users (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
+CREATE TABLE plaid_items (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id TEXT NOT NULL REFERENCES users(id),
+  plaid_access_token TEXT UNIQUE NOT NULL,
+  plaid_cursor TEXT,
+  last_synced_at TIMESTAMP,
+  institution_name TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
 CREATE TABLE accounts (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id TEXT REFERENCES users(id),
+  plaid_item_id UUID REFERENCES plaid_items(id),
   plaid_account_id TEXT UNIQUE,
   plaid_access_token TEXT,
   bank_name TEXT,
@@ -19,8 +30,11 @@ CREATE TABLE accounts (
   balance_available NUMERIC,
   currency TEXT DEFAULT 'USD',
   plaid_cursor TEXT,
+  last_synced_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT NOW()
 );
+
+CREATE INDEX accounts_plaid_item_id_idx ON accounts(plaid_item_id);
 
 CREATE TABLE transactions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

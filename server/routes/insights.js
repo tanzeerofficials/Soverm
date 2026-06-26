@@ -9,6 +9,7 @@ import { Router } from 'express'
 import { getAuth } from '@clerk/express'
 import db from '../db/index.js'
 import { generateFinancialSummary } from '../services/claude.js'
+import { getDisplayBalance } from '../utils/balanceHelpers.js'
 
 const router = Router()
 
@@ -34,9 +35,11 @@ router.post('/generate', async (req, res) => {
 
   try {
     const transactionsResult = await db.query(
-      `SELECT t.*, a.bank_name, a.account_name
+      `SELECT t.*,
+              a.bank_name,
+              COALESCE(a.account_name, 'Disconnected account') AS account_name
        FROM transactions t
-       JOIN accounts a ON t.account_id = a.id
+       LEFT JOIN accounts a ON t.account_id = a.id
        WHERE t.user_id = $1
        ORDER BY t.date DESC
        LIMIT 50`,
@@ -44,7 +47,7 @@ router.post('/generate', async (req, res) => {
     )
 
     const accountsResult = await db.query(
-      `SELECT account_name, account_type, balance_current
+      `SELECT account_name, account_type, balance_current, balance_available
        FROM accounts
        WHERE user_id = $1`,
       [userId]
@@ -53,7 +56,7 @@ router.post('/generate', async (req, res) => {
     const accountSummary = accountsResult.rows
       .map(
         (a) =>
-          `${a.account_name} (${a.account_type}): $${a.balance_current}`
+          `${a.account_name} (${a.account_type}): $${getDisplayBalance(a)}`
       )
       .join('\n')
 

@@ -10,12 +10,14 @@ import { usePlaidLink } from 'react-plaid-link'
 import { useAuth } from '@clerk/clerk-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { dashboardQueryKey } from '../lib/queryKeys.js'
+import { useToastContext } from './ToastContext.jsx'
 
 const PlaidLinkContext = createContext(null)
 
 export function PlaidLinkProvider({ children }) {
   const { getToken, isSignedIn } = useAuth()
   const queryClient = useQueryClient()
+  const { showToast } = useToastContext()
   const [linkToken, setLinkToken] = useState(null)
 
   const onSuccessRef = useRef(null)
@@ -34,12 +36,23 @@ export function PlaidLinkProvider({ children }) {
       const data = await response.json()
 
       if (response.ok && data.success) {
+        const count = data.accountsConnected ?? 0
+        const synced = data.synced
+        const syncDetail =
+          synced != null
+            ? ` — synced ${synced.added} new transaction${synced.added === 1 ? '' : 's'}`
+            : ''
+        showToast(
+          `Connected ${count} account${count === 1 ? '' : 's'}${syncDetail}`,
+          'success'
+        )
         await queryClient.invalidateQueries({ queryKey: dashboardQueryKey })
       } else {
         console.error('Failed to connect bank account:', data.error || response.status)
+        showToast(data.error || 'Couldn’t connect your bank — please try again', 'error')
       }
     }
-  }, [getToken, queryClient])
+  }, [getToken, queryClient, showToast])
 
   useEffect(() => {
     if (!isSignedIn) {

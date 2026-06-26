@@ -8,7 +8,7 @@
 import { Router } from 'express'
 import { getAuth } from '@clerk/express'
 import db from '../db/index.js'
-import { calculateTotalBalance, getDisplayBalance } from '../lib/balances.js'
+import { calculateTotalBalance, getDisplayBalance } from '../utils/balanceHelpers.js'
 
 const router = Router()
 

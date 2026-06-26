@@ -5,7 +5,7 @@
  * action buttons, and AI-generated financial insight.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { SignOutButton, useAuth, useUser } from '@clerk/clerk-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { formatDistanceToNow } from 'date-fns'
@@ -16,33 +16,17 @@ import GenerateInsightButton from '../components/GenerateInsightButton'
 import InsightCard from '../components/InsightCard'
 import ActionChecklist from '../components/ActionChecklist'
 import SecurityNote from '../components/SecurityNote'
-import { useToast, Toast } from '../components/Toast'
+import { useToastContext } from '../context/ToastContext.jsx'
 import ConfirmModal from '../components/ConfirmModal'
 import { dashboardQueryKey } from '../lib/queryKeys.js'
 import { syncTransactions } from '../lib/syncTransactions.js'
+import { getDisplayBalance, isCreditAccount } from '../lib/balanceHelpers.js'
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
   }).format(amount)
-}
-
-function isCreditAccount(account) {
-  return account.account_type?.toLowerCase().includes('credit') ?? false
-}
-
-function getDisplayBalance(account) {
-  if (account.displayBalance != null) {
-    return Number(account.displayBalance) || 0
-  }
-  if (isCreditAccount(account)) {
-    return Number(account.balance_current) || 0
-  }
-  if (account.balance_available != null) {
-    return Number(account.balance_available) || 0
-  }
-  return Number(account.balance_current) || 0
 }
 
 function isBalanceWarning(account) {
@@ -67,6 +51,8 @@ const RANGE_LABELS = {
   '1y': 'in the last year',
 }
 
+const AUTO_SYNC_STALE_MINUTES = 5
+
 function DashboardPage() {
   const { user } = useUser()
   const { getToken } = useAuth()
@@ -77,8 +63,9 @@ function DashboardPage() {
   const [insightError, setInsightError] = useState(null)
   const [insightLoading, setInsightLoading] = useState(false)
   const [selectedRange, setSelectedRange] = useState('30d')
-  const { toast, showToast } = useToast()
+  const { showToast } = useToastContext()
   const [accountToDelete, setAccountToDelete] = useState(null)
+  const autoSyncTriggered = useRef(false)
 
   const {
     data: dashboardData,
@@ -105,6 +92,21 @@ function DashboardPage() {
   })
 
   useEffect(() => {
+    if (!dashboardData || autoSyncTriggered.current) {
+      return
+    }
+
+    autoSyncTriggered.current = true
+
+    if (dashboardData.lastSyncedAt) {
+      const minutesSinceSync =
+        (Date.now() - new Date(dashboardData.lastSyncedAt).getTime()) / (1000 * 60)
+
+      if (minutesSinceSync <= AUTO_SYNC_STALE_MINUTES) {
+        return
+      }
+    }
+
     async function backgroundSync() {
       try {
         await syncTransactions(getToken)
@@ -116,7 +118,7 @@ function DashboardPage() {
     }
 
     backgroundSync()
-  }, [])
+  }, [dashboardData])
 
   const showSkeleton = isPending && dashboardData === undefined
   const showFailedState = isError && dashboardData === undefined && !isPending
@@ -306,6 +308,14 @@ function DashboardPage() {
               <h2 className="text-xs font-semibold uppercase tracking-[0.3em] text-[#9CA3AF]">
                 Your Accounts
               </h2>
+              {(dashboardData?.accounts ?? []).length === 0 ? (
+                <div className="mt-4 rounded-xl border border-dashed border-[#1E2D45] bg-[#111827] px-6 py-10 text-center">
+                  <p className="text-sm text-[#9CA3AF]">
+                    No accounts connected yet. Use{' '}
+                    <span className="text-[#F9FAFB]">Connect Your Bank</span> above to get started.
+                  </p>
+                </div>
+              ) : (
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {(dashboardData?.accounts ?? []).map((account) => {
                   const balanceIsWarning = isBalanceWarning(account)
@@ -342,6 +352,7 @@ function DashboardPage() {
                   )
                 })}
               </div>
+              )}
             </section>
 
             {/* AI Insight */}
@@ -375,7 +386,6 @@ function DashboardPage() {
           </>
         ) : null}
       </main>
-      <Toast toast={toast} />
       <ConfirmModal
         isOpen={!!accountToDelete}
         title="Disconnect this account?"

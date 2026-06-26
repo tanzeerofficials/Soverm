@@ -19,6 +19,7 @@ import './index.css'
 import App from './App.jsx'
 import AppLoadingScreen from './components/AppLoadingScreen.jsx'
 import { PlaidLinkProvider } from './context/PlaidLinkContext.jsx'
+import { ToastProvider } from './context/ToastContext.jsx'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -40,11 +41,13 @@ createRoot(document.getElementById('root')).render(
       </ClerkLoading>
       <ClerkLoaded>
         <QueryClientProvider client={queryClient}>
-          <BrowserRouter>
-            <PlaidLinkProvider>
-              <App />
-            </PlaidLinkProvider>
-          </BrowserRouter>
+          <ToastProvider>
+            <BrowserRouter>
+              <PlaidLinkProvider>
+                <App />
+              </PlaidLinkProvider>
+            </BrowserRouter>
+          </ToastProvider>
         </QueryClientProvider>
       </ClerkLoaded>
     </ClerkProvider>

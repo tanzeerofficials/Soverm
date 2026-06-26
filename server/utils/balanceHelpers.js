@@ -1,6 +1,9 @@
 /*
  * Balance display helpers
  *
+ * Single source of truth for "what balance number do we show?"
+ * Used by dashboard totals, account summaries for Claude, etc.
+ *
  * Plaid sends two balance fields per account:
  * - balance_current: ledger balance (debt owed on credit cards)
  * - balance_available: spendable cash (depository) or remaining credit (credit cards)
