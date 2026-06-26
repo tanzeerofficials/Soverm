@@ -52,6 +52,14 @@ const RANGE_LABELS = {
 }
 
 const AUTO_SYNC_STALE_MINUTES = 5
+const AUTO_SYNC_RETRY_MS = AUTO_SYNC_STALE_MINUTES * 60 * 1000
+
+function minutesSinceSync(lastSyncedAt) {
+  if (!lastSyncedAt) {
+    return Infinity
+  }
+  return (Date.now() - new Date(lastSyncedAt).getTime()) / (1000 * 60)
+}
 
 function DashboardPage() {
   const { user } = useUser()
@@ -65,7 +73,8 @@ function DashboardPage() {
   const [selectedRange, setSelectedRange] = useState('30d')
   const { showToast } = useToastContext()
   const [accountToDelete, setAccountToDelete] = useState(null)
-  const autoSyncTriggered = useRef(false)
+  const syncInFlight = useRef(false)
+  const lastAutoSyncAttempt = useRef(0)
 
   const {
     data: dashboardData,
@@ -73,6 +82,7 @@ function DashboardPage() {
     isFetching,
     isError,
     refetch,
+    dataUpdatedAt,
   } = useQuery({
     queryKey: ['dashboard', selectedRange],
     queryFn: async () => {
@@ -92,20 +102,21 @@ function DashboardPage() {
   })
 
   useEffect(() => {
-    if (!dashboardData || autoSyncTriggered.current) {
+    if (!dashboardData || syncInFlight.current) {
       return
     }
 
-    autoSyncTriggered.current = true
-
-    if (dashboardData.lastSyncedAt) {
-      const minutesSinceSync =
-        (Date.now() - new Date(dashboardData.lastSyncedAt).getTime()) / (1000 * 60)
-
-      if (minutesSinceSync <= AUTO_SYNC_STALE_MINUTES) {
-        return
-      }
+    if (minutesSinceSync(dashboardData.lastSyncedAt) <= AUTO_SYNC_STALE_MINUTES) {
+      return
     }
+
+    const now = Date.now()
+    if (now - lastAutoSyncAttempt.current < AUTO_SYNC_RETRY_MS) {
+      return
+    }
+
+    lastAutoSyncAttempt.current = now
+    syncInFlight.current = true
 
     async function backgroundSync() {
       try {
@@ -113,12 +124,13 @@ function DashboardPage() {
       } catch (err) {
         console.error('Background sync failed:', err.message)
       } finally {
+        syncInFlight.current = false
         await queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       }
     }
 
     backgroundSync()
-  }, [dashboardData])
+  }, [dashboardData?.lastSyncedAt, dataUpdatedAt, getToken, queryClient])
 
   const showSkeleton = isPending && dashboardData === undefined
   const showFailedState = isError && dashboardData === undefined && !isPending

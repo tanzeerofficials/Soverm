@@ -129,8 +129,12 @@ router.get('/summary', async (req, res) => {
 
     const lastSyncedResult = await db.query(
       `SELECT MAX(last_synced_at) AS last_synced
-       FROM accounts
-       WHERE user_id = $1`,
+       FROM (
+         SELECT last_synced_at FROM accounts WHERE user_id = $1
+         UNION ALL
+         SELECT last_synced_at FROM plaid_items WHERE user_id = $1
+       ) AS combined
+       WHERE last_synced_at IS NOT NULL`,
       [userId]
     )
 
