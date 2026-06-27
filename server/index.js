@@ -48,6 +48,7 @@ const { default: insightsRouter } = await import('./routes/insights.js')
 const { default: dashboardRouter } = await import('./routes/dashboard.js')
 const { default: actionsRouter } = await import('./routes/actions.js')
 const { default: historyRouter } = await import('./routes/history.js')
+const { default: chatRouter } = await import('./routes/chat.js')
 const { startSyncJob } = await import('./jobs/syncAllUsers.js')
 
 const app = express()
@@ -94,6 +95,9 @@ app.use('/api/actions', actionsRouter)
 
 // Insight history lives under /api/history
 app.use('/api/history', historyRouter)
+
+// Insight follow-up chat lives under /api/chat
+app.use('/api/chat', chatRouter)
 
 app.use('/', healthRoutes)
 

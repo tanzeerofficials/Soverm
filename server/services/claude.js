@@ -14,7 +14,7 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
-const SYSTEM_PROMPT = `You are Sovrn, a personal AI CFO. You analyze financial data and respond ONLY with valid JSON, nothing else — no markdown code blocks, no explanation text before or after, just the raw JSON object. You are honest and direct, never sugar-coating bad financial decisions, but always constructive.`
+const SYSTEM_PROMPT = `You are Soverm, a personal AI CFO. You analyze financial data and respond ONLY with valid JSON, nothing else — no markdown code blocks, no explanation text before or after, just the raw JSON object. You are honest and direct, never sugar-coating bad financial decisions, but always constructive.`
 
 function parseClaudeJson(rawText) {
   const cleaned = rawText
@@ -41,12 +41,7 @@ function parseClaudeJson(rawText) {
  *   calls this function, and shows the summary to the user
  */
 export async function generateFinancialSummary(transactions, accountSummary) {
-  const formattedTransactions = transactions
-    .map(
-      (t) =>
-        `${t.date} | ${t.name} | $${t.amount} | ${t.category || 'Uncategorized'}`
-    )
-    .join('\n')
+  const formattedTransactions = formatTransactions(transactions)
 
   try {
     const response = await anthropic.messages.create({
@@ -106,5 +101,69 @@ actions must be an array of exactly 3 strings. Each one is a specific, concrete 
   } catch (err) {
     console.error('Failed to generate financial summary:', err.message)
     throw new Error(`Claude financial summary failed: ${err.message}`)
+  }
+}
+
+function formatTransactions(transactions) {
+  return transactions
+    .map(
+      (t) =>
+        `${t.date} | ${t.name} | $${t.amount} | ${t.category || 'Uncategorized'}`
+    )
+    .join('\n')
+}
+
+function normalizeInsightForPrompt(originalInsight) {
+  if (typeof originalInsight === 'string') {
+    try {
+      return JSON.parse(originalInsight)
+    } catch {
+      return originalInsight
+    }
+  }
+  return originalInsight
+}
+
+/*
+ * askFinancialQuestion(originalInsight, chatHistory, newQuestion, transactions, accountSummary)
+ *
+ * Conversational follow-up about a specific insight — returns plain text, not JSON.
+ */
+export async function askFinancialQuestion(
+  originalInsight,
+  chatHistory,
+  newQuestion,
+  transactions,
+  accountSummary
+) {
+  const formattedTransactions = formatTransactions(transactions)
+  const insightForPrompt = normalizeInsightForPrompt(originalInsight)
+  const historyMessages = chatHistory.map(({ role, content }) => ({ role, content }))
+
+  const systemPrompt = `You are Soverm, a personal AI CFO having an ongoing conversation with a user about their finances. You already gave them this insight:
+
+${JSON.stringify(insightForPrompt)}
+
+Here is their current financial data for reference:
+Transactions: ${formattedTransactions}
+Accounts: ${accountSummary}
+
+Answer their follow-up questions directly and specifically, using real numbers from their data. Keep answers conversational and concise — 2-4 sentences for most questions, longer only if genuinely needed. You are honest and specific, never vague.`
+
+  try {
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 500,
+      system: systemPrompt,
+      messages: [
+        ...historyMessages,
+        { role: 'user', content: newQuestion },
+      ],
+    })
+
+    return response.content[0].text
+  } catch (err) {
+    console.error('Failed to answer financial question:', err.message)
+    throw new Error(`Claude chat response failed: ${err.message}`)
   }
 }

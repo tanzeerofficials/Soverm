@@ -8,7 +8,6 @@ import { SignOutButton, useAuth, useUser } from '@clerk/clerk-react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import InsightCard from '../components/InsightCard'
-import ActionChecklist from '../components/ActionChecklist'
 import { historyQueryKey } from '../lib/queryKeys.js'
 
 function HistoryPage() {
@@ -97,9 +96,6 @@ function HistoryPage() {
           insights.map((insight) => (
             <div key={insight.id} className="mb-8">
               <InsightCard insight={insight} />
-              {insight.actions?.length > 0 && (
-                <ActionChecklist actions={insight.actions} />
-              )}
             </div>
           ))
         )}

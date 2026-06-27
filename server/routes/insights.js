@@ -9,7 +9,7 @@ import { Router } from 'express'
 import { getAuth } from '@clerk/express'
 import db from '../db/index.js'
 import { generateFinancialSummary } from '../services/claude.js'
-import { getDisplayBalance } from '../utils/balanceHelpers.js'
+import { loadFinancialContextForUser } from '../utils/financialContext.js'
 
 const router = Router()
 
@@ -34,36 +34,9 @@ router.post('/generate', async (req, res) => {
   }
 
   try {
-    const transactionsResult = await db.query(
-      `SELECT t.*,
-              a.bank_name,
-              COALESCE(a.account_name, 'Disconnected account') AS account_name
-       FROM transactions t
-       LEFT JOIN accounts a ON t.account_id = a.id
-       WHERE t.user_id = $1
-       ORDER BY t.date DESC
-       LIMIT 50`,
-      [userId]
-    )
+    const { transactions, accountSummary } = await loadFinancialContextForUser(userId)
 
-    const accountsResult = await db.query(
-      `SELECT account_name, account_type, balance_current, balance_available
-       FROM accounts
-       WHERE user_id = $1`,
-      [userId]
-    )
-
-    const accountSummary = accountsResult.rows
-      .map(
-        (a) =>
-          `${a.account_name} (${a.account_type}): $${getDisplayBalance(a)}`
-      )
-      .join('\n')
-
-    const claudeResponse = await generateFinancialSummary(
-      transactionsResult.rows,
-      accountSummary
-    )
+    const claudeResponse = await generateFinancialSummary(transactions, accountSummary)
 
     const insightResult = await db.query(
       `INSERT INTO insights (id, user_id, type, content)
@@ -85,7 +58,7 @@ router.post('/generate', async (req, res) => {
       actionIds.push(actionResult.rows[0].id)
     }
 
-    res.json({ success: true, insight: claudeResponse, actionIds })
+    res.json({ success: true, insight: claudeResponse, insightId, actionIds })
   } catch (err) {
     console.error('Failed to generate insight:', err.message)
     res.status(500).json({ error: err.message })

@@ -14,7 +14,6 @@ import ConnectBankButton from '../components/ConnectBankButton.jsx'
 import SyncTransactionsButton from '../components/SyncTransactionsButton'
 import GenerateInsightButton from '../components/GenerateInsightButton'
 import InsightCard from '../components/InsightCard'
-import ActionChecklist from '../components/ActionChecklist'
 import SecurityNote from '../components/SecurityNote'
 import { useToastContext } from '../context/ToastContext.jsx'
 import ConfirmModal from '../components/ConfirmModal'
@@ -388,9 +387,9 @@ function DashboardPage() {
                 </div>
               ) : (
                 <>
-                  <InsightCard insight={dashboardData?.latestInsight} />
-                  <ActionChecklist
-                    actions={dashboardData?.latestInsight?.actions || []}
+                  <InsightCard
+                    insight={dashboardData?.latestInsight}
+                    onChatError={(message) => showToast(message, 'error')}
                   />
                 </>
               )}

@@ -46,6 +46,7 @@ function GenerateInsightButton({
 
       const insightWithActions = {
         ...data.insight,
+        id: data.insightId,
         actions: (data.insight.actions ?? []).map((description, index) => ({
           id: data.actionIds?.[index],
           description,

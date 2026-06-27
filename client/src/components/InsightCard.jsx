@@ -6,6 +6,9 @@
  */
 
 import { useState } from 'react'
+import ActionChecklist from './ActionChecklist.jsx'
+import ChatPanel from './ChatPanel.jsx'
+import InsightQuickQuestions from './InsightQuickQuestions.jsx'
 
 function formatTimestamp(createdAt) {
   if (!createdAt) return null
@@ -29,8 +32,9 @@ function headlineStyles(headlineType) {
   }
 }
 
-function InsightCard({ insight }) {
+function InsightCard({ insight, onChatError }) {
   const [expanded, setExpanded] = useState(false)
+  const [chatExpanded, setChatExpanded] = useState(false)
 
   if (!insight) {
     return (
@@ -47,7 +51,8 @@ function InsightCard({ insight }) {
   const timestamp = formatTimestamp(created_at)
 
   return (
-    <article className="rounded-xl border border-[#1E2D45] border-l-4 border-l-[#8B5CF6] bg-[#111827] p-6 transition hover:bg-[#1A2236]">
+    <>
+      <article className="rounded-xl border border-[#1E2D45] border-l-4 border-l-[#8B5CF6] bg-[#111827] p-6 transition hover:bg-[#1A2236]">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-xs font-semibold uppercase tracking-wide text-[#8B5CF6]">
           AI CFO
@@ -116,7 +121,27 @@ function InsightCard({ insight }) {
           )}
         </>
       )}
-    </article>
+      </article>
+      {insight.actions?.length > 0 && (
+        <ActionChecklist actions={insight.actions} />
+      )}
+      {insight.id && (
+        <>
+          <InsightQuickQuestions
+            insightId={insight.id}
+            insight={insight}
+            onError={onChatError}
+            onExpandChat={() => setChatExpanded(true)}
+          />
+          <ChatPanel
+            insightId={insight.id}
+            onError={onChatError}
+            expanded={chatExpanded}
+            onExpandedChange={setChatExpanded}
+          />
+        </>
+      )}
+    </>
   )
 }
 
