@@ -17,6 +17,8 @@ function GenerateInsightButton({
   onInsightGenerated,
   onError,
   onLoadingChange,
+  onLimitReached,
+  onUsageUpdated,
 }) {
   const { getToken } = useAuth()
   const queryClient = useQueryClient()
@@ -28,6 +30,7 @@ function GenerateInsightButton({
     setLoading(true)
     onLoadingChange?.(true)
     setError(null)
+    onLimitReached?.(false)
 
     try {
       const token = await getToken()
@@ -41,6 +44,11 @@ function GenerateInsightButton({
       const data = await response.json()
 
       if (!response.ok) {
+        if (data.error === 'limit_reached') {
+          onLimitReached?.(true)
+          onUsageUpdated?.(data.usage)
+          return
+        }
         throw new Error(data.error || 'Failed to generate insight')
       }
 
@@ -57,6 +65,7 @@ function GenerateInsightButton({
       setInsight(data.insight)
       onInsightGenerated?.(insightWithActions)
       onError?.(null)
+      onUsageUpdated?.(data.usage)
       showToast?.('Financial summary generated', 'success')
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: dashboardQueryKey }),

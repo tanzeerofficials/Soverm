@@ -5,18 +5,17 @@
  */
 
 import { Router } from 'express'
-import { getAuth } from '@clerk/express'
+import { getAuth, requireAuth } from '@clerk/express'
 import db from '../db/index.js'
 import { askFinancialQuestion } from '../services/claude.js'
 import { loadFinancialContextForUser } from '../utils/financialContext.js'
 
 const router = Router()
 
+router.use(requireAuth())
+
 router.get('/:insightId', async (req, res) => {
   const { userId } = getAuth(req)
-  if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized' })
-  }
 
   try {
     const { insightId } = req.params
@@ -38,9 +37,6 @@ router.get('/:insightId', async (req, res) => {
 
 router.post('/:insightId', async (req, res) => {
   const { userId } = getAuth(req)
-  if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized' })
-  }
 
   try {
     const { insightId } = req.params

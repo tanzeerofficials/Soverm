@@ -10,8 +10,34 @@ import { getAuth } from '@clerk/express'
 import db from '../db/index.js'
 import { generateFinancialSummary } from '../services/claude.js'
 import { loadFinancialContextForUser } from '../utils/financialContext.js'
+import { getUsageSummary } from '../utils/usage.js'
 
 const router = Router()
+
+/*
+ * GET /api/insights/usage
+ *
+ * What it does:
+ * - Reports today's free-tier usage (generated/remaining), streak, and tier
+ *
+ * Why we need it:
+ * - Dashboard shows a "1 insight remaining today" badge and streak
+ *   without guessing — this is the single source of truth for limits
+ */
+router.get('/usage', async (req, res) => {
+  const { userId } = getAuth(req)
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' })
+  }
+
+  try {
+    const usage = await getUsageSummary(userId)
+    res.json(usage)
+  } catch (err) {
+    console.error('Failed to load usage summary:', err.message)
+    res.status(500).json({ error: err.message })
+  }
+})
 
 /*
  * POST /api/insights/generate
@@ -26,6 +52,8 @@ const router = Router()
  *
  * How it fits the app:
  * - Dashboard calls this after syncing transactions to refresh insights
+ * - Free tier is capped at 1 insight/day; Pro is unlimited. Limit is
+ *   checked first so we never spend a Claude call we're about to reject
  */
 router.post('/generate', async (req, res) => {
   const { userId } = getAuth(req)
@@ -34,6 +62,17 @@ router.post('/generate', async (req, res) => {
   }
 
   try {
+    const usage = await getUsageSummary(userId)
+
+    if (!usage.isPro && usage.remainingToday <= 0) {
+      return res.status(403).json({
+        error: 'limit_reached',
+        message:
+          "You've used today's free insight. Upgrade to Soverm Pro for unlimited insights.",
+        usage,
+      })
+    }
+
     const { transactions, accountSummary } = await loadFinancialContextForUser(userId)
 
     const claudeResponse = await generateFinancialSummary(transactions, accountSummary)
@@ -58,7 +97,15 @@ router.post('/generate', async (req, res) => {
       actionIds.push(actionResult.rows[0].id)
     }
 
-    res.json({ success: true, insight: claudeResponse, insightId, actionIds })
+    const updatedUsage = await getUsageSummary(userId)
+
+    res.json({
+      success: true,
+      insight: claudeResponse,
+      insightId,
+      actionIds,
+      usage: updatedUsage,
+    })
   } catch (err) {
     console.error('Failed to generate insight:', err.message)
     res.status(500).json({ error: err.message })

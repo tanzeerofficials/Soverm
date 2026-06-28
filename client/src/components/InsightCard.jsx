@@ -32,9 +32,16 @@ function headlineStyles(headlineType) {
   }
 }
 
-function InsightCard({ insight, onChatError }) {
+function InsightCard({
+  insight,
+  onChatError,
+  chatExpanded: controlledChatExpanded,
+  onChatExpandedChange,
+}) {
   const [expanded, setExpanded] = useState(false)
-  const [chatExpanded, setChatExpanded] = useState(false)
+  const [internalChatExpanded, setInternalChatExpanded] = useState(false)
+  const chatExpanded = controlledChatExpanded ?? internalChatExpanded
+  const setChatExpanded = onChatExpandedChange ?? setInternalChatExpanded
 
   if (!insight) {
     return (
@@ -127,17 +134,17 @@ function InsightCard({ insight, onChatError }) {
       )}
       {insight.id && (
         <>
-          <InsightQuickQuestions
-            insightId={insight.id}
-            insight={insight}
-            onError={onChatError}
-            onExpandChat={() => setChatExpanded(true)}
-          />
           <ChatPanel
             insightId={insight.id}
             onError={onChatError}
             expanded={chatExpanded}
             onExpandedChange={setChatExpanded}
+          />
+          <InsightQuickQuestions
+            insightId={insight.id}
+            insight={insight}
+            onError={onChatError}
+            onExpandChat={() => setChatExpanded(true)}
           />
         </>
       )}

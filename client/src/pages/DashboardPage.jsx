@@ -6,19 +6,25 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { SignOutButton, useAuth, useUser } from '@clerk/clerk-react'
+import { useAuth } from '@clerk/clerk-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { formatDistanceToNow } from 'date-fns'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
+import AppNavbar from '../components/AppNavbar.jsx'
 import ConnectBankButton from '../components/ConnectBankButton.jsx'
 import SyncTransactionsButton from '../components/SyncTransactionsButton'
 import GenerateInsightButton from '../components/GenerateInsightButton'
 import InsightCard from '../components/InsightCard'
 import SecurityNote from '../components/SecurityNote'
+import UsageBadge from '../components/UsageBadge.jsx'
+import PaywallCard from '../components/PaywallCard.jsx'
 import { useToastContext } from '../context/ToastContext.jsx'
 import ConfirmModal from '../components/ConfirmModal'
-import { dashboardQueryKey } from '../lib/queryKeys.js'
+import DashboardOnboarding from '../components/DashboardOnboarding.jsx'
+import { dashboardQueryKey, usageQueryKey } from '../lib/queryKeys.js'
+import { scrollToInsightChat } from '../lib/scrollToInsightChat.js'
 import { syncTransactions } from '../lib/syncTransactions.js'
+import { fetchUsage } from '../lib/fetchUsage.js'
 import { getDisplayBalance, isCreditAccount } from '../lib/balanceHelpers.js'
 
 function formatCurrency(amount) {
@@ -61,19 +67,28 @@ function minutesSinceSync(lastSyncedAt) {
 }
 
 function DashboardPage() {
-  const { user } = useUser()
   const { getToken } = useAuth()
   const queryClient = useQueryClient()
-  const firstName = user?.firstName ?? 'there'
-  const initials = firstName.charAt(0).toUpperCase()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const [insightError, setInsightError] = useState(null)
   const [insightLoading, setInsightLoading] = useState(false)
+  const [limitReached, setLimitReached] = useState(false)
+  const [chatExpanded, setChatExpanded] = useState(false)
+  const [pendingChatScroll, setPendingChatScroll] = useState(false)
   const [selectedRange, setSelectedRange] = useState('30d')
   const { showToast } = useToastContext()
   const [accountToDelete, setAccountToDelete] = useState(null)
   const syncInFlight = useRef(false)
   const lastAutoSyncAttempt = useRef(0)
+
+  const { data: usage } = useQuery({
+    queryKey: usageQueryKey,
+    queryFn: () => fetchUsage(getToken),
+  })
+
+  const showPaywall =
+    limitReached || (!usage?.isPro && usage?.remainingToday === 0)
 
   const {
     data: dashboardData,
@@ -131,43 +146,58 @@ function DashboardPage() {
     backgroundSync()
   }, [dashboardData?.lastSyncedAt, dataUpdatedAt, getToken, queryClient])
 
+  useEffect(() => {
+    if (searchParams.get('chat') !== 'open') {
+      return
+    }
+
+    setChatExpanded(true)
+    setPendingChatScroll(true)
+
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete('chat')
+    setSearchParams(nextParams, { replace: true })
+  }, [searchParams, setSearchParams])
+
+  useEffect(() => {
+    if (!pendingChatScroll || !dashboardData?.latestInsight?.id) {
+      return
+    }
+
+    scrollToInsightChat()
+    setPendingChatScroll(false)
+  }, [pendingChatScroll, dashboardData?.latestInsight?.id])
+
+  function handleNavbarChat() {
+    if (!dashboardData?.latestInsight?.id) {
+      showToast('Generate an insight first to chat with your CFO', 'error')
+      return
+    }
+
+    setChatExpanded(true)
+    scrollToInsightChat()
+  }
+
   const showSkeleton = isPending && dashboardData === undefined
   const showFailedState = isError && dashboardData === undefined && !isPending
 
   return (
     <div className="min-h-screen bg-[#0A0F1C] text-[#F9FAFB]">
-      {/* Navbar */}
-      <header className="fixed inset-x-0 top-0 z-50 h-16 border-b border-[#1E2D45] bg-[#0A0F1C]">
-        <div className="mx-auto flex h-full max-w-6xl items-center justify-between px-4 sm:px-6">
+      <AppNavbar
+        onChatClick={handleNavbarChat}
+        leftContent={
           <span className="text-sm font-semibold uppercase tracking-[0.35em] text-[#10B981]">
             Soverm
           </span>
-
-          <div className="flex items-center gap-3 sm:gap-4">
-            <span className="hidden text-sm text-[#9CA3AF] sm:inline">{firstName}</span>
-            <div
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-[#1A2236] text-sm font-semibold text-[#10B981] ring-1 ring-[#1E2D45]"
-              aria-hidden="true"
-            >
-              {initials}
-            </div>
-            <Link
-              to="/history"
-              className="mr-2 text-sm text-[#9CA3AF] transition hover:text-white sm:mr-3"
-            >
-              View History
-            </Link>
-            <SignOutButton>
-              <button
-                type="button"
-                className="rounded-lg border border-[#1E2D45] bg-[#111827] px-3 py-1.5 text-xs font-medium text-[#F9FAFB] transition hover:bg-[#1A2236] sm:px-4 sm:text-sm"
-              >
-                Sign Out
-              </button>
-            </SignOutButton>
-          </div>
-        </div>
-      </header>
+        }
+      >
+        <Link
+          to="/history"
+          className="text-sm text-[#9CA3AF] transition hover:text-white"
+        >
+          View History
+        </Link>
+      </AppNavbar>
 
       <main className="mx-auto max-w-6xl px-4 pb-16 pt-24 sm:px-6 sm:pt-28">
         {isError && isFetching && dashboardData && (
@@ -291,12 +321,20 @@ function DashboardPage() {
               </div>
             </section>
 
-            <div className="mx-auto mt-8 max-w-xl">
+            <div className="mx-auto mt-8 max-w-xl space-y-4">
+              <DashboardOnboarding
+                hasAccounts={(dashboardData?.accounts ?? []).length > 0}
+                hasInsight={!!dashboardData?.latestInsight}
+              />
               <SecurityNote />
             </div>
 
+            <div className="mt-6 flex justify-center">
+              <UsageBadge usage={usage} />
+            </div>
+
             {/* Action row */}
-            <section className="mt-10 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <section className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
               <div className="w-full sm:max-w-[200px] sm:flex-1">
                 <ConnectBankButton className="w-full" />
               </div>
@@ -310,6 +348,10 @@ function DashboardPage() {
                   showToast={showToast}
                   onError={setInsightError}
                   onLoadingChange={setInsightLoading}
+                  onLimitReached={setLimitReached}
+                  onUsageUpdated={(updatedUsage) =>
+                    queryClient.setQueryData(usageQueryKey, updatedUsage)
+                  }
                 />
               </div>
             </section>
@@ -390,7 +432,25 @@ function DashboardPage() {
                   <InsightCard
                     insight={dashboardData?.latestInsight}
                     onChatError={(message) => showToast(message, 'error')}
+                    chatExpanded={chatExpanded}
+                    onChatExpandedChange={setChatExpanded}
                   />
+                  {showPaywall && (
+                    <div className="mt-6">
+                      <p className="mb-3 text-xs font-semibold uppercase tracking-[0.3em] text-[#6B7280]">
+                        Want another insight today?
+                      </p>
+                      <PaywallCard
+                        spent={dashboardData?.spent}
+                        onUpgrade={() =>
+                          showToast(
+                            'Soverm Pro checkout is coming soon — stay tuned!',
+                            'success'
+                          )
+                        }
+                      />
+                    </div>
+                  )}
                 </>
               )}
             </section>

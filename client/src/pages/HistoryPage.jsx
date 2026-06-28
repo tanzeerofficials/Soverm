@@ -4,17 +4,39 @@
  * Lists all past AI financial insights and their action items.
  */
 
-import { SignOutButton, useAuth, useUser } from '@clerk/clerk-react'
+import { useAuth } from '@clerk/clerk-react'
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import AppNavbar from '../components/AppNavbar.jsx'
 import InsightCard from '../components/InsightCard'
 import { historyQueryKey } from '../lib/queryKeys.js'
+import { useToastContext } from '../context/ToastContext.jsx'
+
+function HistoryLockedBanner({ lockedCount, onUpgrade }) {
+  return (
+    <div className="mt-4 rounded-xl border border-[#1E2D45] bg-[#111827] p-6 text-center">
+      <p className="text-sm font-semibold text-[#F9FAFB]">
+        {lockedCount} earlier insight{lockedCount === 1 ? '' : 's'} locked
+      </p>
+      <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-[#9CA3AF]">
+        Free accounts keep the last 7 days of history. Soverm Pro keeps everything,
+        forever.
+      </p>
+      <button
+        type="button"
+        onClick={onUpgrade}
+        className="mt-4 rounded-lg bg-[#F59E0B] px-5 py-2.5 text-sm font-semibold text-[#0A0F1C] transition hover:bg-[#FBBF24]"
+      >
+        Upgrade to Soverm Pro
+      </button>
+    </div>
+  )
+}
 
 function HistoryPage() {
-  const { user } = useUser()
   const { getToken } = useAuth()
-  const firstName = user?.firstName ?? 'there'
-  const initials = firstName.charAt(0).toUpperCase()
+  const navigate = useNavigate()
+  const { showToast } = useToastContext()
 
   const { data: historyData, isLoading: historyLoading } = useQuery({
     queryKey: historyQueryKey,
@@ -31,11 +53,17 @@ function HistoryPage() {
   })
 
   const insights = historyData?.insights ?? []
+  const lockedCount = historyData?.lockedCount ?? 0
+
+  function handleUpgrade() {
+    showToast('Soverm Pro checkout is coming soon — stay tuned!', 'success')
+  }
 
   return (
     <div className="min-h-screen bg-[#0A0F1C] text-[#F9FAFB]">
-      <header className="fixed inset-x-0 top-0 z-50 h-16 border-b border-[#1E2D45] bg-[#0A0F1C]">
-        <div className="mx-auto flex h-full max-w-6xl items-center justify-between px-4 sm:px-6">
+      <AppNavbar
+        onChatClick={() => navigate('/dashboard?chat=open')}
+        leftContent={
           <div className="flex items-center gap-4">
             <Link
               to="/dashboard"
@@ -47,26 +75,8 @@ function HistoryPage() {
               Soverm
             </span>
           </div>
-
-          <div className="flex items-center gap-3 sm:gap-4">
-            <span className="hidden text-sm text-[#9CA3AF] sm:inline">{firstName}</span>
-            <div
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-[#1A2236] text-sm font-semibold text-[#10B981] ring-1 ring-[#1E2D45]"
-              aria-hidden="true"
-            >
-              {initials}
-            </div>
-            <SignOutButton>
-              <button
-                type="button"
-                className="rounded-lg border border-[#1E2D45] bg-[#111827] px-3 py-1.5 text-xs font-medium text-[#F9FAFB] transition hover:bg-[#1A2236] sm:px-4 sm:text-sm"
-              >
-                Sign Out
-              </button>
-            </SignOutButton>
-          </div>
-        </div>
-      </header>
+        }
+      />
 
       <main className="mx-auto max-w-6xl px-4 pb-16 pt-24 sm:px-6 sm:pt-28">
         <div className="mb-10">
@@ -76,11 +86,11 @@ function HistoryPage() {
           </p>
         </div>
 
-        {historyLoading && !historyData ? (
+        {historyLoading ? (
           <div className="flex min-h-[40vh] items-center justify-center">
-            <p className="text-sm text-[#9CA3AF]">Loading your history...</p>
+            <p className="text-sm text-[#9CA3AF]">Loading your insights...</p>
           </div>
-        ) : insights.length === 0 ? (
+        ) : insights.length === 0 && lockedCount === 0 ? (
           <div className="flex min-h-[40vh] flex-col items-center justify-center gap-4 text-center">
             <p className="text-sm text-[#9CA3AF]">
               No insights yet. Generate your first one from the dashboard.
@@ -93,11 +103,17 @@ function HistoryPage() {
             </Link>
           </div>
         ) : (
-          insights.map((insight) => (
-            <div key={insight.id} className="mb-8">
-              <InsightCard insight={insight} />
-            </div>
-          ))
+          <>
+            {insights.map((insight) => (
+              <div key={insight.id} className="mb-8">
+                <InsightCard insight={insight} />
+              </div>
+            ))}
+
+            {lockedCount > 0 && (
+              <HistoryLockedBanner lockedCount={lockedCount} onUpgrade={handleUpgrade} />
+            )}
+          </>
         )}
       </main>
     </div>

@@ -9,17 +9,19 @@
  */
 
 import { SignedIn, SignedOut } from '@clerk/clerk-react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import AppLoadingScreen from './components/AppLoadingScreen.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
 import HistoryPage from './pages/HistoryPage.jsx'
 import LandingPage from './pages/LandingPage.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
 
-function ProtectedRoute({ children }) {
+function PrivateRoutes() {
   return (
     <>
-      <SignedIn>{children}</SignedIn>
+      <SignedIn>
+        <Outlet />
+      </SignedIn>
       <SignedOut>
         <AppLoadingScreen message="Signing you out…" />
         <Navigate to="/" replace />
@@ -34,30 +36,18 @@ function ProtectedRoute({ children }) {
  * What it does:
  * - Sets up all app routes and login guards.
  *
- * Why we need login guards on /dashboard:
- * - We do not want strangers seeing a private dashboard page.
+ * PrivateRoutes wraps /dashboard and /history so only signed-in users
+ * can reach them — including /dashboard?chat=open from the navbar.
  */
 function App() {
   return (
     <div className="min-h-screen bg-[#0A0F1C]">
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <DashboardPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/history"
-          element={
-            <ProtectedRoute>
-              <HistoryPage />
-            </ProtectedRoute>
-          }
-        />
+        <Route element={<PrivateRoutes />}>
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/history" element={<HistoryPage />} />
+        </Route>
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </div>
