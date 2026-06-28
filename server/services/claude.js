@@ -16,13 +16,63 @@ const anthropic = new Anthropic({
 
 const SYSTEM_PROMPT = `You are Soverm, a personal AI CFO. You analyze financial data and respond ONLY with valid JSON, nothing else — no markdown code blocks, no explanation text before or after, just the raw JSON object. You are honest and direct, never sugar-coating bad financial decisions, but always constructive.`
 
+function extractJsonObject(text) {
+  const start = text.indexOf('{')
+  if (start === -1) {
+    throw new Error('No JSON object found in response')
+  }
+
+  let depth = 0
+  let inString = false
+  let escaped = false
+
+  for (let i = start; i < text.length; i++) {
+    const char = text[i]
+
+    if (escaped) {
+      escaped = false
+      continue
+    }
+
+    if (char === '\\' && inString) {
+      escaped = true
+      continue
+    }
+
+    if (char === '"') {
+      inString = !inString
+      continue
+    }
+
+    if (inString) {
+      continue
+    }
+
+    if (char === '{') {
+      depth++
+    } else if (char === '}') {
+      depth--
+      if (depth === 0) {
+        return text.slice(start, i + 1)
+      }
+    }
+  }
+
+  throw new Error('Unclosed JSON object in response')
+}
+
 function parseClaudeJson(rawText) {
   const cleaned = rawText
-    .replace(/```json/g, '')
+    .replace(/```json\s*/gi, '')
     .replace(/```/g, '')
     .trim()
 
-  return JSON.parse(cleaned)
+  try {
+    return JSON.parse(cleaned)
+  } catch {
+    // Claude sometimes appends text after valid JSON — extract the first object only.
+    return JSON.parse(extractJsonObject(cleaned))
+  }
 }
 
 /*
