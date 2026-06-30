@@ -27,6 +27,16 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // into process.env so the rest of the app can use them safely.
 dotenv.config({ path: path.join(__dirname, '.env') })
 
+const { Sentry, captureServerError, initSentry } = await import('./utils/sentry.js')
+const sentryEnabled = initSentry()
+if (process.env.NODE_ENV !== 'production') {
+  console.info(
+    sentryEnabled
+      ? '[Sentry] enabled'
+      : '[Sentry] disabled — add SENTRY_DSN to server/.env, then restart the server'
+  )
+}
+
 let db
 
 try {
@@ -49,18 +59,30 @@ const { default: dashboardRouter } = await import('./routes/dashboard.js')
 const { default: actionsRouter } = await import('./routes/actions.js')
 const { default: historyRouter } = await import('./routes/history.js')
 const { default: chatRouter } = await import('./routes/chat.js')
+const { default: userRouter } = await import('./routes/user.js')
 const { startSyncJob } = await import('./jobs/syncAllUsers.js')
+const { GENERIC_ERROR_MESSAGE } = await import('./utils/apiErrors.js')
 
 const app = express()
 const port = Number(process.env.PORT) || 5000
 
-// cors lets our React app (running on a different origin) talk to this server.
+// CORS: comma-separated browser origins in ALLOWED_ORIGINS (no wildcards).
+// Include production Vercel URL, preview deployment URLs, and http://localhost:5173 for local dev.
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean)
+
 app.use(
   cors({
-    origin: [
-      'http://localhost:5173',
-      'https://soverm.vercel.app',
-    ],
+    origin(origin, callback) {
+      // No origin: curl, server-to-server, some mobile clients
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true)
+      } else {
+        callback(new Error('Not allowed by CORS'))
+      }
+    },
     credentials: true,
   })
 )
@@ -99,40 +121,41 @@ app.use('/api/history', historyRouter)
 // Insight follow-up chat lives under /api/chat
 app.use('/api/chat', chatRouter)
 
+// Account deletion lives under /api/user
+app.use('/api/user', userRouter)
+
 app.use('/', healthRoutes)
 
-/*
- * Test route: /protected
- *
- * What it does:
- * - Only works if you are logged in with Clerk.
- *
- * Why we have it:
- * - It is a simple way to test that login is working on the server.
- */
-app.get('/protected', requireAuth(), (req, res) => {
-  res.json({
-    message: 'You are authenticated',
-    userId: req.auth.userId,
-  })
-})
+if (process.env.SENTRY_DSN) {
+  Sentry.setupExpressErrorHandler(app)
+}
 
-/*
- * Test route: /test-db
- *
- * What it does:
- * - Runs a tiny database query (SELECT NOW()) to check if Postgres is connected.
- *
- * Why we have it:
- * - If the app feels broken, this helps us quickly see if the database is the problem.
- */
-app.get('/test-db', async (req, res) => {
-  try {
-    const result = await db.query('SELECT NOW()')
-    res.json({ connected: true, time: result.rows[0] })
-  } catch (err) {
-    res.json({ connected: false, error: err.message })
+// Dev-only sanity checks — not registered in production (returns 404).
+if (process.env.NODE_ENV !== 'production') {
+  app.get('/protected', requireAuth(), (req, res) => {
+    res.json({
+      message: 'You are authenticated',
+      userId: req.auth.userId,
+    })
+  })
+
+  app.get('/test-db', async (req, res) => {
+    try {
+      const result = await db.query('SELECT NOW()')
+      res.json({ connected: true, time: result.rows[0] })
+    } catch (err) {
+      res.json({ connected: false, error: err.message })
+    }
+  })
+}
+
+// Express error middleware (after Sentry.setupExpressErrorHandler).
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err.message)
+  if (res.headersSent) {
+    return next(err)
   }
+  res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
 })
 
 const server = app.listen(port, () => {
@@ -148,6 +171,8 @@ server.on('error', (error) => {
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled rejection:', reason)
+  const err = reason instanceof Error ? reason : new Error(String(reason))
+  captureServerError(err, { label: 'unhandled_rejection' })
 })
 
 process.on('SIGINT', () => {

@@ -11,6 +11,7 @@ import { useAuth } from '@clerk/clerk-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { dashboardQueryKey } from '../lib/queryKeys.js'
 import { useToastContext } from './ToastContext.jsx'
+import { captureClientError } from '../lib/sentry.js'
 
 const PlaidLinkContext = createContext(null)
 
@@ -19,37 +20,49 @@ export function PlaidLinkProvider({ children }) {
   const queryClient = useQueryClient()
   const { showToast } = useToastContext()
   const [linkToken, setLinkToken] = useState(null)
+  const [isExchanging, setIsExchanging] = useState(false)
 
   const onSuccessRef = useRef(null)
 
   useEffect(() => {
     onSuccessRef.current = async (public_token) => {
-      const token = await getToken()
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/plaid/exchange-public-token`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ public_token }),
-      })
-      const data = await response.json()
+      setIsExchanging(true)
+      showToast('Bank connected — syncing your transactions…', 'info')
 
-      if (response.ok && data.success) {
-        const count = data.accountsConnected ?? 0
-        const synced = data.synced
-        const syncDetail =
-          synced != null
-            ? ` — synced ${synced.added} new transaction${synced.added === 1 ? '' : 's'}`
-            : ''
-        showToast(
-          `Connected ${count} account${count === 1 ? '' : 's'}${syncDetail}`,
-          'success'
-        )
-        await queryClient.invalidateQueries({ queryKey: dashboardQueryKey })
-      } else {
-        console.error('Failed to connect bank account:', data.error || response.status)
-        showToast(data.error || 'Couldn’t connect your bank — please try again', 'error')
+      try {
+        const token = await getToken()
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/plaid/exchange-public-token`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ public_token }),
+        })
+        const data = await response.json()
+
+        if (response.ok && data.success) {
+          const count = data.accountsConnected ?? 0
+          const synced = data.synced
+          const syncDetail =
+            synced != null
+              ? ` — synced ${synced.added} new transaction${synced.added === 1 ? '' : 's'}`
+              : ''
+          showToast(
+            `Connected ${count} account${count === 1 ? '' : 's'}${syncDetail}`,
+            'success'
+          )
+          await queryClient.invalidateQueries({ queryKey: dashboardQueryKey })
+        } else {
+          console.error('Failed to connect bank account:', data.error || response.status)
+          showToast(data.error || 'Couldn’t connect your bank — please try again', 'error')
+        }
+      } catch (err) {
+        console.error('Failed to connect bank account:', err.message)
+        captureClientError(err, { label: 'plaid_exchange' })
+        showToast('Couldn’t connect your bank — please try again', 'error')
+      } finally {
+        setIsExchanging(false)
       }
     }
   }, [getToken, queryClient, showToast])
@@ -89,7 +102,9 @@ export function PlaidLinkProvider({ children }) {
   })
 
   return (
-    <PlaidLinkContext.Provider value={{ open, ready: ready && !!linkToken }}>
+    <PlaidLinkContext.Provider
+      value={{ open, ready: ready && !!linkToken && !isExchanging, isExchanging }}
+    >
       {children}
     </PlaidLinkContext.Provider>
   )

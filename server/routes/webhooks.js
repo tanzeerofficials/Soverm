@@ -13,6 +13,7 @@
 import { Router } from 'express'
 import { Webhook } from 'svix'
 import db from '../db/index.js'
+import { reportServerError } from '../utils/sentry.js'
 
 const router = Router()
 
@@ -55,7 +56,7 @@ router.post('/clerk', async (req, res) => {
       'svix-signature': svixSignature,
     })
   } catch (err) {
-    console.error('Webhook verification failed:', err.message)
+    reportServerError('to verify Clerk webhook', err, { req })
     return res.status(400).send('Webhook verification failed')
   }
 
@@ -75,7 +76,7 @@ router.post('/clerk', async (req, res) => {
         [id, email, name]
       )
     } catch (err) {
-      console.error('Failed to insert user:', err.message)
+      reportServerError('to insert user from webhook', err, { req })
       return res.status(500).json({ error: 'Failed to save user' })
     }
 

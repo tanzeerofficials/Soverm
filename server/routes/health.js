@@ -13,4 +13,10 @@ const router = Router()
 
 router.get('/', getHealthCheck)
 
+if (process.env.NODE_ENV !== 'production') {
+  router.get('/sentry-test', () => {
+    throw new Error('Sentry server test event')
+  })
+}
+
 export default router

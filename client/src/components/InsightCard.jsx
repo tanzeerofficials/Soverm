@@ -59,7 +59,7 @@ function InsightCard({
 
   return (
     <>
-      <article className="rounded-xl border border-[#1E2D45] border-l-4 border-l-[#8B5CF6] bg-[#111827] p-6 transition hover:bg-[#1A2236]">
+      <article className="rounded-xl border border-[#1E2D45] border-l-4 border-l-[#8B5CF6] bg-[#111827] p-4 transition hover:bg-[#1A2236] sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-xs font-semibold uppercase tracking-wide text-[#8B5CF6]">
           AI CFO
@@ -71,7 +71,7 @@ function InsightCard({
         )}
       </div>
 
-      <h3 className={`mb-4 mt-4 text-2xl font-bold ${headlineColor}`}>
+      <h3 className={`mb-4 mt-4 break-words text-xl font-bold sm:text-2xl ${headlineColor}`}>
         {headlineIcon && <span className="mr-2">{headlineIcon}</span>}
         {headline}
       </h3>

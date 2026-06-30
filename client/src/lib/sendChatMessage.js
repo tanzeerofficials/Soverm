@@ -1,4 +1,5 @@
 import { chatQueryKey } from './queryKeys.js'
+import { captureClientError } from './sentry.js'
 
 async function getAuthToken(getToken) {
   const token = await getToken()
@@ -42,7 +43,10 @@ export async function sendChatMessage(getToken, insightId, message) {
   const data = await response.json()
 
   if (!response.ok) {
-    throw new Error(data.error || 'Failed to send message')
+    if (data.error === 'rate_limit_exceeded' && data.message) {
+      throw new Error(data.message)
+    }
+    throw new Error(data.message || data.error || 'Failed to send message')
   }
 
   return data.reply
@@ -93,6 +97,7 @@ export async function sendChatMessageAndRefresh(
       }
       return messages
     })
+    captureClientError(err, { label: 'send_chat_message' })
     throw err
   }
 }

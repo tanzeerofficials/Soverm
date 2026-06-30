@@ -6,21 +6,38 @@
  */
 
 import { usePlaidLinkContext } from '../context/PlaidLinkContext.jsx'
+import { trackConnectBankClick } from '../lib/analytics.js'
 
-function ConnectBankButton({ className = '' }) {
-  const { open, ready } = usePlaidLinkContext()
+function ConnectBankButton({ className = '', highlighted = false, showSecurityNote = true }) {
+  const { open, ready, isExchanging } = usePlaidLinkContext()
+
+  const label = isExchanging ? 'Connecting & syncing…' : 'Connect Your Bank'
+
+  function handleClick() {
+    trackConnectBankClick()
+    open()
+  }
 
   return (
-    <div className="flex w-full flex-col items-center">
+    <div
+      className={`flex w-full max-w-full flex-col items-center ${
+        highlighted
+          ? 'rounded-lg ring-2 ring-[#10B981] ring-offset-1 ring-offset-[#0A0F1C]'
+          : ''
+      }`}
+    >
       <button
         type="button"
-        onClick={() => open()}
-        disabled={!ready}
-        className={`rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
+        onClick={handleClick}
+        disabled={!ready || isExchanging}
+        className={`min-h-11 w-full rounded-lg bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60 ${
+          highlighted && !isExchanging ? 'animate-pulse' : ''
+        } ${className}`}
       >
-        Connect Your Bank
+        {label}
       </button>
-      <p className="mt-2 flex items-center gap-1.5 text-xs text-[#9CA3AF]">
+      {showSecurityNote && (
+      <p className="mt-2 flex max-w-[280px] items-center justify-center gap-1.5 px-1 text-center text-[11px] leading-snug text-[#9CA3AF] sm:text-xs">
         <svg
           className="h-3.5 w-3.5 flex-shrink-0"
           viewBox="0 0 20 20"
@@ -35,6 +52,7 @@ function ConnectBankButton({ className = '' }) {
         </svg>
         Secured by Plaid — bank-level encryption
       </p>
+      )}
     </div>
   )
 }

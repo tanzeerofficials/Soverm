@@ -9,8 +9,10 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import AppNavbar from '../components/AppNavbar.jsx'
 import InsightCard from '../components/InsightCard'
+import InsightCardSkeleton from '../components/InsightCardSkeleton.jsx'
 import { historyQueryKey } from '../lib/queryKeys.js'
 import { useToastContext } from '../context/ToastContext.jsx'
+import { trackUpgradeProClick } from '../lib/analytics.js'
 
 function HistoryLockedBanner({ lockedCount, onUpgrade }) {
   return (
@@ -56,6 +58,7 @@ function HistoryPage() {
   const lockedCount = historyData?.lockedCount ?? 0
 
   function handleUpgrade() {
+    trackUpgradeProClick('history')
     showToast('Soverm Pro checkout is coming soon — stay tuned!', 'success')
   }
 
@@ -87,8 +90,10 @@ function HistoryPage() {
         </div>
 
         {historyLoading ? (
-          <div className="flex min-h-[40vh] items-center justify-center">
-            <p className="text-sm text-[#9CA3AF]">Loading your insights...</p>
+          <div className="space-y-8" aria-busy="true" aria-label="Loading insights">
+            {[0, 1, 2].map((index) => (
+              <InsightCardSkeleton key={index} />
+            ))}
           </div>
         ) : insights.length === 0 && lockedCount === 0 ? (
           <div className="flex min-h-[40vh] flex-col items-center justify-center gap-4 text-center">
@@ -106,7 +111,10 @@ function HistoryPage() {
           <>
             {insights.map((insight) => (
               <div key={insight.id} className="mb-8">
-                <InsightCard insight={insight} />
+                <InsightCard
+                  insight={insight}
+                  onChatError={(message) => showToast(message, 'error')}
+                />
               </div>
             ))}
 

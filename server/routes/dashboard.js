@@ -9,6 +9,8 @@ import { Router } from 'express'
 import { getAuth } from '@clerk/express'
 import db from '../db/index.js'
 import { calculateTotalBalance, getDisplayBalance } from '../utils/balanceHelpers.js'
+import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
+import { reportServerError } from '../utils/sentry.js'
 
 const router = Router()
 
@@ -150,8 +152,8 @@ router.get('/summary', async (req, res) => {
       appliedRange,
     })
   } catch (err) {
-    console.error('Failed to load dashboard summary:', err.message)
-    res.status(500).json({ error: err.message })
+    reportServerError('to load dashboard summary', err, { userId, req })
+    res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
   }
 })
 

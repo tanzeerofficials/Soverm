@@ -2,7 +2,7 @@
  * HOME PAGE (older marketing-style page)
  *
  * This page is not currently used in App.jsx routes,
- * but it shows early product messaging for Sovrn.
+ * but it shows early product messaging for Soverm.
  */
 
 /*

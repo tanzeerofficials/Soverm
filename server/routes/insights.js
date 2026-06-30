@@ -11,6 +11,13 @@ import db from '../db/index.js'
 import { generateFinancialSummary } from '../services/claude.js'
 import { loadFinancialContextForUser } from '../utils/financialContext.js'
 import { getUsageSummary } from '../utils/usage.js'
+import {
+  getGenerateRateLimitMessage,
+  isGenerateRateLimited,
+  PRO_DAILY_INSIGHT_CEILING,
+} from '../utils/rateLimit.js'
+import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
+import { reportServerError } from '../utils/sentry.js'
 
 const router = Router()
 
@@ -18,10 +25,10 @@ const router = Router()
  * GET /api/insights/usage
  *
  * What it does:
- * - Reports today's free-tier usage (generated/remaining), streak, and tier
+ * - Reports today's free-tier usage (generated/remaining) and tier
  *
  * Why we need it:
- * - Dashboard shows a "1 insight remaining today" badge and streak
+ * - Dashboard shows a "1 insight remaining today" badge
  *   without guessing — this is the single source of truth for limits
  */
 router.get('/usage', async (req, res) => {
@@ -34,8 +41,8 @@ router.get('/usage', async (req, res) => {
     const usage = await getUsageSummary(userId)
     res.json(usage)
   } catch (err) {
-    console.error('Failed to load usage summary:', err.message)
-    res.status(500).json({ error: err.message })
+    reportServerError('to load usage summary', err, { userId, req })
+    res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
   }
 })
 
@@ -69,6 +76,15 @@ router.post('/generate', async (req, res) => {
         error: 'limit_reached',
         message:
           "You've used today's free insight. Upgrade to Soverm Pro for unlimited insights.",
+        usage,
+      })
+    }
+
+    if (isGenerateRateLimited(usage)) {
+      return res.status(429).json({
+        error: 'rate_limit_exceeded',
+        message: getGenerateRateLimitMessage(),
+        limit: PRO_DAILY_INSIGHT_CEILING,
         usage,
       })
     }
@@ -107,8 +123,8 @@ router.post('/generate', async (req, res) => {
       usage: updatedUsage,
     })
   } catch (err) {
-    console.error('Failed to generate insight:', err.message)
-    res.status(500).json({ error: err.message })
+    reportServerError('to generate insight', err, { userId, req })
+    res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
   }
 })
 

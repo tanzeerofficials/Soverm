@@ -8,6 +8,8 @@
 import { SignedIn, SignedOut, SignInButton, SignUpButton } from '@clerk/clerk-react'
 import { Navigate } from 'react-router-dom'
 import AppLoadingScreen from '../components/AppLoadingScreen.jsx'
+import SecurityFaq from '../components/SecurityFaq.jsx'
+import PricingSection from '../components/PricingSection.jsx'
 
 /*
  * LandingPage
@@ -30,7 +32,7 @@ function LandingPage() {
         <Navigate to="/dashboard" replace />
       </SignedIn>
       <SignedOut>
-        <main className="min-h-screen bg-[#0A0F1C] px-6 pb-24 text-white">
+        <main className="bg-[#0A0F1C] px-6 pb-16 text-white">
           <div className="mx-auto flex w-full max-w-2xl flex-col items-center pt-24 text-center sm:pt-32">
             <p className="text-sm font-medium uppercase tracking-wide text-emerald-500">
               SOVERM
@@ -121,6 +123,10 @@ function LandingPage() {
               your login credentials.
             </p>
           </section>
+
+          <PricingSection />
+
+          <SecurityFaq />
 
           <section className="mb-16 mt-24 text-center">
             <h2 className="text-2xl font-bold text-[#F9FAFB]">

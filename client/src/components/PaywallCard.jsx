@@ -9,6 +9,11 @@
  * not an arbitrary "go pro!" pitch.
  */
 
+import {
+  FREE_HISTORY_DAYS,
+  PRO_MONTHLY_PRICE,
+} from '@shared/usageLimits.js'
+
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -17,7 +22,7 @@ function formatCurrency(amount) {
 }
 
 function PaywallCard({ spent, onUpgrade }) {
-  const monthlyPrice = 5
+  const monthlyPrice = PRO_MONTHLY_PRICE
   const hasSpendContext = typeof spent === 'number' && spent > 0
   const percentOfSpend = hasSpendContext ? (monthlyPrice / spent) * 100 : null
 
@@ -53,7 +58,7 @@ function PaywallCard({ spent, onUpgrade }) {
         </p>
         <p className="max-w-sm text-xs leading-relaxed text-[#9CA3AF]">
           Soverm Pro gives you unlimited insights, on-demand, any time you want a fresh read on
-          your money — plus your full history, not just the last 7 days.
+          your money — plus your full history, not just the last {FREE_HISTORY_DAYS} days.
         </p>
         <button
           type="button"

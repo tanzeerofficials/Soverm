@@ -9,6 +9,11 @@ import { useState } from 'react'
 import { useAuth } from '@clerk/clerk-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { dashboardQueryKey, historyQueryKey } from '../lib/queryKeys.js'
+import {
+  trackGenerateInsightClick,
+  trackGenerateInsightResult,
+} from '../lib/analytics.js'
+import { captureClientError } from '../lib/sentry.js'
 
 function GenerateInsightButton({
   className = '',
@@ -19,6 +24,7 @@ function GenerateInsightButton({
   onLoadingChange,
   onLimitReached,
   onUsageUpdated,
+  highlighted = false,
 }) {
   const { getToken } = useAuth()
   const queryClient = useQueryClient()
@@ -27,6 +33,7 @@ function GenerateInsightButton({
   const [error, setError] = useState(null)
 
   async function handleGenerate() {
+    trackGenerateInsightClick()
     setLoading(true)
     onLoadingChange?.(true)
     setError(null)
@@ -45,11 +52,20 @@ function GenerateInsightButton({
 
       if (!response.ok) {
         if (data.error === 'limit_reached') {
+          trackGenerateInsightResult('paywall')
           onLimitReached?.(true)
           onUsageUpdated?.(data.usage)
           return
         }
-        throw new Error(data.error || 'Failed to generate insight')
+        if (data.error === 'rate_limit_exceeded') {
+          trackGenerateInsightResult('error')
+          const message =
+            data.message || 'Daily insight limit reached. Try again tomorrow.'
+          showToast?.(message, 'error')
+          onError?.(message)
+          return
+        }
+        throw new Error(data.message || data.error || 'Failed to generate insight')
       }
 
       const insightWithActions = {
@@ -66,13 +82,16 @@ function GenerateInsightButton({
       onInsightGenerated?.(insightWithActions)
       onError?.(null)
       onUsageUpdated?.(data.usage)
+      trackGenerateInsightResult('success')
       showToast?.('Financial summary generated', 'success')
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: dashboardQueryKey }),
         queryClient.invalidateQueries({ queryKey: historyQueryKey }),
       ])
     } catch (err) {
+      captureClientError(err, { label: 'generate_insight' })
       console.error('Insight generation failed:', err.message)
+      trackGenerateInsightResult('error')
       setError(err.message)
       onError?.(err.message)
       setInsight(null)
@@ -88,7 +107,9 @@ function GenerateInsightButton({
       type="button"
       onClick={handleGenerate}
       disabled={loading}
-      className={`rounded-lg bg-purple-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
+      className={`min-h-11 rounded-lg bg-purple-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-60 ${
+        highlighted && !loading ? 'animate-pulse ring-2 ring-[#8B5CF6] ring-offset-2 ring-offset-[#0A0F1C]' : ''
+      } ${className}`}
     >
       {loading ? 'Analyzing...' : 'Generate Summary'}
     </button>
