@@ -32,9 +32,10 @@ cfo-agent/
 │   ├── db/
 │   │   ├── schema.sql      # Bootstrap schema for a fresh database
 │   │   └── migrations/     # Incremental SQL migrations (001–007)
+│   ├── shared/             # Constants shared with the client (usage limits, pricing)
 │   ├── scripts/            # Migration runners and verification helpers
 │   └── index.js
-└── shared/                 # Constants shared by client + server (usage limits, pricing)
+└── client/                 # Vite React app (imports server/shared via @shared alias)
 ```
 
 ## Features (current)

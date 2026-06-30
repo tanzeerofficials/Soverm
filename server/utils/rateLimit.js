@@ -10,7 +10,7 @@ import db from '../db/index.js'
 import {
   CHAT_HOURLY_LIMIT,
   PRO_DAILY_INSIGHT_CEILING,
-} from '../../shared/usageLimits.js'
+} from '../shared/usageLimits.js'
 import { reportServerError } from './sentry.js'
 
 export { CHAT_HOURLY_LIMIT, PRO_DAILY_INSIGHT_CEILING }

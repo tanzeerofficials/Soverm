@@ -68,18 +68,37 @@ const port = Number(process.env.PORT) || 5000
 
 // CORS: comma-separated browser origins in ALLOWED_ORIGINS (no wildcards).
 // Include production Vercel URL, preview deployment URLs, and http://localhost:5173 for local dev.
+function normalizeOrigin(origin) {
+  return origin.replace(/\/$/, '')
+}
+
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
-  .map((s) => s.trim())
+  .map((s) => normalizeOrigin(s.trim()))
   .filter(Boolean)
+
+function isOriginAllowed(origin) {
+  if (!origin) {
+    return true
+  }
+  return allowedOrigins.includes(normalizeOrigin(origin))
+}
+
+if (process.env.NODE_ENV === 'production' && allowedOrigins.length === 0) {
+  console.warn(
+    '[CORS] ALLOWED_ORIGINS is empty — browser requests from Vercel will be blocked once the API is up'
+  )
+} else {
+  console.log(`[CORS] ${allowedOrigins.length} allowed origin(s) configured`)
+}
 
 app.use(
   cors({
     origin(origin, callback) {
-      // No origin: curl, server-to-server, some mobile clients
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (isOriginAllowed(origin)) {
         callback(null, true)
       } else {
+        console.warn(`[CORS] blocked origin: ${origin}`)
         callback(new Error('Not allowed by CORS'))
       }
     },
@@ -158,7 +177,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
 })
 
-const server = app.listen(port, () => {
+const server = app.listen(port, '0.0.0.0', () => {
   console.log(`CFO Agent API listening on port ${port}`)
   startSyncJob()
   console.log('Auto-sync job scheduled (every 4 hours)')

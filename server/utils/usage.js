@@ -10,9 +10,9 @@ import db from '../db/index.js'
 import {
   FREE_DAILY_INSIGHT_LIMIT,
   FREE_HISTORY_DAYS,
-} from '../../shared/usageLimits.js'
+} from '../shared/usageLimits.js'
 
-export { FREE_DAILY_INSIGHT_LIMIT, FREE_HISTORY_DAYS } from '../../shared/usageLimits.js'
+export { FREE_DAILY_INSIGHT_LIMIT, FREE_HISTORY_DAYS } from '../shared/usageLimits.js'
 
 export async function getUserTier(userId) {
   const result = await db.query(`SELECT subscription_tier FROM users WHERE id = $1`, [userId])
