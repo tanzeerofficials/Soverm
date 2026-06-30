@@ -149,7 +149,8 @@ router.delete('/accounts/:accountId', async (req, res) => {
     const { accountId } = req.params
 
     const accountResult = await client.query(
-      `SELECT a.id, a.plaid_item_id, pi.plaid_access_token
+      `SELECT a.id, a.plaid_item_id,
+              COALESCE(pi.plaid_access_token, a.plaid_access_token) AS plaid_access_token
        FROM accounts a
        LEFT JOIN plaid_items pi ON a.plaid_item_id = pi.id
        WHERE a.id = $1 AND a.user_id = $2`,
@@ -163,6 +164,36 @@ router.delete('/accounts/:accountId', async (req, res) => {
     const { plaid_item_id: plaidItemId, plaid_access_token: accessToken } =
       accountResult.rows[0]
 
+    let isLastAccountOnItem = false
+
+    if (plaidItemId) {
+      const remainingResult = await client.query(
+        `SELECT COUNT(*)::int AS count
+         FROM accounts
+         WHERE plaid_item_id = $1 AND id != $2`,
+        [plaidItemId, accountId]
+      )
+      isLastAccountOnItem = remainingResult.rows[0].count === 0
+    } else if (accessToken) {
+      const remainingResult = await client.query(
+        `SELECT COUNT(*)::int AS count
+         FROM accounts
+         WHERE user_id = $1 AND plaid_access_token = $2 AND id != $3`,
+        [userId, accessToken, accountId]
+      )
+      isLastAccountOnItem = remainingResult.rows[0].count === 0
+    }
+
+    // Tear down the Plaid Item before local rows — user intent is "stop showing this bank".
+    // If Plaid's API fails, still remove our copy of the data.
+    if (isLastAccountOnItem && accessToken) {
+      try {
+        await plaidClient.itemRemove({ access_token: accessToken })
+      } catch (removeErr) {
+        reportServerError('to remove Plaid item on disconnect', removeErr, { userId, req })
+      }
+    }
+
     await client.query('BEGIN')
 
     await client.query(
@@ -175,26 +206,11 @@ router.delete('/accounts/:accountId', async (req, res) => {
       userId,
     ])
 
-    if (plaidItemId) {
-      const remainingResult = await client.query(
-        'SELECT COUNT(*)::int AS count FROM accounts WHERE plaid_item_id = $1',
-        [plaidItemId]
-      )
-
-      if (remainingResult.rows[0].count === 0) {
-        if (accessToken) {
-          try {
-            await plaidClient.itemRemove({ access_token: accessToken })
-          } catch (removeErr) {
-            console.error('Plaid itemRemove failed (account still disconnected):', removeErr.message)
-          }
-        }
-
-        await client.query('DELETE FROM plaid_items WHERE id = $1 AND user_id = $2', [
-          plaidItemId,
-          userId,
-        ])
-      }
+    if (plaidItemId && isLastAccountOnItem) {
+      await client.query('DELETE FROM plaid_items WHERE id = $1 AND user_id = $2', [
+        plaidItemId,
+        userId,
+      ])
     }
 
     await client.query('COMMIT')
