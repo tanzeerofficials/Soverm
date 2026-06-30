@@ -8,22 +8,36 @@
 import { SignedIn, SignedOut, SignInButton, SignUpButton } from '@clerk/clerk-react'
 import { Navigate } from 'react-router-dom'
 import AppLoadingScreen from '../components/AppLoadingScreen.jsx'
+import LandingComparison from '../components/LandingComparison.jsx'
+import LandingInsightPreview from '../components/LandingInsightPreview.jsx'
+import LandingNavbar from '../components/LandingNavbar.jsx'
 import SecurityFaq from '../components/SecurityFaq.jsx'
+import SecurityTrustSection from '../components/SecurityTrustSection.jsx'
 import PricingSection from '../components/PricingSection.jsx'
 
-/*
- * LandingPage
- *
- * What it does:
- * - Shows sign in / sign up buttons for logged-out users
- * - Redirects logged-in users to dashboard
- *
- * Why we need SignedIn and SignedOut:
- * - Clerk gives us easy switches so we do not manually check login state everywhere.
- *
- * Important concept:
- * - Navigate is like telling the browser "go to this page now".
- */
+const HOW_IT_WORKS = [
+  {
+    step: '1',
+    title: 'Connect your bank',
+    description:
+      'Link through Plaid in under a minute — the same secure technology used by Venmo, Coinbase, and major banks.',
+  },
+  {
+    step: '2',
+    title: 'Soverm reads your activity',
+    description:
+      'Every transaction and balance is analyzed for patterns — not just what you have, but where money is actually going.',
+  },
+  {
+    step: '3',
+    title: 'Get honest, specific advice',
+    description:
+      'A plain-English insight with real numbers, risks, and three concrete actions you can take this week.',
+  },
+]
+
+const HERO_TRUST_CHIPS = ['Free to start', 'No credit card', 'Read-only access']
+
 function LandingPage() {
   return (
     <>
@@ -32,119 +46,134 @@ function LandingPage() {
         <Navigate to="/dashboard" replace />
       </SignedIn>
       <SignedOut>
+        <LandingNavbar />
         <main className="bg-[#0A0F1C] px-6 pb-16 text-white">
-          <div className="mx-auto flex w-full max-w-2xl flex-col items-center pt-24 text-center sm:pt-32">
-            <p className="text-sm font-medium uppercase tracking-wide text-emerald-500">
-              SOVERM
+          {/* Hero */}
+          <div className="relative mx-auto max-w-4xl pt-16 text-center sm:pt-24">
+            <div
+              className="pointer-events-none absolute inset-x-0 -top-8 h-72 bg-[radial-gradient(ellipse_at_top,_rgba(16,185,129,0.14)_0%,_transparent_65%)]"
+              aria-hidden="true"
+            />
+
+            <p className="relative text-sm font-medium uppercase tracking-wide text-emerald-500">
+              Your AI CFO
             </p>
-            <h1 className="mt-3 text-4xl font-bold leading-tight tracking-tight text-[#F9FAFB] sm:text-5xl">
+            <h1 className="relative mt-3 text-4xl font-bold leading-tight tracking-tight text-[#F9FAFB] sm:text-5xl lg:text-6xl">
               Your AI CFO tells you the truth about your money.
             </h1>
-            <p className="mx-auto mt-4 max-w-xl text-lg leading-relaxed text-[#9CA3AF]">
+            <p className="relative mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-[#9CA3AF]">
               Connect your bank. Soverm reads every transaction and tells you — in plain
               English — what&apos;s working, what&apos;s not, and what to do next.
             </p>
 
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <div className="relative mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+              <SignUpButton mode="modal">
+                <button
+                  type="button"
+                  className="w-full rounded-lg bg-emerald-500 px-8 py-3.5 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 sm:w-auto"
+                >
+                  Get started free
+                </button>
+              </SignUpButton>
               <SignInButton mode="modal">
                 <button
                   type="button"
-                  className="w-full rounded-lg border border-white/20 bg-white/5 px-6 py-3 text-sm font-medium text-white transition hover:bg-white/10 sm:w-auto"
+                  className="w-full rounded-lg border border-[#1E2D45] bg-[#111827] px-8 py-3.5 text-sm font-medium text-[#F9FAFB] transition hover:border-[#2D3F5C] hover:bg-[#1A2236] sm:w-auto"
                 >
                   Sign In
                 </button>
               </SignInButton>
-              <SignUpButton mode="modal">
-                <button
-                  type="button"
-                  className="w-full rounded-lg bg-emerald-500 px-6 py-3 text-sm font-medium text-slate-950 transition hover:bg-emerald-400 sm:w-auto"
-                >
-                  Sign Up
-                </button>
-              </SignUpButton>
             </div>
+
+            <ul className="relative mt-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
+              {HERO_TRUST_CHIPS.map((chip) => (
+                <li
+                  key={chip}
+                  className="flex items-center gap-1.5 text-xs text-[#6B7280]"
+                >
+                  <svg
+                    className="h-3.5 w-3.5 text-emerald-500"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  {chip}
+                </li>
+              ))}
+            </ul>
           </div>
 
-          <section className="mx-auto mt-24 max-w-4xl text-center">
-            <h2 className="mb-12 text-2xl font-bold text-[#F9FAFB]">How it works</h2>
+          <LandingInsightPreview />
 
-            <div className="grid grid-cols-1 gap-8 sm:grid-cols-3">
-              <div className="flex flex-col items-center">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full border border-emerald-500 text-emerald-500">
-                  1
-                </div>
-                <h3 className="mt-4 font-semibold text-[#F9FAFB]">Connect your bank</h3>
-                <p className="mt-2 text-sm text-[#9CA3AF]">
-                  Securely link your accounts through Plaid — the same secure technology trusted and used
-                  by major banks and financial apps like Venmo and Coinbase.
-                </p>
-              </div>
+          <LandingComparison />
 
-              <div className="flex flex-col items-center">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full border border-emerald-500 text-emerald-500">
-                  2
-                </div>
-                <h3 className="mt-4 font-semibold text-[#F9FAFB]">Soverm reads your activity</h3>
-                <p className="mt-2 text-sm text-[#9CA3AF]">
-                  Every transaction is analyzed to understand your real financial picture
-                  — not just balances, but patterns.
-                </p>
-              </div>
+          {/* How it works */}
+          <section
+            id="how-it-works"
+            className="mx-auto mt-24 max-w-4xl"
+            aria-labelledby="how-it-works-heading"
+          >
+            <div className="text-center">
+              <h2 id="how-it-works-heading" className="text-2xl font-bold text-[#F9FAFB] sm:text-3xl">
+                How it works
+              </h2>
+              <p className="mt-3 text-sm text-[#9CA3AF]">
+                Three steps from bank connection to actionable advice.
+              </p>
+            </div>
 
-              <div className="flex flex-col items-center">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full border border-emerald-500 text-emerald-500">
-                  3
-                </div>
-                <h3 className="mt-4 font-semibold text-[#F9FAFB]">Get honest, specific advice</h3>
-                <p className="mt-2 text-sm text-[#9CA3AF]">
-                  No charts to interpret. Soverm tells you plainly what matters and gives
-                  you concrete next steps.
-                </p>
-              </div>
+            <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3">
+              {HOW_IT_WORKS.map(({ step, title, description }) => (
+                <article
+                  key={step}
+                  className="relative flex flex-col rounded-xl border border-[#1E2D45] bg-[#111827] p-6 text-left"
+                >
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-500/40 bg-emerald-500/10 text-sm font-bold text-emerald-400">
+                    {step}
+                  </span>
+                  <h3 className="mt-4 font-semibold text-[#F9FAFB]">{title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-[#9CA3AF]">{description}</p>
+                </article>
+              ))}
             </div>
           </section>
 
-          <section className="mx-auto mt-24 max-w-2xl rounded-xl border border-[#1E2D45] bg-[#111827] p-8 text-center">
-            <span className="text-xl text-emerald-500" aria-hidden="true">
-              🛡️
-            </span>
-            <h2 className="mt-3 text-lg font-semibold text-[#F9FAFB]">
-              Built with real security, not just promises
-            </h2>
-
-            <ul className="mt-6 flex flex-col gap-6 text-sm text-[#9CA3AF] sm:flex-row sm:justify-center">
-              <li>🔒 Secured by Plaid — bank-level encryption</li>
-              <li>🚫 We never have access to your credentials</li>
-              <li>✕ Disconnect anytime, instantly</li>
-            </ul>
-
-            <p className="mt-4 text-xs text-[#6B7280] ">
-              Soverm only receives and monitors your account balances and transaction history — never
-              your login credentials.
-            </p>
-          </section>
+          <SecurityTrustSection />
 
           <PricingSection />
 
           <SecurityFaq />
 
-          <section className="mb-16 mt-24 text-center">
-            <h2 className="text-2xl font-bold text-[#F9FAFB]">
-              Ready to know where you actually stand?
-            </h2>
-            <div className="mt-6">
-              <SignUpButton mode="modal">
-                <button
-                  type="button"
-                  className="rounded-lg bg-emerald-500 px-8 py-4 text-base font-medium text-slate-950 transition hover:bg-emerald-400"
-                >
-                  Sign Up
-                </button>
-              </SignUpButton>
+          {/* Final CTA */}
+          <section className="mx-auto mb-8 mt-24 max-w-2xl text-center">
+            <div className="rounded-2xl border border-[#1E2D45] bg-gradient-to-b from-[#111827] to-[#0A0F1C] px-6 py-12 sm:px-10">
+              <h2 className="text-2xl font-bold text-[#F9FAFB] sm:text-3xl">
+                Ready to know where you actually stand?
+              </h2>
+              <p className="mx-auto mt-3 max-w-md text-sm text-[#9CA3AF]">
+                Join Soverm free — connect a bank, generate your first insight, and see
+                your finances in plain English.
+              </p>
+              <div className="mt-8">
+                <SignUpButton mode="modal">
+                  <button
+                    type="button"
+                    className="rounded-lg bg-emerald-500 px-8 py-4 text-base font-semibold text-slate-950 transition hover:bg-emerald-400"
+                  >
+                    Get started free
+                  </button>
+                </SignUpButton>
+              </div>
+              <p className="mt-3 text-xs text-[#6B7280]">
+                No credit card required · Cancel anytime
+              </p>
             </div>
-            <p className="mt-3 text-xs text-[#6B7280]">
-              Free to start. No credit card required.
-            </p>
           </section>
         </main>
       </SignedOut>

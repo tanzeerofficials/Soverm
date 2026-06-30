@@ -189,6 +189,7 @@ router.delete('/accounts/:accountId', async (req, res) => {
     if (isLastAccountOnItem && accessToken) {
       try {
         await plaidClient.itemRemove({ access_token: accessToken })
+        console.info('Plaid itemRemove succeeded on disconnect')
       } catch (removeErr) {
         reportServerError('to remove Plaid item on disconnect', removeErr, { userId, req })
       }
