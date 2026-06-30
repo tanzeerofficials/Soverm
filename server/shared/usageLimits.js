@@ -4,6 +4,8 @@
  * Single source of truth for free-tier limits and Pro pricing.
  * Imported by the Express API and the Vite client so landing-page
  * copy never drifts from what the backend actually enforces.
+ *
+ * Lives under server/shared/ so Railway (root directory: server) includes it in deploys.
  */
 
 export const FREE_DAILY_INSIGHT_LIMIT = 1
