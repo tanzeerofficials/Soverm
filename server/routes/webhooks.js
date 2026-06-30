@@ -8,6 +8,15 @@
  * We do NOT use normal login for webhooks.
  * Instead, we verify a special signature to prove the message
  * really came from Clerk and not a random stranger on the internet.
+ *
+ * PLAID WEBHOOKS: Not used. There is no POST /webhooks/plaid route and no
+ * webhook URL is registered with Plaid — sync is pull-based (/api/plaid/sync-transactions
+ * and the cron job). plaid-node v42 has no verifyWebhook helper; if Plaid webhooks are
+ * added later, verify the Plaid-Verification JWT per Plaid docs using
+ * plaidClient.webhookVerificationKeyGet() (ES256 + request_body_sha256 check).
+ *
+ * CLERK WEBHOOKS: Used for user.created only (inserts a row in Postgres).
+ * user.updated and user.deleted are not processed; we still return 200 so Clerk does not retry.
  */
 
 import { Router } from 'express'
@@ -42,10 +51,14 @@ router.post('/clerk', async (req, res) => {
     return res.status(500).json({ error: 'Webhook secret not configured' })
   }
 
-  // These 3 headers are used to prove the webhook is authentic.
+  // These 3 headers are used to prove the webhook is authentic (Svix signing).
   const svixId = req.headers['svix-id']
   const svixTimestamp = req.headers['svix-timestamp']
   const svixSignature = req.headers['svix-signature']
+
+  if (!svixId || !svixTimestamp || !svixSignature) {
+    return res.status(400).send('Webhook verification failed')
+  }
 
   let event
   try {

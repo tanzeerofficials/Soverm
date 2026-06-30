@@ -71,8 +71,8 @@ function PricingSection() {
   }
 
   return (
-    <section className="mx-auto mt-24 max-w-4xl">
-      <h2 className="text-center text-2xl font-bold text-[#F9FAFB]">Pricing</h2>
+    <section className="mx-auto mt-24 max-w-4xl" id="pricing" aria-labelledby="pricing-heading">
+      <h2 id="pricing-heading" className="text-center text-2xl font-bold text-[#F9FAFB]">Pricing</h2>
       <p className="mt-3 text-center text-sm text-[#9CA3AF]">
         Start free. Upgrade when you want unlimited insights and full history.
       </p>
