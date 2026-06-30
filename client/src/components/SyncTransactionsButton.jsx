@@ -40,7 +40,7 @@ function SyncTransactionsButton({ className = '', showToast }) {
       type="button"
       onClick={handleSync}
       disabled={loading}
-      className={`rounded-lg bg-blue-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
+      className={`min-h-11 rounded-lg bg-blue-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
     >
       {loading ? 'Syncing...' : 'Sync Transactions'}
     </button>

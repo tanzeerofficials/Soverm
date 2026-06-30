@@ -9,6 +9,9 @@ import { getAuth, requireAuth } from '@clerk/express'
 import db from '../db/index.js'
 import { askFinancialQuestion } from '../services/claude.js'
 import { loadFinancialContextForUser } from '../utils/financialContext.js'
+import { chatRateLimitMiddleware } from '../utils/rateLimit.js'
+import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
+import { reportServerError } from '../utils/sentry.js'
 
 const router = Router()
 
@@ -30,12 +33,12 @@ router.get('/:insightId', async (req, res) => {
 
     res.json({ messages: messagesResult.rows })
   } catch (err) {
-    console.error('Failed to load chat messages:', err.message)
-    res.status(500).json({ error: err.message })
+    reportServerError('to load chat messages', err, { userId, req })
+    res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
   }
 })
 
-router.post('/:insightId', async (req, res) => {
+router.post('/:insightId', chatRateLimitMiddleware(), async (req, res) => {
   const { userId } = getAuth(req)
 
   try {
@@ -73,12 +76,6 @@ router.post('/:insightId', async (req, res) => {
       return res.status(404).json({ error: 'Insight not found' })
     }
 
-    await db.query(
-      `INSERT INTO chat_messages (id, user_id, insight_id, role, content)
-       VALUES (gen_random_uuid(), $1, $2, 'user', $3)`,
-      [userId, insightId, trimmedMessage]
-    )
-
     const claudeResponseText = await askFinancialQuestion(
       insightResult.rows[0].content,
       historyResult.rows,
@@ -87,16 +84,35 @@ router.post('/:insightId', async (req, res) => {
       accountSummary
     )
 
-    await db.query(
-      `INSERT INTO chat_messages (id, user_id, insight_id, role, content)
-       VALUES (gen_random_uuid(), $1, $2, 'assistant', $3)`,
-      [userId, insightId, claudeResponseText]
-    )
+    const client = await db.connect()
+
+    try {
+      await client.query('BEGIN')
+
+      await client.query(
+        `INSERT INTO chat_messages (id, user_id, insight_id, role, content)
+         VALUES (gen_random_uuid(), $1, $2, 'user', $3)`,
+        [userId, insightId, trimmedMessage]
+      )
+
+      await client.query(
+        `INSERT INTO chat_messages (id, user_id, insight_id, role, content)
+         VALUES (gen_random_uuid(), $1, $2, 'assistant', $3)`,
+        [userId, insightId, claudeResponseText]
+      )
+
+      await client.query('COMMIT')
+    } catch (dbErr) {
+      await client.query('ROLLBACK')
+      throw dbErr
+    } finally {
+      client.release()
+    }
 
     res.json({ reply: claudeResponseText })
   } catch (err) {
-    console.error('Failed to send chat message:', err.message)
-    res.status(500).json({ error: err.message })
+    reportServerError('to send chat message', err, { userId, req })
+    res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
   }
 })
 

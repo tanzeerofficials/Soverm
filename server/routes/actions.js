@@ -7,6 +7,8 @@
 import { Router } from 'express'
 import { getAuth } from '@clerk/express'
 import db from '../db/index.js'
+import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
+import { reportServerError } from '../utils/sentry.js'
 
 const router = Router()
 
@@ -37,8 +39,8 @@ router.get('/', async (req, res) => {
 
     res.json({ actions: result.rows })
   } catch (err) {
-    console.error('Failed to fetch actions:', err.message)
-    res.status(500).json({ error: err.message })
+    reportServerError('to fetch actions', err, { userId, req })
+    res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
   }
 })
 
@@ -68,8 +70,8 @@ router.patch('/:id', async (req, res) => {
 
     res.json({ success: true })
   } catch (err) {
-    console.error('Failed to update action:', err.message)
-    res.status(500).json({ error: err.message })
+    reportServerError('to update action', err, { userId, req })
+    res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
   }
 })
 

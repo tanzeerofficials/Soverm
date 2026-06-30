@@ -8,6 +8,8 @@ import { Router } from 'express'
 import { getAuth } from '@clerk/express'
 import db from '../db/index.js'
 import { getUsageSummary } from '../utils/usage.js'
+import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
+import { reportServerError } from '../utils/sentry.js'
 
 const router = Router()
 
@@ -108,8 +110,8 @@ router.get('/', async (req, res) => {
 
     res.json({ insights, lockedCount, usage })
   } catch (err) {
-    console.error('Failed to load insight history:', err.message)
-    res.status(500).json({ error: err.message })
+    reportServerError('to load insight history', err, { userId, req })
+    res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
   }
 })
 

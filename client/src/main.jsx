@@ -13,15 +13,28 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { ClerkLoaded, ClerkLoading, ClerkProvider } from '@clerk/clerk-react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryCache, QueryClient, QueryClientProvider, MutationCache } from '@tanstack/react-query'
 import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.jsx'
 import AppLoadingScreen from './components/AppLoadingScreen.jsx'
 import { PlaidLinkProvider } from './context/PlaidLinkContext.jsx'
 import { ToastProvider } from './context/ToastContext.jsx'
+import { initAnalytics } from './lib/analytics.js'
+import { initSentry, Sentry, captureClientError } from './lib/sentry.js'
 
 const queryClient = new QueryClient({
+  queryCache: new QueryCache({
+    onError: (error, query) => {
+      const key = Array.isArray(query.queryKey) ? query.queryKey[0] : 'query'
+      captureClientError(error, { label: `query:${key}` })
+    },
+  }),
+  mutationCache: new MutationCache({
+    onError: (error) => {
+      captureClientError(error, { label: 'mutation' })
+    },
+  }),
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: true,
@@ -33,9 +46,26 @@ const queryClient = new QueryClient({
 // VITE_ prefix means this value comes from client/.env and is safe for frontend use.
 const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 
+initAnalytics()
+const sentryEnabled = initSentry()
+if (import.meta.env.DEV) {
+  console.info(
+    sentryEnabled
+      ? '[Sentry] enabled'
+      : '[Sentry] disabled — add VITE_SENTRY_DSN to client/.env (not server SENTRY_DSN), then restart Vite'
+  )
+}
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <ClerkProvider publishableKey={clerkPublishableKey}>
+    <Sentry.ErrorBoundary
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-[#0A0F1C] px-6 text-center text-sm text-[#9CA3AF]">
+          Something went wrong. Please refresh the page.
+        </div>
+      }
+    >
+      <ClerkProvider publishableKey={clerkPublishableKey}>
       <ClerkLoading>
         <AppLoadingScreen />
       </ClerkLoading>
@@ -51,5 +81,6 @@ createRoot(document.getElementById('root')).render(
         </QueryClientProvider>
       </ClerkLoaded>
     </ClerkProvider>
+    </Sentry.ErrorBoundary>
   </StrictMode>,
 )

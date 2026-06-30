@@ -1,7 +1,7 @@
 /*
  * DASHBOARD PAGE
  *
- * Premium home screen for Sovrn — total balance hero, account cards,
+ * Premium home screen for Soverm — total balance hero, account cards,
  * action buttons, and AI-generated financial insight.
  */
 
@@ -21,10 +21,16 @@ import PaywallCard from '../components/PaywallCard.jsx'
 import { useToastContext } from '../context/ToastContext.jsx'
 import ConfirmModal from '../components/ConfirmModal'
 import DashboardOnboarding from '../components/DashboardOnboarding.jsx'
+import DashboardHeroSkeleton from '../components/DashboardHeroSkeleton.jsx'
+import AccountCardSkeleton from '../components/AccountCardSkeleton.jsx'
+import InsightCardSkeleton from '../components/InsightCardSkeleton.jsx'
+import Skeleton from '../components/Skeleton.jsx'
 import { dashboardQueryKey, usageQueryKey } from '../lib/queryKeys.js'
 import { scrollToInsightChat } from '../lib/scrollToInsightChat.js'
 import { syncTransactions } from '../lib/syncTransactions.js'
+import { disconnectAccount } from '../lib/disconnectAccount.js'
 import { fetchUsage } from '../lib/fetchUsage.js'
+import { trackUpgradeProClick } from '../lib/analytics.js'
 import { getDisplayBalance, isCreditAccount } from '../lib/balanceHelpers.js'
 
 function formatCurrency(amount) {
@@ -81,6 +87,7 @@ function DashboardPage() {
   const [accountToDelete, setAccountToDelete] = useState(null)
   const syncInFlight = useRef(false)
   const lastAutoSyncAttempt = useRef(0)
+  const prevAccountCount = useRef(null)
 
   const { data: usage } = useQuery({
     queryKey: usageQueryKey,
@@ -168,6 +175,28 @@ function DashboardPage() {
     setPendingChatScroll(false)
   }, [pendingChatScroll, dashboardData?.latestInsight?.id])
 
+  const accountCount = dashboardData?.accounts?.length ?? 0
+  const hasAccounts = accountCount > 0
+  const hasSynced = !!dashboardData?.lastSyncedAt
+  const hasInsight = !!dashboardData?.latestInsight
+  const highlightGenerate = hasAccounts && hasSynced && !hasInsight
+
+  useEffect(() => {
+    if (prevAccountCount.current === null) {
+      prevAccountCount.current = accountCount
+      return
+    }
+
+    if (prevAccountCount.current === 0 && accountCount > 0 && !hasInsight) {
+      document.getElementById('generate-insight-action')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      })
+    }
+
+    prevAccountCount.current = accountCount
+  }, [accountCount, hasInsight])
+
   function handleNavbarChat() {
     if (!dashboardData?.latestInsight?.id) {
       showToast('Generate an insight first to chat with your CFO', 'error')
@@ -193,9 +222,10 @@ function DashboardPage() {
       >
         <Link
           to="/history"
-          className="text-sm text-[#9CA3AF] transition hover:text-white"
+          className="shrink-0 text-xs text-[#9CA3AF] transition hover:text-white sm:text-sm"
         >
-          View History
+          <span className="sm:hidden">History</span>
+          <span className="hidden sm:inline">View History</span>
         </Link>
       </AppNavbar>
 
@@ -208,52 +238,33 @@ function DashboardPage() {
 
         {showSkeleton ? (
           <>
-            <section className="text-center">
-              <div
-                className="mx-auto h-4 w-32 animate-pulse rounded bg-[#1A2236]"
-                aria-hidden="true"
-              />
-              <div
-                className="mx-auto mt-3 h-16 w-64 animate-pulse rounded bg-[#1A2236]"
-                aria-hidden="true"
-              />
-              <div className="mt-4 flex flex-wrap items-center justify-center gap-4 sm:gap-8">
-                <div
-                  className="h-4 w-40 animate-pulse rounded bg-[#1A2236]"
-                  aria-hidden="true"
-                />
-                <div
-                  className="h-4 w-40 animate-pulse rounded bg-[#1A2236]"
-                  aria-hidden="true"
-                />
-              </div>
-            </section>
+            <DashboardHeroSkeleton />
 
             <section className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <div
-                className="h-12 w-36 animate-pulse rounded-lg bg-[#1A2236]"
-                aria-hidden="true"
-              />
-              <div
-                className="h-12 w-36 animate-pulse rounded-lg bg-[#1A2236]"
-                aria-hidden="true"
-              />
-              <div
-                className="h-12 w-36 animate-pulse rounded-lg bg-[#1A2236]"
-                aria-hidden="true"
-              />
+              <Skeleton className="h-12 w-full max-w-[200px] rounded-lg sm:flex-1" />
+              <Skeleton className="h-12 w-full max-w-[200px] rounded-lg sm:flex-1" />
+              <Skeleton className="h-12 w-full max-w-[200px] rounded-lg sm:flex-1" />
             </section>
 
             <section className="mt-12">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.3em] text-[#9CA3AF]">
+                Your Accounts
+              </h2>
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {[0, 1, 2, 3].map((index) => (
-                  <div
-                    key={index}
-                    className="h-32 animate-pulse rounded-xl bg-[#1A2236]"
-                    aria-hidden="true"
-                  />
+                  <AccountCardSkeleton key={index} />
                 ))}
               </div>
+            </section>
+
+            <section className="mt-12">
+              <div className="mb-4 flex items-center gap-2">
+                <h2 className="text-xs font-semibold uppercase tracking-[0.3em] text-[#9CA3AF]">
+                  Soverm Insight
+                </h2>
+                <span className="h-2 w-2 rounded-full bg-[#8B5CF6]" aria-hidden="true" />
+              </div>
+              <InsightCardSkeleton />
             </section>
           </>
         ) : showFailedState ? (
@@ -273,58 +284,76 @@ function DashboardPage() {
           <>
             {/* Hero */}
             <section className="text-center">
-              <p className="text-xs font-medium uppercase tracking-[0.3em] text-[#9CA3AF]">
-                Total Balance
-              </p>
-              <p className="mt-3 font-mono text-5xl font-light tracking-tight text-[#F9FAFB] sm:text-6xl md:text-7xl">
-                {formatCurrency(dashboardData?.totalBalance ?? 0)}
-              </p>
-              {dashboardData?.lastSyncedAt && (
+              {!hasAccounts ? (
                 <>
-                  <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-[#9CA3AF]">
-                    <span className="text-emerald-500" aria-hidden="true">
-                      ●
-                    </span>
-                    Last synced{' '}
-                    {formatDistanceToNow(new Date(dashboardData.lastSyncedAt))} ago
+                  <p className="text-xs font-medium uppercase tracking-[0.3em] text-[#10B981]">
+                    Step 1
                   </p>
-                  <p className="mt-1 text-center text-xs text-[#6B7280]">
-                    Recent transactions may take a few minutes to appear
+                  <h2 className="mt-3 text-2xl font-bold text-[#F9FAFB] sm:text-3xl">
+                    Connect your bank to get started
+                  </h2>
+                  <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-[#9CA3AF]">
+                    Soverm needs your accounts linked before it can analyze your finances.
+                    Your bank login stays with Plaid — we never see it.
                   </p>
                 </>
+              ) : (
+                <>
+                  <p className="text-xs font-medium uppercase tracking-[0.3em] text-[#9CA3AF]">
+                    Total Balance
+                  </p>
+                  <p className="mt-3 font-mono text-4xl font-light tracking-tight text-[#F9FAFB] sm:text-6xl md:text-7xl">
+                    {formatCurrency(dashboardData?.totalBalance ?? 0)}
+                  </p>
+                  {dashboardData?.lastSyncedAt && (
+                    <>
+                      <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-[#9CA3AF]">
+                        <span className="text-emerald-500" aria-hidden="true">
+                          ●
+                        </span>
+                        Last synced{' '}
+                        {formatDistanceToNow(new Date(dashboardData.lastSyncedAt))} ago
+                      </p>
+                      <p className="mt-1 text-center text-xs text-[#6B7280]">
+                        Recent transactions may take a few minutes to appear
+                      </p>
+                    </>
+                  )}
+                  <div className="mt-5 mb-2 flex justify-center gap-2">
+                    {RANGE_OPTIONS.map(({ value, label }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setSelectedRange(value)}
+                        className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                          selectedRange === value
+                            ? 'bg-emerald-500 text-slate-950'
+                            : 'bg-[#1A2236] text-[#9CA3AF] hover:text-white'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-8">
+                    <span className="text-sm text-[#10B981]">
+                      ↑ {formatCurrency(dashboardData?.income ?? 0)} income{' '}
+                      {RANGE_LABELS[selectedRange]}
+                    </span>
+                    <span className="text-sm text-[#EF4444]">
+                      ↓ {formatCurrency(dashboardData?.spent ?? 0)} spent{' '}
+                      {RANGE_LABELS[selectedRange]}
+                    </span>
+                  </div>
+                </>
               )}
-              <div className="mt-5 mb-2 flex justify-center gap-2">
-                {RANGE_OPTIONS.map(({ value, label }) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setSelectedRange(value)}
-                    className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                      selectedRange === value
-                        ? 'bg-emerald-500 text-slate-950'
-                        : 'bg-[#1A2236] text-[#9CA3AF] hover:text-white'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-8">
-                <span className="text-sm text-[#10B981]">
-                  ↑ {formatCurrency(dashboardData?.income ?? 0)} income{' '}
-                  {RANGE_LABELS[selectedRange]}
-                </span>
-                <span className="text-sm text-[#EF4444]">
-                  ↓ {formatCurrency(dashboardData?.spent ?? 0)} spent{' '}
-                  {RANGE_LABELS[selectedRange]}
-                </span>
-              </div>
             </section>
 
             <div className="mx-auto mt-8 max-w-xl space-y-4">
               <DashboardOnboarding
-                hasAccounts={(dashboardData?.accounts ?? []).length > 0}
-                hasInsight={!!dashboardData?.latestInsight}
+                hasAccounts={hasAccounts}
+                hasSynced={hasSynced}
+                hasInsight={hasInsight}
               />
               <SecurityNote />
             </div>
@@ -334,18 +363,23 @@ function DashboardPage() {
             </div>
 
             {/* Action row */}
-            <section className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <section className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-stretch sm:justify-center">
               <div className="w-full sm:max-w-[200px] sm:flex-1">
-                <ConnectBankButton className="w-full" />
+                <ConnectBankButton
+                  className="w-full"
+                  highlighted={!hasAccounts}
+                  showSecurityNote={false}
+                />
               </div>
               <div className="w-full sm:max-w-[200px] sm:flex-1">
                 <SyncTransactionsButton className="w-full" showToast={showToast} />
               </div>
-              <div className="w-full sm:max-w-[200px] sm:flex-1">
+              <div id="generate-insight-action" className="w-full sm:max-w-[200px] sm:flex-1">
                 <GenerateInsightButton
                   className="w-full"
                   showCard={false}
                   showToast={showToast}
+                  highlighted={highlightGenerate}
                   onError={setInsightError}
                   onLoadingChange={setInsightLoading}
                   onLimitReached={setLimitReached}
@@ -363,9 +397,12 @@ function DashboardPage() {
               </h2>
               {(dashboardData?.accounts ?? []).length === 0 ? (
                 <div className="mt-4 rounded-xl border border-dashed border-[#1E2D45] bg-[#111827] px-6 py-10 text-center">
-                  <p className="text-sm text-[#9CA3AF]">
-                    No accounts connected yet. Use{' '}
-                    <span className="text-[#F9FAFB]">Connect Your Bank</span> above to get started.
+                  <p className="text-sm font-medium text-[#F9FAFB]">
+                    No bank connected yet
+                  </p>
+                  <p className="mt-2 text-sm text-[#9CA3AF]">
+                    Tap <span className="text-[#10B981]">Connect Your Bank</span> above —
+                    that&apos;s your first step.
                   </p>
                 </div>
               ) : (
@@ -375,27 +412,27 @@ function DashboardPage() {
                   return (
                     <article
                       key={account.id}
-                      className="relative rounded-xl border border-[#1E2D45] bg-[#111827] p-5 transition hover:border-[#10B981]/40 hover:bg-[#1A2236]"
+                      className="relative min-w-0 rounded-xl border border-[#1E2D45] bg-[#111827] p-4 sm:p-5 transition hover:border-[#10B981]/40 hover:bg-[#1A2236]"
                     >
                       <button
                         type="button"
                         onClick={() => setAccountToDelete(account)}
-                        className="absolute right-3 top-3 text-xs text-[#9CA3AF] transition hover:text-red-400"
+                        className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center text-sm text-[#9CA3AF] transition hover:text-red-400"
                         aria-label={`Disconnect ${account.account_name}`}
                       >
                         ×
                       </button>
-                      <p className="text-xs font-medium uppercase tracking-wide text-[#9CA3AF]">
+                      <p className="truncate pr-8 text-xs font-medium uppercase tracking-wide text-[#9CA3AF]">
                         {account.bank_name}
                       </p>
-                      <p className="mt-1 text-sm font-medium text-[#F9FAFB]">
+                      <p className="mt-1 truncate pr-8 text-sm font-medium text-[#F9FAFB]">
                         {account.account_name}
                       </p>
-                      <span className="mt-2 inline-block rounded-full border border-[#1E2D45] bg-[#1A2236] px-2.5 py-0.5 text-xs capitalize text-[#9CA3AF]">
+                      <span className="mt-2 inline-block max-w-full truncate rounded-full border border-[#1E2D45] bg-[#1A2236] px-2.5 py-0.5 text-xs capitalize text-[#9CA3AF]">
                         {account.account_type}
                       </span>
                       <p
-                        className={`mt-4 font-mono text-2xl font-semibold ${
+                        className={`mt-4 break-all font-mono text-xl font-semibold sm:text-2xl ${
                           balanceIsWarning ? 'text-[#EF4444]' : 'text-[#10B981]'
                         }`}
                       >
@@ -424,9 +461,7 @@ function DashboardPage() {
               )}
 
               {insightLoading ? (
-                <div className="rounded-xl border border-[#1E2D45] bg-[#111827] px-6 py-10 text-center">
-                  <p className="text-sm text-[#9CA3AF]">Analyzing your finances...</p>
-                </div>
+                <InsightCardSkeleton />
               ) : (
                 <>
                   <InsightCard
@@ -442,12 +477,13 @@ function DashboardPage() {
                       </p>
                       <PaywallCard
                         spent={dashboardData?.spent}
-                        onUpgrade={() =>
+                        onUpgrade={() => {
+                          trackUpgradeProClick('dashboard_paywall')
                           showToast(
                             'Soverm Pro checkout is coming soon — stay tuned!',
                             'success'
                           )
-                        }
+                        }}
                       />
                     </div>
                   )}
@@ -466,26 +502,10 @@ function DashboardPage() {
         onConfirm={async () => {
           if (!accountToDelete) return
 
-          const accountId = accountToDelete.id
           const accountName = accountToDelete.account_name
 
           try {
-            const token = await getToken()
-            const response = await fetch(
-              `${import.meta.env.VITE_API_URL}/api/plaid/accounts/${accountId}`,
-              {
-                method: 'DELETE',
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                },
-              }
-            )
-
-            if (!response.ok) {
-              const data = await response.json()
-              throw new Error(data.error || 'Failed to disconnect account')
-            }
-
+            await disconnectAccount(getToken, accountToDelete.id)
             setAccountToDelete(null)
             showToast(`"${accountName}" disconnected`, 'success')
             await queryClient.invalidateQueries({ queryKey: dashboardQueryKey })

@@ -6,7 +6,7 @@ function ChatWithCfoButton({ variant = 'full', onClick, className = '' }) {
       <button
         type="button"
         onClick={onClick}
-        className={`flex items-center gap-1.5 rounded-lg border border-[#8B5CF6]/40 bg-[#8B5CF6]/10 px-3 py-1.5 text-xs font-medium text-[#C4B5FD] transition hover:border-[#8B5CF6]/60 hover:bg-[#8B5CF6]/20 sm:text-sm ${className}`}
+        className={`flex min-h-11 items-center gap-1.5 rounded-lg border border-[#8B5CF6]/40 bg-[#8B5CF6]/10 px-3 py-2 text-xs font-medium text-[#C4B5FD] transition hover:border-[#8B5CF6]/60 hover:bg-[#8B5CF6]/20 sm:text-sm ${className}`}
       >
         <ChatBubbleIcon className="h-4 w-4 flex-shrink-0 text-[#8B5CF6]" />
         <span className="hidden sm:inline">Chat with your CFO</span>

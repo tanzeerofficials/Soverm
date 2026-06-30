@@ -11,6 +11,8 @@ import { getAuth } from '@clerk/express'
 import { plaidClient, syncAllAccountsForUser } from '../services/plaid.js'
 import db from '../db/index.js'
 import { ensureUserExists } from '../utils/ensureUser.js'
+import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
+import { reportServerError } from '../utils/sentry.js'
 
 const router = Router()
 
@@ -31,7 +33,8 @@ router.post('/create-link-token', async (req, res) => {
 
     res.json({ link_token: response.data.link_token })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    reportServerError('to create Plaid link token', err, { userId, req })
+    res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
   }
 })
 
@@ -111,11 +114,11 @@ router.post('/exchange-public-token', async (req, res) => {
       synced: { added, modified, removed },
     })
   } catch (err) {
-    console.error('Failed to exchange public token and save accounts:', err.message)
+    reportServerError('to exchange public token and save accounts', err, { userId, req })
     if (err.response?.data) {
-      console.error('Plaid error:', err.response.data)
+      console.error('Plaid error: [redacted from Sentry]')
     }
-    res.status(500).json({ error: err.message })
+    res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
   }
 })
 
@@ -129,8 +132,8 @@ router.post('/sync-transactions', async (req, res) => {
     const { added, modified, removed } = await syncAllAccountsForUser(userId)
     res.json({ success: true, added, modified, removed })
   } catch (err) {
-    console.error('Failed to sync transactions:', err.message)
-    res.status(500).json({ error: err.message })
+    reportServerError('to sync transactions', err, { userId, req })
+    res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
   }
 })
 
@@ -199,8 +202,8 @@ router.delete('/accounts/:accountId', async (req, res) => {
     res.json({ success: true })
   } catch (err) {
     await client.query('ROLLBACK')
-    console.error('Failed to disconnect account:', err.message)
-    res.status(500).json({ error: err.message })
+    reportServerError('to disconnect account', err, { userId, req })
+    res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
   } finally {
     client.release()
   }

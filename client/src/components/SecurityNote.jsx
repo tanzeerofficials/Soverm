@@ -1,7 +1,7 @@
 /*
  * SECURITY NOTE
  *
- * Dismissible info card that explains how Sovrn handles financial data.
+ * Dismissible info card that explains how Soverm handles financial data.
  * Transparency about the data flow (Plaid, encryption, disconnect) builds
  * trust better than a vague "secure" label alone.
  */

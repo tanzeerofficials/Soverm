@@ -1,7 +1,7 @@
 /*
  * USAGE FETCHER
  *
- * Fetches today's free-tier usage (remaining insights, streak, tier)
+ * Fetches today's free-tier usage (remaining insights, tier)
  * so the dashboard can show the countdown badge and gate the paywall.
  */
 

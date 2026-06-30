@@ -56,7 +56,7 @@ function InsightQuickQuestions({ insightId, insight, onError, onExpandChat }) {
             type="button"
             disabled={!!sendingQuestion}
             onClick={() => handleSend(question)}
-            className="rounded-full bg-[#1A2236] px-3 py-1.5 text-xs text-[#9CA3AF] transition hover:bg-[#232d42] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+            className="max-w-full rounded-full bg-[#1A2236] px-3 py-2 text-left text-xs leading-snug text-[#9CA3AF] transition hover:bg-[#232d42] hover:text-white disabled:cursor-not-allowed disabled:opacity-60 sm:py-1.5"
           >
             {sendingQuestion === question ? 'Asking…' : question}
           </button>

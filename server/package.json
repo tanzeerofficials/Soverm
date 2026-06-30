@@ -1,12 +1,12 @@
 {
   "name": "server",
   "version": "1.0.0",
-  "description": "Express API for the Sovrn personal CFO app",
+  "description": "Express API for the Soverm personal CFO app",
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "dev": "nodemon index.js",
-    "start": "node index.js"
+    "dev": "nodemon --exec \"node --import ./instrument.js\" index.js",
+    "start": "node --import ./instrument.js index.js"
   },
   "keywords": [],
   "author": "",
@@ -14,6 +14,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.2",
     "@clerk/express": "^2.1.27",
+    "@sentry/node": "^10.62.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
