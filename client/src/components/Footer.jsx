@@ -118,8 +118,8 @@ function Footer() {
               SOVERM
             </Link>
             <p className="mt-3 max-w-xs text-sm leading-relaxed text-[#9CA3AF]">
-              Your AI CFO — honest financial insights and specific next steps, in plain
-              English.
+              Your personal accountant — accounting intelligence that monitors your
+              transactions and helps you put your money to better use.
             </p>
             <SignedOut>
               <div className="mt-5">

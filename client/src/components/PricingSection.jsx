@@ -34,7 +34,7 @@ const FEATURE_ROWS = [
     pro: 'Full history',
   },
   {
-    label: 'AI chat with your CFO',
+    label: 'Chat with your accountant',
     free: 'Included',
     pro: 'Included',
   },

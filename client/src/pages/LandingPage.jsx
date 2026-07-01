@@ -56,14 +56,15 @@ function LandingPage() {
             />
 
             <p className="relative text-sm font-medium uppercase tracking-wide text-emerald-500">
-              Your AI CFO
+              Your Personal Accountant
             </p>
             <h1 className="relative mt-3 text-4xl font-bold leading-tight tracking-tight text-[#F9FAFB] sm:text-5xl lg:text-6xl">
-              Your AI CFO tells you the truth about your money.
+              Your Personal Accountant tells you the truth about your money.
             </h1>
             <p className="relative mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-[#9CA3AF]">
-              Connect your bank. Soverm reads every transaction and tells you — in plain
-              English — what&apos;s working, what&apos;s not, and what to do next.
+              Accounting intelligence that monitors your transactions, analyzes where your
+              money actually goes, and delivers financial insights — so you can make
+              smarter decisions with every dollar.
             </p>
 
             <div className="relative mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
@@ -157,8 +158,8 @@ function LandingPage() {
                 Ready to know where you actually stand?
               </h2>
               <p className="mx-auto mt-3 max-w-md text-sm text-[#9CA3AF]">
-                Join Soverm free — connect a bank, generate your first insight, and see
-                your finances in plain English.
+                Accounting intelligence that watches your transactions and turns them into
+                clear insights — so you always know the smartest move for your money.
               </p>
               <div className="mt-8">
                 <SignUpButton mode="modal">

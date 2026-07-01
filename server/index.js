@@ -69,13 +69,30 @@ const port = Number(process.env.PORT) || 5000
 // CORS: comma-separated browser origins in ALLOWED_ORIGINS (no wildcards).
 // Include production Vercel URL, preview deployment URLs, and http://localhost:5173 for local dev.
 function normalizeOrigin(origin) {
-  return origin.replace(/\/$/, '')
+  return origin.replace(/^["']|["']$/g, '').replace(/\/$/, '').trim()
 }
 
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
-  .split(',')
-  .map((s) => normalizeOrigin(s.trim()))
-  .filter(Boolean)
+function parseAllowedOrigins() {
+  const fromEnv = (process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((s) => normalizeOrigin(s))
+    .filter(Boolean)
+
+  // Local dev: always allow Vite defaults even if ALLOWED_ORIGINS is unset in server/.env
+  if (process.env.NODE_ENV !== 'production') {
+    return [
+      ...new Set([
+        ...fromEnv,
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+      ]),
+    ]
+  }
+
+  return fromEnv
+}
+
+const allowedOrigins = parseAllowedOrigins()
 
 function isOriginAllowed(origin) {
   if (!origin) {
@@ -86,10 +103,10 @@ function isOriginAllowed(origin) {
 
 if (process.env.NODE_ENV === 'production' && allowedOrigins.length === 0) {
   console.warn(
-    '[CORS] ALLOWED_ORIGINS is empty — browser requests from Vercel will be blocked once the API is up'
+    '[CORS] ALLOWED_ORIGINS is empty — browser requests from Vercel will be blocked'
   )
 } else {
-  console.log(`[CORS] ${allowedOrigins.length} allowed origin(s) configured`)
+  console.log(`[CORS] ${allowedOrigins.length} allowed origin(s): ${allowedOrigins.join(', ')}`)
 }
 
 app.use(
@@ -98,7 +115,9 @@ app.use(
       if (isOriginAllowed(origin)) {
         callback(null, true)
       } else {
-        console.warn(`[CORS] blocked origin: ${origin}`)
+        console.warn(
+          `[CORS] blocked origin: ${origin ?? '(none)'} — allowed: ${allowedOrigins.join(', ')}`
+        )
         callback(new Error('Not allowed by CORS'))
       }
     },
