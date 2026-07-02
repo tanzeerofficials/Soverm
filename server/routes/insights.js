@@ -8,8 +8,8 @@
 import { Router } from 'express'
 import { getAuth } from '@clerk/express'
 import db from '../db/index.js'
-import { generateFinancialSummary } from '../services/claude.js'
-import { loadFinancialContextForUser } from '../utils/financialContext.js'
+import { generateFinancialSummary, buildPersistedInsightContent } from '../services/claude.js'
+import { loadFinancialContextForUser, loadMonthOverMonthComparison } from '../utils/financialContext.js'
 import { getUsageSummary } from '../utils/usage.js'
 import {
   getGenerateRateLimitMessage,
@@ -89,21 +89,34 @@ router.post('/generate', async (req, res) => {
       })
     }
 
-    const { transactions, accountSummary } = await loadFinancialContextForUser(userId)
+    const [{ transactions, accountSummary }, monthOverMonthComparison] = await Promise.all([
+      loadFinancialContextForUser(userId),
+      loadMonthOverMonthComparison(userId),
+    ])
 
-    const claudeResponse = await generateFinancialSummary(transactions, accountSummary)
+    const claudeResponse = await generateFinancialSummary(
+      transactions,
+      accountSummary,
+      monthOverMonthComparison
+    )
+
+    const persistedInsight = buildPersistedInsightContent(
+      claudeResponse,
+      monthOverMonthComparison,
+      { transactionCount: transactions.length }
+    )
 
     const insightResult = await db.query(
       `INSERT INTO insights (id, user_id, type, content)
        VALUES (gen_random_uuid(), $1, 'weekly_summary', $2)
        RETURNING id`,
-      [userId, JSON.stringify(claudeResponse)]
+      [userId, JSON.stringify(persistedInsight)]
     )
 
     const insightId = insightResult.rows[0].id
     const actionIds = []
 
-    for (const actionText of claudeResponse.actions ?? []) {
+    for (const actionText of persistedInsight.actions ?? []) {
       const actionResult = await db.query(
         `INSERT INTO actions (id, user_id, insight_id, description)
          VALUES (gen_random_uuid(), $1, $2, $3)
@@ -117,7 +130,7 @@ router.post('/generate', async (req, res) => {
 
     res.json({
       success: true,
-      insight: claudeResponse,
+      insight: persistedInsight,
       insightId,
       actionIds,
       usage: updatedUsage,

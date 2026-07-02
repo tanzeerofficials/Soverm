@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:insight-display": "node scripts/test-insight-display.js",
+    "test:badge-tone": "node scripts/test-badge-tone-logic.js"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.61.8",

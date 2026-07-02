@@ -7,8 +7,7 @@
 import { Router } from 'express'
 import { getAuth, requireAuth } from '@clerk/express'
 import db from '../db/index.js'
-import { askFinancialQuestion } from '../services/claude.js'
-import { loadFinancialContextForUser } from '../utils/financialContext.js'
+import { askFinancialQuestion, resolveInsightGeneratedAt } from '../services/claude.js'
 import { chatRateLimitMiddleware } from '../utils/rateLimit.js'
 import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
 import { reportServerError } from '../utils/sentry.js'
@@ -51,37 +50,41 @@ router.post('/:insightId', chatRateLimitMiddleware(), async (req, res) => {
 
     const trimmedMessage = message.trim()
 
-    const [insightResult, historyResult, { transactions, accountSummary }] =
-      await Promise.all([
-        db.query(
-          `SELECT content FROM insights WHERE id = $1 AND user_id = $2`,
-          [insightId, userId]
-        ),
-        db.query(
-          `SELECT role, content
-           FROM (
-             SELECT role, content, created_at
-             FROM chat_messages
-             WHERE insight_id = $1 AND user_id = $2
-             ORDER BY created_at DESC
-             LIMIT 15
-           ) recent
-           ORDER BY created_at ASC`,
-          [insightId, userId]
-        ),
-        loadFinancialContextForUser(userId),
-      ])
+    const [insightResult, historyResult] = await Promise.all([
+      db.query(
+        `SELECT content, created_at FROM insights WHERE id = $1 AND user_id = $2`,
+        [insightId, userId]
+      ),
+      db.query(
+        `SELECT role, content
+         FROM (
+           SELECT role, content, created_at
+           FROM chat_messages
+           WHERE insight_id = $1 AND user_id = $2
+           ORDER BY created_at DESC
+           LIMIT 15
+         ) recent
+         ORDER BY created_at ASC`,
+        [insightId, userId]
+      ),
+    ])
 
     if (insightResult.rows.length === 0) {
       return res.status(404).json({ error: 'Insight not found' })
     }
 
+    const insightRow = insightResult.rows[0]
+
     const claudeResponseText = await askFinancialQuestion(
-      insightResult.rows[0].content,
+      insightRow.content,
       historyResult.rows,
       trimmedMessage,
-      transactions,
-      accountSummary
+      {
+        generatedAt: resolveInsightGeneratedAt(
+          insightRow.content,
+          insightRow.created_at
+        ),
+      }
     )
 
     const client = await db.connect()

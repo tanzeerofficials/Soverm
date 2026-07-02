@@ -181,7 +181,7 @@ function ChatPanel({
         )}
         {!isPending && !isError && messages.length === 0 && !isSending && (
           <p className="text-center text-xs text-[#9CA3AF]">
-            Ask a follow-up about this insight.
+            Ask Soverm what concerns you.
           </p>
         )}
         {messages.map((message, index) => (

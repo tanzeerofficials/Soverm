@@ -1,26 +1,8 @@
 import { useState } from 'react'
 import { useAuth } from '@clerk/clerk-react'
 import { useQueryClient } from '@tanstack/react-query'
+import { buildQuickQuestions } from '../lib/insightDisplay.js'
 import { sendChatMessageAndRefresh } from '../lib/sendChatMessage.js'
-
-function buildQuickQuestions(insight) {
-  let dollarAmount = null
-  for (const stat of insight.stats ?? []) {
-    const match = String(stat.value ?? '').match(/\$[\d,]+(?:\.\d{2})?/)
-    if (match) {
-      dollarAmount = match[0]
-      break
-    }
-  }
-
-  return [
-    'Which one should I prioritize?',
-    dollarAmount
-      ? `What if I only had ${dollarAmount} to work with?`
-      : 'What if I only had limited funds to work with?',
-    'Explain this in simpler terms',
-  ]
-}
 
 function InsightQuickQuestions({ insightId, insight, onError, onExpandChat }) {
   const { getToken } = useAuth()

@@ -6,6 +6,13 @@
  */
 
 import { formatInsightDate } from '../lib/formatInsightDate.js'
+import {
+  buildDeltaAriaLabel,
+  compactDeltaToneClass,
+  formatCompactDelta,
+  resolveStatType,
+  selectHistoryPreviewStats,
+} from '../lib/insightDisplay.js'
 
 function entryAccent(headlineType) {
   switch (headlineType) {
@@ -30,8 +37,48 @@ function entryAccent(headlineType) {
   }
 }
 
+function HistoryStatPreview({ stats }) {
+  const previewStats = selectHistoryPreviewStats(stats)
+
+  if (previewStats.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+      {previewStats.map((stat, index) => {
+        const statType = resolveStatType(stat)
+        const deltaLabel = formatCompactDelta(stat.delta)
+        const deltaAriaLabel = buildDeltaAriaLabel(stat.delta, statType)
+
+        return (
+          <span key={stat.label} className="inline-flex min-w-0 items-center gap-1.5">
+            {index > 0 && (
+              <span className="text-[#374151]" aria-hidden="true">
+                ·
+              </span>
+            )}
+            <span className="inline-flex min-w-0 items-center gap-1.5 rounded-md bg-[#0A0F1C]/60 px-2 py-0.5 text-xs">
+              <span className="truncate font-medium text-[#9CA3AF]">{stat.label}</span>
+              <span className="shrink-0 font-mono font-semibold text-[#F9FAFB]">{stat.value}</span>
+              {deltaLabel && (
+                <span
+                  className={`shrink-0 font-semibold ${compactDeltaToneClass(statType, stat.delta)}`}
+                  aria-label={deltaAriaLabel}
+                >
+                  {deltaLabel}
+                </span>
+              )}
+            </span>
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
 function HistoryInsightEntry({ insight, onSelect }) {
-  const { headline, headlineType, created_at } = insight
+  const { headline, headlineType, stats = [], created_at } = insight
   const { border, icon, iconClass } = entryAccent(headlineType)
   const dateLabel = formatInsightDate(created_at)
 
@@ -58,9 +105,10 @@ function HistoryInsightEntry({ insight, onSelect }) {
           )}
           {headline}
         </p>
+        <HistoryStatPreview stats={stats} />
       </div>
 
-      <span className="flex flex-shrink-0 items-center gap-1 text-xs font-medium text-[#8B5CF6] transition group-hover:text-[#A78BFA]">
+      <span className="flex flex-shrink-0 items-center gap-1 self-center text-xs font-medium text-[#8B5CF6] transition group-hover:text-[#A78BFA]">
         View insight
         <svg
           className="h-3.5 w-3.5"
