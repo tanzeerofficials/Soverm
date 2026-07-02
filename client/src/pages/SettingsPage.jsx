@@ -94,6 +94,8 @@ function SettingsPage() {
   return (
     <div className="min-h-screen bg-[#0A0F1C] text-[#F9FAFB]">
       <AppNavbar
+        backTo="/dashboard"
+        backLabel="Dashboard"
         leftContent={
           <div className="flex min-w-0 items-center gap-3 sm:gap-4">
             <Link

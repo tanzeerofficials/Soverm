@@ -19,21 +19,28 @@ const FAQ_ITEMS = [
   },
   {
     question: 'Do you sell my data?',
-    answer: 'No.',
+    answer:
+      "No. Your financial data is never sold, rented, or shared with advertisers. It's used only to generate your personal insights — nothing else.",
   },
   {
     question: 'What does the AI actually see?',
     answer:
-      'Your transaction descriptions, amounts, and account balances — used only to generate your insights. Not shared with other users or third parties beyond Plaid and Anthropic as processors.',
+      "Your transaction descriptions, amounts, and account balances. This data is sent to Anthropic's API to generate your insight, then stored securely in your account. It's never shared with other users, sold to advertisers, or used to train AI models.",
   },
   {
     question: 'Can I disconnect my bank anytime?',
-    answer: 'Yes — from your dashboard or Settings. Disconnecting stops future syncing.',
+    answer:
+      'Yes — from your dashboard at any time. Disconnecting removes Soverm\'s access immediately and stops all future syncing. Your existing insights and history are kept unless you delete your account.',
   },
   {
     question: 'Can I delete my Soverm account and all my data?',
     answer:
       'Yes. Go to Settings → Delete my account. You must type DELETE to confirm. This permanently removes your profile, bank links, transactions, insights, and chat history, and deletes your login. See our Privacy Policy for the full list.',
+  },
+  {
+    question: 'Is this a bank or a financial institution?',
+    answer:
+      "No. Soverm is a financial intelligence tool, not a bank. We don't hold, move, or manage your money — we only read your transaction data to help you understand it. The insights Soverm provides are for informational purposes and not financial advice.",
   },
 ]
 

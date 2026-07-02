@@ -62,7 +62,7 @@ function InsightCard({
       <article className="rounded-xl border border-[#1E2D45] border-l-4 border-l-[#8B5CF6] bg-[#111827] p-4 transition hover:bg-[#1A2236] sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-xs font-semibold uppercase tracking-wide text-[#8B5CF6]">
-          AI CFO
+          Soverm
         </span>
         {timestamp && (
           <time className="text-xs text-[#9CA3AF]" dateTime={new Date(created_at).toISOString()}>
