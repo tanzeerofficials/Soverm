@@ -32,6 +32,10 @@ import { disconnectAccount } from '../lib/disconnectAccount.js'
 import { fetchUsage } from '../lib/fetchUsage.js'
 import { trackUpgradeProClick } from '../lib/analytics.js'
 import { getDisplayBalance, isCreditAccount } from '../lib/balanceHelpers.js'
+import {
+  FloatingCfoChatButton,
+  FloatingCfoChatModal,
+} from '../components/FloatingCfoChat.jsx'
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-US', {
@@ -81,6 +85,7 @@ function DashboardPage() {
   const [insightLoading, setInsightLoading] = useState(false)
   const [limitReached, setLimitReached] = useState(false)
   const [chatExpanded, setChatExpanded] = useState(false)
+  const [floatingChatOpen, setFloatingChatOpen] = useState(false)
   const [pendingChatScroll, setPendingChatScroll] = useState(false)
   const [selectedRange, setSelectedRange] = useState('30d')
   const { showToast } = useToastContext()
@@ -199,7 +204,7 @@ function DashboardPage() {
 
   function handleNavbarChat() {
     if (!dashboardData?.latestInsight?.id) {
-      showToast('Generate an insight first to chat with your CFO', 'error')
+      showToast('Generate an insight first to ask Soverm', 'error')
       return
     }
 
@@ -222,10 +227,9 @@ function DashboardPage() {
       >
         <Link
           to="/history"
-          className="shrink-0 text-xs text-[#9CA3AF] transition hover:text-white sm:text-sm"
+          className="shrink-0 text-sm text-[#9CA3AF] transition hover:text-white"
         >
-          <span className="sm:hidden">History</span>
-          <span className="hidden sm:inline">View History</span>
+          View History
         </Link>
       </AppNavbar>
 
@@ -515,6 +519,20 @@ function DashboardPage() {
           }
         }}
       />
+
+      {!showFailedState && (
+        <>
+          {!floatingChatOpen && (
+            <FloatingCfoChatButton onClick={() => setFloatingChatOpen(true)} />
+          )}
+          <FloatingCfoChatModal
+            isOpen={floatingChatOpen}
+            onClose={() => setFloatingChatOpen(false)}
+            insightId={dashboardData?.latestInsight?.id}
+            onChatError={(message) => showToast(message, 'error')}
+          />
+        </>
+      )}
     </div>
   )
 }

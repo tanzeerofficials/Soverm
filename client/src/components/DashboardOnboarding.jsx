@@ -21,7 +21,7 @@ function DashboardOnboarding({ hasAccounts, hasSynced, hasInsight }) {
     {
       number: 3,
       title: 'Generate your first insight',
-      detail: 'Let your AI CFO analyze your finances.',
+      detail: 'Let Soverm analyze your finances.',
       done: false,
     },
   ]

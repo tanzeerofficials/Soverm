@@ -31,7 +31,7 @@ function PaywallCard({ spent, onUpgrade }) {
       <div className="select-none p-6 opacity-60 blur-[3px]" aria-hidden="true">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold uppercase tracking-wide text-[#8B5CF6]">
-            AI CFO
+            Soverm
           </span>
           <span className="text-xs text-[#9CA3AF]">Today</span>
         </div>

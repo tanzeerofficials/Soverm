@@ -9,6 +9,7 @@ import { SignedIn, SignedOut, SignInButton, SignUpButton } from '@clerk/clerk-re
 import { Navigate } from 'react-router-dom'
 import AppLoadingScreen from '../components/AppLoadingScreen.jsx'
 import LandingComparison from '../components/LandingComparison.jsx'
+import LandingCompoundSection from '../components/LandingCompoundSection.jsx'
 import LandingInsightPreview from '../components/LandingInsightPreview.jsx'
 import LandingNavbar from '../components/LandingNavbar.jsx'
 import SecurityFaq from '../components/SecurityFaq.jsx'
@@ -59,12 +60,16 @@ function LandingPage() {
               Your Personal Accountant
             </p>
             <h1 className="relative mt-3 text-4xl font-bold leading-tight tracking-tight text-[#F9FAFB] sm:text-5xl lg:text-6xl">
-              Your Personal Accountant tells you the truth about your money.
+              Your personal accountant tells you the truth about your money.
             </h1>
             <p className="relative mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-[#9CA3AF]">
               Accounting intelligence that monitors your transactions, analyzes where your
-              money actually goes, and delivers financial insights — so you can make
-              smarter decisions with every dollar.
+              money actually goes, and delivers financial insights — so you can make smarter
+              decisions with every dollar.
+            </p>
+            <p className="relative mx-auto mt-4 max-w-2xl text-lg leading-relaxed text-[#F9FAFB]">
+              And you know what&apos;s even more interesting? It gets sharper every single day
+              you use it.
             </p>
 
             <div className="relative mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
@@ -111,6 +116,8 @@ function LandingPage() {
           </div>
 
           <LandingInsightPreview />
+
+          <LandingCompoundSection />
 
           <LandingComparison />
 

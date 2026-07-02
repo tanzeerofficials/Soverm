@@ -19,7 +19,7 @@ function Home() {
     <main className="min-h-screen bg-slate-950 text-white">
       <section className="mx-auto flex min-h-screen w-full max-w-5xl flex-col items-start justify-center px-6 py-20">
         <p className="mb-4 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-4 py-2 text-sm font-medium text-emerald-200">
-          AI-powered personal CFO
+          AI-powered personal accountant
         </p>
         <h1 className="max-w-3xl text-5xl font-bold tracking-tight sm:text-6xl">
           Soverm helps you understand your true financial picture.

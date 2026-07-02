@@ -35,8 +35,8 @@ function LandingInsightPreview() {
           Plain English, not another spreadsheet
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-sm text-[#9CA3AF]">
-          No charts to decode. Soverm reads your transactions and provide you insights on what matters and what to prioritize to improve your finances —
-          with specific numbers and next steps.
+          No charts to decode. Soverm reads your transactions and provides insights on what
+          matters and what to prioritize — with specific numbers and next steps.
         </p>
       </div>
 

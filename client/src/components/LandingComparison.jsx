@@ -76,8 +76,8 @@ function LandingComparison() {
   return (
     <section className="mx-auto mt-24 max-w-4xl" aria-labelledby="comparison-heading">
       <div className="text-center">
-        <p className="text-sm font-medium uppercase tracking-wide text-[#9CA3AF]">
-          Why switch
+        <p className="text-sm font-medium uppercase tracking-wide text-emerald-500">
+          Why Soverm
         </p>
         <h2 id="comparison-heading" className="mt-2 text-2xl font-bold text-[#F9FAFB] sm:text-3xl">
           Spreadsheets vs. Soverm
