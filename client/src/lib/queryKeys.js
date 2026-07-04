@@ -1,4 +1,6 @@
 export const dashboardQueryKey = ['dashboard']
 export const historyQueryKey = ['history']
+export const expenseAnalyzerQueryKey = ['expense-analyzer']
+export const expenseAnalyzerSummaryQueryKey = ['expense-analyzer', 'summary']
 export const usageQueryKey = ['usage']
 export const chatQueryKey = (insightId) => ['chat', insightId]

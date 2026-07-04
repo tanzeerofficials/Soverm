@@ -111,6 +111,12 @@ function AppNavbar({ leftContent, onChatClick, backTo, backLabel, children }) {
         <div className="hidden shrink-0 items-center gap-3 lg:flex">
           {children}
           <Link
+            to="/expense-analyzer"
+            className="shrink-0 text-sm text-[#9CA3AF] transition hover:text-white"
+          >
+            Expense Analyzer
+          </Link>
+          <Link
             to="/settings"
             className="shrink-0 text-sm text-[#9CA3AF] transition hover:text-white"
           >
@@ -190,6 +196,14 @@ function AppNavbar({ leftContent, onChatClick, backTo, backLabel, children }) {
                   {children}
                 </div>
               )}
+
+              <Link
+                to="/expense-analyzer"
+                onClick={() => setMenuOpen(false)}
+                className="flex w-full items-center px-4 py-3 text-sm text-[#F9FAFB] transition hover:bg-[#1A2236]"
+              >
+                Expense Analyzer
+              </Link>
 
               <Link
                 to="/settings"

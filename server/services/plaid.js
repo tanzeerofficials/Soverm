@@ -16,6 +16,7 @@
 
 import { Configuration, PlaidApi, PlaidEnvironments } from 'plaid'
 import db from '../db/index.js'
+import { resolvePlaidTransactionCategory } from '../utils/plaidCategory.js'
 
 const configuration = new Configuration({
   basePath: PlaidEnvironments[process.env.PLAID_ENV],
@@ -49,6 +50,9 @@ export async function syncTransactionsForAccount(accessToken, cursor) {
     const response = await plaidClient.transactionsSync({
       access_token: accessToken,
       cursor: cursor || undefined,
+      options: {
+        personal_finance_category_version: 'v2',
+      },
     })
 
     const { added, modified, removed, next_cursor, has_more } = response.data
@@ -169,7 +173,7 @@ export async function syncAllAccountsForUser(userId) {
             [
               transaction.amount,
               transaction.name,
-              transaction.category ? transaction.category[0] : null,
+              resolvePlaidTransactionCategory(transaction),
               transaction.date,
               transaction.pending,
               transaction.transaction_id,
@@ -199,7 +203,7 @@ export async function syncAllAccountsForUser(userId) {
               transaction.transaction_id,
               transaction.amount,
               transaction.name,
-              transaction.category ? transaction.category[0] : null,
+              resolvePlaidTransactionCategory(transaction),
               transaction.date,
               transaction.pending,
             ]
