@@ -10,6 +10,7 @@ import { getAuth } from '@clerk/express'
 import db from '../db/index.js'
 import { generateFinancialSummary, buildPersistedInsightContent } from '../services/claude.js'
 import { loadFinancialContextForUser, loadMonthOverMonthComparison } from '../utils/financialContext.js'
+import { loadExpenseAnalyzerData } from '../utils/expenseAnalyzerData.js'
 import { getUsageSummary } from '../utils/usage.js'
 import {
   getGenerateRateLimitMessage,
@@ -89,15 +90,21 @@ router.post('/generate', async (req, res) => {
       })
     }
 
-    const [{ transactions, accountSummary }, monthOverMonthComparison] = await Promise.all([
+    const [
+      { transactions, accountSummary },
+      monthOverMonthComparison,
+      expenseAnalyzerContext,
+    ] = await Promise.all([
       loadFinancialContextForUser(userId),
       loadMonthOverMonthComparison(userId),
+      loadExpenseAnalyzerData(userId),
     ])
 
     const claudeResponse = await generateFinancialSummary(
       transactions,
       accountSummary,
-      monthOverMonthComparison
+      monthOverMonthComparison,
+      expenseAnalyzerContext
     )
 
     const persistedInsight = buildPersistedInsightContent(

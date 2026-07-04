@@ -25,7 +25,9 @@ import DashboardHeroSkeleton from '../components/DashboardHeroSkeleton.jsx'
 import AccountCardSkeleton from '../components/AccountCardSkeleton.jsx'
 import InsightCardSkeleton from '../components/InsightCardSkeleton.jsx'
 import Skeleton from '../components/Skeleton.jsx'
-import { dashboardQueryKey, usageQueryKey } from '../lib/queryKeys.js'
+import { dashboardQueryKey, expenseAnalyzerSummaryQueryKey, usageQueryKey } from '../lib/queryKeys.js'
+import { fetchExpenseAnalyzerSummary } from '../lib/fetchExpenseAnalyzer.js'
+import { isNotableTopMover } from '../lib/topMover.js'
 import { scrollToInsightChat } from '../lib/scrollToInsightChat.js'
 import { syncTransactions } from '../lib/syncTransactions.js'
 import { disconnectAccount } from '../lib/disconnectAccount.js'
@@ -152,6 +154,7 @@ function DashboardPage() {
       } finally {
         syncInFlight.current = false
         await queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+        await queryClient.invalidateQueries({ queryKey: expenseAnalyzerSummaryQueryKey })
       }
     }
 
@@ -185,6 +188,19 @@ function DashboardPage() {
   const hasSynced = !!dashboardData?.lastSyncedAt
   const hasInsight = !!dashboardData?.latestInsight
   const highlightGenerate = hasAccounts && hasSynced && !hasInsight
+
+  const { data: expenseTeaser } = useQuery({
+    queryKey: expenseAnalyzerSummaryQueryKey,
+    queryFn: () => fetchExpenseAnalyzerSummary(getToken),
+    enabled: hasAccounts,
+  })
+
+  const notableTopMover = isNotableTopMover(expenseTeaser?.topMover)
+    ? expenseTeaser.topMover
+    : null
+
+  const showExpenseTeaser =
+    (expenseTeaser?.recurringCount ?? 0) > 0 || notableTopMover != null
 
   useEffect(() => {
     if (prevAccountCount.current === null) {
@@ -349,6 +365,27 @@ function DashboardPage() {
                       {RANGE_LABELS[selectedRange]}
                     </span>
                   </div>
+                  {showExpenseTeaser && (
+                    <p className="mt-4 text-center text-xs text-[#9CA3AF]">
+                      {[
+                        notableTopMover
+                          ? `${notableTopMover.category} ${notableTopMover.direction} ${notableTopMover.percent}% vs prior 30 days`
+                          : null,
+                        (expenseTeaser?.recurringCount ?? 0) > 0
+                          ? `${expenseTeaser.recurringCount} subscription${expenseTeaser.recurringCount === 1 ? '' : 's'} detected · ${formatCurrency(expenseTeaser.totalRecurringMonthly)}/mo`
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                      {' · '}
+                      <Link
+                        to="/expense-analyzer"
+                        className="text-[#8B5CF6] transition hover:text-[#A78BFA] hover:underline"
+                      >
+                        View Expense Analyzer →
+                      </Link>
+                    </p>
+                  )}
                 </>
               )}
             </section>

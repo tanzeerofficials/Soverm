@@ -9,6 +9,10 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk'
+import {
+  buildCategoryBreakdownFromComparison,
+  computeSpendingDelta,
+} from '../utils/financialContext.js'
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -93,11 +97,14 @@ function parseClaudeJson(rawText) {
 export async function generateFinancialSummary(
   transactions,
   accountSummary,
-  monthOverMonthComparison = null
+  monthOverMonthComparison = null,
+  expenseAnalyzerContext = null
 ) {
   const formattedTransactions = formatTransactions(transactions)
   const { block: monthOverMonthBlock, instruction: monthOverMonthInstruction } =
     buildMonthOverMonthPromptContext(monthOverMonthComparison)
+  const { block: expenseAnalyzerBlock, instruction: expenseAnalyzerInstruction } =
+    buildExpenseAnalyzerPromptBlock(expenseAnalyzerContext)
 
   try {
     const response = await anthropic.messages.create({
@@ -112,7 +119,7 @@ export async function generateFinancialSummary(
 ${formattedTransactions}
 
 Account balances:
-${accountSummary}${monthOverMonthBlock}
+${accountSummary}${monthOverMonthBlock}${expenseAnalyzerBlock}
 
 Respond with ONLY this exact JSON structure, no other text:
 
@@ -147,7 +154,7 @@ Respond with ONLY this exact JSON structure, no other text:
 
 Each stat object must include "statType" and a "delta" field. Set statType to "income" for income/paycheck/deposit stats, "neutral" for cash balances, debt ratios, or other non-spend metrics, and "spending" for expense categories and overall spending. Use the pre-computed delta values provided above when the stat matches overall spending or a listed category; otherwise set "delta": null. Do not calculate percentages yourself.
 
-fullSummary must be an array of exactly 3 strings. Each string is a complete standalone paragraph. Do not use line breaks within a single string — each paragraph is its own array element.${monthOverMonthInstruction}
+fullSummary must be an array of exactly 3 strings. Each string is a complete standalone paragraph. Do not use line breaks within a single string — each paragraph is its own array element.${monthOverMonthInstruction}${expenseAnalyzerInstruction}
 
 actions must be an array of exactly 3 strings. Each one is a specific, concrete next step the person can take this week. Use real numbers from their data when relevant. Order from most urgent/impactful to least.`,
         },
@@ -176,6 +183,60 @@ function formatTransactions(transactions) {
         `${t.date} | ${t.name} | $${t.amount} | ${t.category || 'Uncategorized'}`
     )
     .join('\n')
+}
+
+export function buildExpenseAnalyzerPromptBlock(expenseAnalyzerContext) {
+  if (!expenseAnalyzerContext) {
+    return { block: '', instruction: '' }
+  }
+
+  const {
+    topMover,
+    recurringCharges = [],
+    totalRecurringMonthly = 0,
+    overallSpending,
+  } = expenseAnalyzerContext
+
+  const lines = []
+
+  if (overallSpending?.delta) {
+    const { direction, percent } = overallSpending.delta
+    lines.push(
+      `Overall spending: ${direction} ${percent ?? 0}% vs prior 30 days ($${overallSpending.currentTotal} vs $${overallSpending.priorTotal})`
+    )
+  }
+
+  if (topMover?.percent != null && topMover.direction !== 'flat' && topMover.percent >= 5) {
+    lines.push(
+      `Top category mover: ${topMover.category} ${topMover.direction} ${topMover.percent}% vs prior 30 days`
+    )
+  }
+
+  if (recurringCharges.length > 0) {
+    lines.push(
+      `Detected recurring charges: ${recurringCharges.length} totaling about $${totalRecurringMonthly}/mo`
+    )
+
+    for (const charge of recurringCharges.slice(0, 5)) {
+      lines.push(
+        `- ${charge.merchant}: $${charge.averageAmount} (${charge.cadence}, category: ${charge.category})`
+      )
+    }
+  }
+
+  if (lines.length === 0) {
+    return { block: '', instruction: '' }
+  }
+
+  return {
+    block: `
+
+Pre-computed expense analyzer signals:
+${lines.join('\n')}`,
+    instruction: `
+
+When relevant, reference detected recurring charges or the top category mover in fullSummary or actions. Use only the figures above — do not invent subscription amounts.`,
+  }
 }
 
 const MONTH_OVER_MONTH_VS_LABEL = 'vs prior 30 days'
@@ -401,21 +462,14 @@ function buildPrecomputedDeltaEntries(monthOverMonthComparison) {
     delta: toStatDelta(incomeTotalDelta),
   })
 
-  const categories = new Set([
-    ...Object.keys(currentPeriod.spending.byCategory),
-    ...Object.keys(priorPeriod.spending.byCategory),
-  ])
-
-  for (const category of categories) {
-    const current = currentPeriod.spending.byCategory[category] ?? 0
-    const prior = priorPeriod.spending.byCategory[category] ?? 0
-    const delta = computeSpendingDelta(current, prior)
-
+  for (const { category, spendingDelta } of buildCategoryBreakdownFromComparison(
+    monthOverMonthComparison
+  )) {
     entries.push({
       kind: 'category',
       label: category,
       matchTerms: [category, ...tokenizeMatchText(category)],
-      delta: toStatDelta(delta),
+      delta: toStatDelta(spendingDelta),
     })
   }
 
@@ -566,27 +620,6 @@ export function buildPersistedInsightContent(
   }
 }
 
-function computeSpendingDelta(current, prior) {
-  if (prior === 0) {
-    if (current === 0) {
-      return { direction: 'flat', percent: 0, isNewCategory: false }
-    }
-    return { direction: 'up', percent: null, isNewCategory: true }
-  }
-
-  const rawPercent = Math.round(((current - prior) / prior) * 100)
-
-  if (rawPercent === 0) {
-    return { direction: 'flat', percent: 0, isNewCategory: false }
-  }
-
-  return {
-    direction: rawPercent > 0 ? 'up' : 'down',
-    percent: Math.abs(rawPercent),
-    isNewCategory: false,
-  }
-}
-
 function toStatDelta(delta) {
   if (!delta) {
     return null
@@ -643,23 +676,16 @@ No month-over-month comparison is available for this user. Do not reference any 
     priorPeriod.income.total
   )
 
-  const categories = new Set([
-    ...Object.keys(currentPeriod.spending.byCategory),
-    ...Object.keys(priorPeriod.spending.byCategory),
-  ])
-
-  const rankedCategoryChanges = [...categories]
-    .map((category) => {
-      const current = currentPeriod.spending.byCategory[category] ?? 0
-      const prior = priorPeriod.spending.byCategory[category] ?? 0
-      const delta = computeSpendingDelta(current, prior)
-      const magnitude = delta.isNewCategory ? current : (delta.percent ?? 0)
-
-      return { category, current, prior, delta, magnitude }
-    })
-    .sort((a, b) => b.magnitude - a.magnitude)
-
-  const topCategoryChanges = rankedCategoryChanges.slice(0, 2)
+  const topCategoryChanges = buildCategoryBreakdownFromComparison(
+    monthOverMonthComparison
+  )
+    .slice(0, 2)
+    .map(({ category, currentTotal, priorTotal, spendingDelta }) => ({
+      category,
+      current: currentTotal,
+      prior: priorTotal,
+      delta: spendingDelta,
+    }))
 
   const lines = [
     formatDeltaForPrompt(
