@@ -19,8 +19,17 @@ function assert(condition, message) {
   }
 }
 
-function tx(name, amount, date, category = 'Subscriptions') {
-  return { name, amount, date, category, pending: false }
+function tx(name, amount, date, category = 'Subscriptions', account = null) {
+  return {
+    name,
+    amount,
+    date,
+    category,
+    pending: false,
+    account_id: account?.id ?? null,
+    account_name: account?.name ?? null,
+    bank_name: account?.bankName ?? null,
+  }
 }
 
 function daysAgo(days) {
@@ -51,6 +60,7 @@ try {
   assert(payload.overallSpending.currentTotal > 0, 'Overall spending current total')
   assert(typeof payload.narrativeSummary === 'string', 'Narrative summary should be a string')
   assert(summary.recurringCount === payload.recurringCharges.length, 'Summary recurring count')
+  assert(Array.isArray(summary.recurringPreview), 'Summary includes recurring preview')
   console.log('  pass: full payload and summary helpers')
   passed++
 
@@ -71,7 +81,7 @@ try {
 
   const prompt = buildExpenseAnalyzerPromptBlock(payload)
   assert(prompt.block.includes('Pre-computed expense analyzer signals'), 'Prompt block present')
-  assert(prompt.block.includes('SPOTIFY'), 'Prompt includes recurring merchant')
+  assert(prompt.block.includes('Spotify'), 'Prompt includes recurring merchant')
   console.log('  pass: insight prompt block from expense context')
   passed++
 

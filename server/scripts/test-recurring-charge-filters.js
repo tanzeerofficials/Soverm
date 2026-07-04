@@ -9,6 +9,7 @@ import {
   isExcludedFromRecurringDetection,
   isNoisyRecurringCategory,
   merchantSuggestsSubscription,
+  resolveSubscriptionMerchantKeyword,
 } from '../utils/recurringChargeFilters.js'
 
 function assert(condition, message) {
@@ -62,6 +63,14 @@ try {
 
   assert(merchantSuggestsSubscription('NETFLIX.COM'), 'Netflix keyword')
   assert(merchantSuggestsSubscription('PLANET FITNESS MEMBERSHIP'), 'Gym keyword')
+  assert(merchantSuggestsSubscription('REPLIT INC'), 'Replit keyword')
+  assert(merchantSuggestsSubscription('ANTHROPIC'), 'Anthropic keyword')
+  assert(merchantSuggestsSubscription('CLAUDE.AI SUBSCRIPTION'), 'Claude keyword')
+  assert(
+    resolveSubscriptionMerchantKeyword('CHECKCARD 0504 CLAUDE.AI SUBSCRIPTION ANTHROPIC.COMCA') ===
+      'claude',
+    'Claude subscription still resolves as subscription keyword'
+  )
   assert(!merchantSuggestsSubscription("McDonald's"), 'McDonald\'s not a subscription keyword')
   console.log('  pass: subscription merchant keywords')
   passed++

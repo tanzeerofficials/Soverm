@@ -39,16 +39,11 @@ const EXCLUDED_CATEGORY_KEYWORDS = [
   'check',
 ]
 
-const SUBSCRIPTION_MERCHANT_KEYWORDS = [
+const SUBSCRIPTION_BRAND_KEYWORDS = [
   'spotify',
   'netflix',
   'hulu',
   'disney',
-  'gym',
-  'membership',
-  'subscription',
-  'subscr',
-  'premium',
   'adobe',
   'microsoft 365',
   'office 365',
@@ -59,10 +54,26 @@ const SUBSCRIPTION_MERCHANT_KEYWORDS = [
   'dropbox',
   'notion',
   'slack',
+  'replit',
+  'claude',
+  'anthropic',
   'planet fitness',
   'peloton',
   'classpass',
   'prime video',
+]
+
+const SUBSCRIPTION_GENERIC_KEYWORDS = [
+  'gym',
+  'membership',
+  'subscription',
+  'subscr',
+  'premium',
+]
+
+const SUBSCRIPTION_MERCHANT_KEYWORDS = [
+  ...SUBSCRIPTION_BRAND_KEYWORDS,
+  ...SUBSCRIPTION_GENERIC_KEYWORDS,
 ]
 
 const COINCIDENTAL_MERCHANT_FRAGMENTS = [
@@ -168,13 +179,30 @@ export function isExcludedFromRecurringDetection(row) {
   )
 }
 
-export function merchantSuggestsSubscription(name) {
+export function resolveSubscriptionMerchantKeyword(name) {
   if (!name || typeof name !== 'string') {
-    return false
+    return null
   }
 
   const normalized = name.toLowerCase()
-  return SUBSCRIPTION_MERCHANT_KEYWORDS.some((keyword) => normalized.includes(keyword))
+
+  for (const keyword of SUBSCRIPTION_BRAND_KEYWORDS) {
+    if (normalized.includes(keyword)) {
+      return keyword
+    }
+  }
+
+  for (const keyword of SUBSCRIPTION_GENERIC_KEYWORDS) {
+    if (normalized.includes(keyword)) {
+      return keyword
+    }
+  }
+
+  return null
+}
+
+export function merchantSuggestsSubscription(name) {
+  return resolveSubscriptionMerchantKeyword(name) != null
 }
 
 export function isCoincidentalMerchantName(name) {

@@ -218,8 +218,9 @@ export function buildExpenseAnalyzerPromptBlock(expenseAnalyzerContext) {
     )
 
     for (const charge of recurringCharges.slice(0, 5)) {
+      const accountSuffix = charge.accountLabel ? `, account: ${charge.accountLabel}` : ''
       lines.push(
-        `- ${charge.merchant}: $${charge.averageAmount} (${charge.cadence}, category: ${charge.category})`
+        `- ${charge.merchant}: $${charge.averageAmount} (${charge.cadence}, category: ${charge.category}${accountSuffix})`
       )
     }
   }

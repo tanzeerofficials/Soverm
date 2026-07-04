@@ -18,6 +18,69 @@ import { Configuration, PlaidApi, PlaidEnvironments } from 'plaid'
 import db from '../db/index.js'
 import { resolvePlaidTransactionCategory } from '../utils/plaidCategory.js'
 
+function formatBackfillDate(date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+/*
+ * backfillMissingCategoriesForItem(accessToken, userId)
+ *
+ * Fetches recent Plaid transactions and fills category on rows that were
+ * stored before personal_finance_category support existed.
+ */
+async function backfillMissingCategoriesForItem(accessToken, userId) {
+  const endDate = formatBackfillDate(new Date())
+  const start = new Date()
+  start.setDate(start.getDate() - 90)
+  const startDate = formatBackfillDate(start)
+
+  let offset = 0
+  let backfilled = 0
+
+  while (true) {
+    const response = await plaidClient.transactionsGet({
+      access_token: accessToken,
+      start_date: startDate,
+      end_date: endDate,
+      options: {
+        offset,
+        count: 500,
+        include_personal_finance_category: true,
+      },
+    })
+
+    const transactions = response.data.transactions ?? []
+
+    for (const transaction of transactions) {
+      const category = resolvePlaidTransactionCategory(transaction)
+      if (!category) {
+        continue
+      }
+
+      const updateResult = await db.query(
+        `UPDATE transactions
+         SET category = $1
+         WHERE plaid_transaction_id = $2
+           AND user_id = $3
+           AND category IS NULL`,
+        [category, transaction.transaction_id, userId]
+      )
+      backfilled += updateResult.rowCount
+    }
+
+    if (transactions.length < 500) {
+      break
+    }
+
+    offset += transactions.length
+  }
+
+  return backfilled
+}
+
 const configuration = new Configuration({
   basePath: PlaidEnvironments[process.env.PLAID_ENV],
   baseOptions: {
@@ -111,7 +174,7 @@ function groupAccountsByPlaidItem(accounts) {
 }
 
 export async function syncAllAccountsForUser(userId) {
-  const counts = { added: 0, modified: 0, removed: 0 }
+  const counts = { added: 0, modified: 0, removed: 0, categoriesBackfilled: 0 }
 
   try {
     const accountsResult = await db.query(
@@ -246,6 +309,18 @@ export async function syncAllAccountsForUser(userId) {
            WHERE user_id = $2 AND plaid_access_token = $3`,
           [syncResult.nextCursor, userId, accessToken]
         )
+
+        try {
+          counts.categoriesBackfilled += await backfillMissingCategoriesForItem(
+            accessToken,
+            userId
+          )
+        } catch (backfillErr) {
+          console.warn(
+            `Category backfill skipped for user ${userId}:`,
+            backfillErr.response?.data?.error_message ?? backfillErr.message
+          )
+        }
       } catch (itemErr) {
         console.error(
           `Failed to sync Plaid item for user ${userId} (${groupAccounts.length} account(s)):`,

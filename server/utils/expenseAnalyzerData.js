@@ -1,5 +1,5 @@
 import db from '../db/index.js'
-import { normalizeMerchantName } from './merchantNormalize.js'
+import { normalizeMerchantName, formatMerchantDisplayLabel } from './merchantNormalize.js'
 import {
   isCoincidentalMerchantName,
   isExcludedFromRecurringDetection,
@@ -12,6 +12,25 @@ import {
   computeSpendingDelta,
   isSignificantCategoryDelta,
 } from './financialContext.js'
+import { formatAccountLabel } from './accountLabel.js'
+import {
+  buildCategoryAccountBreakdowns,
+  buildCategoryDrillDownMaps,
+} from './categoryBreakdownEnhancements.js'
+import {
+  computeRecurringVsOneTimeSplit,
+  getCategoryRecurringOneTimeFields,
+} from './recurringVsOneTime.js'
+import {
+  deriveBorderlineDetectionReason,
+  deriveHeuristicDetectionReason,
+  partitionRecurringCharges,
+} from './recurringDetectionMeta.js'
+import {
+  fetchPlaidRecurringOutflowsForUser,
+  mergeRecurringCharges,
+} from '../services/plaidRecurring.js'
+import { buildNarrativeMeta } from './expenseAnalyzerNarrativeBrief.js'
 
 export const NON_PENDING_FILTER = 'AND (pending IS NOT TRUE)'
 const RECURRING_LOOKBACK_INTERVAL = '3 months'
@@ -84,6 +103,81 @@ function isPostedSpendingRow(row) {
   return Number.isFinite(amount) && amount > 0 && row.date && row.pending !== true
 }
 
+function resolveAccountSnapshot(row) {
+  return {
+    id: row.account_id ?? row.accountId ?? null,
+    name: row.account_name ?? row.accountName ?? 'Disconnected account',
+    bankName: row.bank_name ?? row.bankName ?? null,
+  }
+}
+
+function accountSnapshotKey(account) {
+  return account.id ?? `${account.bankName ?? ''}:${account.name ?? ''}`
+}
+
+function mergeAccountSnapshots(existingAccounts, incomingAccounts) {
+  const merged = [...existingAccounts]
+
+  for (const account of incomingAccounts) {
+    if (merged.some((entry) => accountSnapshotKey(entry) === accountSnapshotKey(account))) {
+      continue
+    }
+
+    merged.push(account)
+  }
+
+  return merged
+}
+
+function attachAccountsToRow(row) {
+  return {
+    ...row,
+    accounts: row.accounts ?? [resolveAccountSnapshot(row)],
+  }
+}
+
+function resolveAccountsFromChain(chain) {
+  const merged = []
+
+  for (const row of chain) {
+    merged.push(...(row.accounts ?? [resolveAccountSnapshot(row)]))
+  }
+
+  const byKey = new Map()
+  for (const account of merged) {
+    byKey.set(accountSnapshotKey(account), account)
+  }
+
+  return [...byKey.values()]
+}
+
+function buildPublicAccountFields(chain) {
+  const primaryAccount = resolveAccountSnapshot(chain[chain.length - 1])
+  const accounts = resolveAccountsFromChain(chain)
+  const ordered = [
+    primaryAccount,
+    ...accounts.filter(
+      (account) => accountSnapshotKey(account) !== accountSnapshotKey(primaryAccount)
+    ),
+  ].map((account) => ({
+    id: account.id,
+    name: account.name,
+    bankName: account.bankName,
+    label: formatAccountLabel(account),
+  }))
+
+  const accountLabel =
+    ordered.length <= 1
+      ? ordered[0]?.label ?? null
+      : `${ordered[0].label} +${ordered.length - 1} more`
+
+  return {
+    accounts: ordered,
+    accountLabel,
+    primaryAccount: ordered[0] ?? null,
+  }
+}
+
 function dedupeCrossAccountTransactions(transactions) {
   const sorted = [...transactions].sort(
     (left, right) => parseDateOnly(left.date) - parseDateOnly(right.date)
@@ -96,15 +190,24 @@ function dedupeCrossAccountTransactions(transactions) {
     const duplicate = kept.find((existing) => {
       const sameMerchant = normalizeMerchantName(existing.name) === merchantKey
       const sameAmount = Math.abs(Number(existing.amount) - amount) <= amount * RECURRING_AMOUNT_TOLERANCE
+      const sameCalendarDay =
+        formatDateOnly(parseDateOnly(existing.date)) === formatDateOnly(parseDateOnly(row.date))
       const closeDates =
+        sameCalendarDay ||
         Math.abs(daysBetween(existing.date, row.date)) <= CROSS_ACCOUNT_DEDUPE_DAYS
 
       return sameMerchant && sameAmount && closeDates
     })
 
-    if (!duplicate) {
-      kept.push(row)
+    if (duplicate) {
+      duplicate.accounts = mergeAccountSnapshots(
+        duplicate.accounts ?? [resolveAccountSnapshot(duplicate)],
+        [resolveAccountSnapshot(row)]
+      )
+      continue
     }
+
+    kept.push(attachAccountsToRow(row))
   }
 
   return kept
@@ -133,7 +236,9 @@ function allGapsWithin(chain, minDays, maxDays) {
 }
 
 function resolveMerchantLabel(chain) {
-  return chain[chain.length - 1].name || chain[0].name || ''
+  const raw = chain[chain.length - 1].name || chain[0].name || ''
+  const groupingKey = normalizeMerchantName(raw)
+  return formatMerchantDisplayLabel(groupingKey, raw)
 }
 
 function amountsAreIdentical(amounts) {
@@ -200,7 +305,7 @@ function shouldAcceptRecurringChain(chain, rule) {
       return (
         chain.length >= 2 &&
         amountsWithinTolerance(amounts, KEYWORD_AMOUNT_TOLERANCE) &&
-        allGapsWithin(chain, STRICT_MONTHLY_MIN_DAYS, STRICT_MONTHLY_MAX_DAYS)
+        allGapsWithin(chain, rule.minDays, rule.maxDays)
       )
     }
 
@@ -304,23 +409,42 @@ function buildRecurringChargeFromMatch({ chain, rule }) {
 
   const merchantName = resolveMerchantLabel(chain)
   const hasKeyword = merchantSuggestsSubscription(merchantName)
+  const accountFields = buildPublicAccountFields(chain)
+  const merchantKey = normalizeMerchantName(chain[0]?.name ?? merchantName)
+  const category = resolveCategoryFromChain(chain)
+  const isIdenticalFallback = isIdenticalAmountFallbackChain(chain)
+  const confidence =
+    hasKeyword && chain.length >= 3
+      ? 'high'
+      : isIdenticalFallback
+        ? 'medium'
+        : chain.length >= 4 && amountsAreIdentical(amounts)
+          ? 'high'
+          : 'medium'
+  const detectionReason = deriveHeuristicDetectionReason({
+    chain,
+    rule,
+    merchantName,
+    hasKeyword,
+    amounts,
+    category,
+    isIdenticalFallback,
+  })
 
   return {
-    merchant: chain[chain.length - 1].name || chain[0].name || 'Unknown merchant',
-    category: resolveCategoryFromChain(chain),
+    merchant: resolveMerchantLabel(chain) || 'Unknown merchant',
+    category,
     averageAmount,
     cadence: rule.cadence,
     lastChargedDate: formatDateOnly(parseDateOnly(lastChargedDate)),
     nextExpectedDate: addDays(lastChargedDate, gapDays || rule.averageGapDays),
     occurrenceCount: chain.length,
-    confidence:
-      hasKeyword && chain.length >= 3
-        ? 'high'
-        : isIdenticalAmountFallbackChain(chain)
-          ? 'medium'
-          : chain.length >= 4 && amountsAreIdentical(amounts)
-            ? 'high'
-            : 'medium',
+    ...accountFields,
+    merchantKey,
+    source: 'heuristic',
+    detectionReason,
+    needsReview: confidence !== 'high',
+    confidence,
     monthlyEquivalent:
       Math.round(monthlyEquivalentAmount(averageAmount, rule.cadence) * 100) / 100,
   }
@@ -363,6 +487,127 @@ export function detectRecurringChargesFromTransactions(transactions) {
   }
 
   return recurring.sort((left, right) => right.monthlyEquivalent - left.monthlyEquivalent)
+}
+
+function buildBorderlineChargeFromMatch({ chain, rule, identicalAmounts }) {
+  const amounts = chain.map((row) => Number(row.amount))
+  const averageAmount =
+    Math.round((amounts.reduce((sum, amount) => sum + amount, 0) / amounts.length) * 100) /
+    100
+  const lastChargedDate = chain[chain.length - 1].date
+  const gapDays = averageGapDays(chain)
+  const merchantName = resolveMerchantLabel(chain)
+  const hasKeyword = merchantSuggestsSubscription(merchantName)
+  const accountFields = buildPublicAccountFields(chain)
+
+  return {
+    merchant: merchantName || 'Unknown merchant',
+    category: resolveCategoryFromChain(chain),
+    averageAmount,
+    cadence: rule.cadence,
+    lastChargedDate: formatDateOnly(parseDateOnly(lastChargedDate)),
+    nextExpectedDate: addDays(lastChargedDate, gapDays || rule.averageGapDays),
+    occurrenceCount: chain.length,
+    ...accountFields,
+    merchantKey: normalizeMerchantName(chain[0]?.name ?? merchantName),
+    source: 'heuristic',
+    confidence: 'low',
+    needsReview: true,
+    detectionReason: deriveBorderlineDetectionReason({
+      merchantName,
+      chainLength: chain.length,
+      hasKeyword,
+      identicalAmounts: identicalAmounts ? averageAmount : null,
+    }),
+    monthlyEquivalent:
+      Math.round(monthlyEquivalentAmount(averageAmount, rule.cadence) * 100) / 100,
+  }
+}
+
+export function detectBorderlineRecurringCandidates(transactions, acceptedMerchantKeys) {
+  const monthlyRule = CADENCE_RULES.find((rule) => rule.cadence === 'monthly')
+  if (!monthlyRule) {
+    return []
+  }
+
+  const postedSpending = dedupeCrossAccountTransactions(
+    transactions.filter(
+      (row) => isPostedSpendingRow(row) && !isExcludedFromRecurringDetection(row)
+    )
+  )
+  const byMerchant = new Map()
+
+  for (const row of postedSpending) {
+    const key = normalizeMerchantName(row.name)
+    const group = byMerchant.get(key) ?? []
+    group.push(row)
+    byMerchant.set(key, group)
+  }
+
+  const candidates = []
+
+  for (const group of byMerchant.values()) {
+    const merchantKey = normalizeMerchantName(group[0]?.name ?? '')
+    if (acceptedMerchantKeys.has(merchantKey)) {
+      continue
+    }
+
+    const merchantName = resolveMerchantLabel(group)
+    if (isCoincidentalMerchantName(merchantName)) {
+      continue
+    }
+
+    if (merchantSuggestsSubscription(merchantName)) {
+      continue
+    }
+
+    const match = findBestChainForCadence(group, monthlyRule)
+    if (!match || match.chain.length !== 2) {
+      continue
+    }
+
+    if (match.chain.some(isExcludedFromRecurringDetection)) {
+      continue
+    }
+
+    const amounts = match.chain.map((row) => Number(row.amount))
+    const identical = amountsAreIdentical(amounts)
+    const monthlyGaps = allGapsWithin(match.chain, monthlyRule.minDays, monthlyRule.maxDays)
+    const tightGaps = allGapsWithin(
+      match.chain,
+      IDENTICAL_AMOUNT_MIN_DAYS,
+      IDENTICAL_AMOUNT_MAX_DAYS
+    )
+    const category = resolveCategoryFromChain(match.chain)
+
+    if (identical && tightGaps && monthlyGaps) {
+      candidates.push(
+        buildBorderlineChargeFromMatch({
+          chain: match.chain,
+          rule: monthlyRule,
+          identicalAmounts: true,
+        })
+      )
+      continue
+    }
+
+    if (
+      monthlyGaps &&
+      amountsWithinTolerance(amounts) &&
+      isSubscriptionLikelyCategory(category) &&
+      !isNoisyRecurringCategory(category)
+    ) {
+      candidates.push(
+        buildBorderlineChargeFromMatch({
+          chain: match.chain,
+          rule: monthlyRule,
+          identicalAmounts: false,
+        })
+      )
+    }
+  }
+
+  return candidates.sort((left, right) => right.monthlyEquivalent - left.monthlyEquivalent)
 }
 
 function isWithinDaysAgo(dateInput, days) {
@@ -488,6 +733,7 @@ export function buildTemplateNarrative({
   topMover,
   overallSpending,
   recurringCharges,
+  reviewCharges,
   totalRecurringMonthly,
 }) {
   const parts = []
@@ -521,6 +767,12 @@ export function buildTemplateNarrative({
     )
   }
 
+  if (reviewCharges?.length > 0) {
+    parts.push(
+      `${reviewCharges.length} pattern${reviewCharges.length === 1 ? '' : 's'} in Review might be subscriptions — or repeat one-offs like frequent rides or coffee.`
+    )
+  }
+
   if (parts.length === 0) {
     return null
   }
@@ -528,9 +780,34 @@ export function buildTemplateNarrative({
   return parts.join(' ')
 }
 
-export function buildExpenseAnalyzerPayload(comparison, recurringLookbackRows) {
-  const recurringCharges = detectRecurringChargesFromTransactions(recurringLookbackRows)
+function stripInternalRecurringFields(charges) {
+  return charges.map(({ merchantKey, rawName, plaidStreamId, ...publicCharge }) => publicCharge)
+}
+
+export function buildExpenseAnalyzerPayload(comparison, recurringLookbackRows, options = {}) {
+  const heuristicCharges = detectRecurringChargesFromTransactions(recurringLookbackRows)
+  const mergedRecurring = options.plaidRecurringCharges
+    ? mergeRecurringCharges(heuristicCharges, options.plaidRecurringCharges)
+    : heuristicCharges
+  const acceptedMerchantKeys = new Set(
+    mergedRecurring.map(
+      (charge) => charge.merchantKey ?? normalizeMerchantName(charge.merchant)
+    )
+  )
+  const borderlineCandidates = detectBorderlineRecurringCandidates(
+    recurringLookbackRows,
+    acceptedMerchantKeys
+  )
+  const { confirmed, review } = partitionRecurringCharges([
+    ...mergedRecurring,
+    ...borderlineCandidates,
+  ])
+  const recurringCharges = stripInternalRecurringFields(confirmed)
+  const reviewCharges = stripInternalRecurringFields(review)
   const recurringByCategory = groupRecurringByCategory(recurringCharges)
+  const recurringOneTimeSplit = computeRecurringVsOneTimeSplit(recurringLookbackRows, confirmed)
+  const accountBreakdowns = buildCategoryAccountBreakdowns(recurringLookbackRows)
+  const drillDowns = buildCategoryDrillDownMaps(recurringLookbackRows)
   const currentSpendingTotal = comparison.currentPeriod.spending.total
   const priorSpendingTotal = comparison.priorPeriod.spending.total
   const overallDelta = comparison.hasComparisonData
@@ -538,17 +815,30 @@ export function buildExpenseAnalyzerPayload(comparison, recurringLookbackRows) {
     : null
 
   const categoryBreakdown = buildCategoryBreakdownFromComparison(comparison).map(
-    ({ category, currentTotal, priorTotal, spendingDelta }) => ({
-      category,
-      currentTotal,
-      priorTotal,
-      delta: toPublicCategoryDelta(spendingDelta),
-      percentOfTotal:
-        currentSpendingTotal > 0
-          ? Math.round((currentTotal / currentSpendingTotal) * 1000) / 10
-          : 0,
-      recurringCharges: recurringByCategory[category] ?? [],
-    })
+    ({ category, currentTotal, priorTotal, spendingDelta }) => {
+      const drillDown = drillDowns.get(category) ?? { topMerchants: [], recentTransactions: [] }
+      const { recurringMonthly, oneTimeTotal } = getCategoryRecurringOneTimeFields(
+        category,
+        recurringOneTimeSplit
+      )
+
+      return {
+        category,
+        currentTotal,
+        priorTotal,
+        delta: toPublicCategoryDelta(spendingDelta),
+        percentOfTotal:
+          currentSpendingTotal > 0
+            ? Math.round((currentTotal / currentSpendingTotal) * 1000) / 10
+            : 0,
+        recurringMonthly,
+        oneTimeTotal,
+        accountBreakdown: accountBreakdowns.get(category) ?? [],
+        topMerchants: drillDown.topMerchants,
+        recentTransactions: drillDown.recentTransactions,
+        recurringCharges: recurringByCategory[category] ?? [],
+      }
+    }
   )
 
   const overallSpending = {
@@ -561,20 +851,38 @@ export function buildExpenseAnalyzerPayload(comparison, recurringLookbackRows) {
   }
 
   const totalRecurringMonthly = sumRecurringMonthly(recurringCharges)
+  const totalReviewMonthly = sumRecurringMonthly(reviewCharges)
   const topMover = deriveTopMover(categoryBreakdown)
+
+  const overallSpendingWithSplit = {
+    ...overallSpending,
+    recurringMonthly: totalRecurringMonthly,
+    oneTimeTotal: recurringOneTimeSplit.totalOneTime,
+  }
 
   return {
     categoryBreakdown,
     recurringCharges,
+    reviewCharges,
     recurringByCategory,
     topMover,
     totalRecurringMonthly,
-    overallSpending,
+    totalReviewMonthly,
+    overallSpending: overallSpendingWithSplit,
     narrativeSummary: buildTemplateNarrative({
       topMover,
       overallSpending,
       recurringCharges,
+      reviewCharges,
       totalRecurringMonthly,
+    }),
+    narrativeMeta: buildNarrativeMeta({
+      categoryBreakdown,
+      recurringCharges,
+      reviewCharges,
+      topMover,
+      totalRecurringMonthly,
+      overallSpending: overallSpendingWithSplit,
     }),
   }
 }
@@ -582,36 +890,53 @@ export function buildExpenseAnalyzerPayload(comparison, recurringLookbackRows) {
 export function buildExpenseAnalyzerSummary(payload) {
   return {
     recurringCount: payload.recurringCharges.length,
+    reviewCount: payload.reviewCharges?.length ?? 0,
     totalRecurringMonthly: payload.totalRecurringMonthly,
     topMover: payload.topMover,
+    recurringPreview: payload.recurringCharges.slice(0, 3).map((charge) => ({
+      merchant: charge.merchant,
+      accountLabel: charge.accountLabel,
+      monthlyEquivalent: charge.monthlyEquivalent,
+    })),
   }
 }
 
 export async function loadExpenseAnalyzerData(userId) {
-  const result = await db.query(
-    `SELECT name, amount, date, category, pending
-     FROM transactions
-     WHERE user_id = $1
-       AND date >= NOW() - $2::interval
-       ${NON_PENDING_FILTER}
-     ORDER BY date ASC`,
-    [userId, RECURRING_LOOKBACK_INTERVAL]
-  )
+  const [result, plaidRecurringCharges] = await Promise.all([
+    db.query(
+      `SELECT t.name, t.amount, t.date, t.category, t.pending,
+              t.account_id,
+              COALESCE(a.account_name, 'Disconnected account') AS account_name,
+              a.bank_name
+       FROM transactions t
+       LEFT JOIN accounts a ON t.account_id = a.id AND a.user_id = t.user_id
+       WHERE t.user_id = $1
+         AND t.date >= NOW() - $2::interval
+         ${NON_PENDING_FILTER}
+       ORDER BY t.date ASC`,
+      [userId, RECURRING_LOOKBACK_INTERVAL]
+    ),
+    fetchPlaidRecurringOutflowsForUser(userId),
+  ])
 
   const comparison = buildComparisonFromTransactions(result.rows)
 
-  return buildExpenseAnalyzerPayload(comparison, result.rows)
+  return buildExpenseAnalyzerPayload(comparison, result.rows, { plaidRecurringCharges })
 }
 
 export async function loadRecentTransactionsForRecurring(userId) {
   const result = await db.query(
-    `SELECT name, amount, date, category, pending
-     FROM transactions
-     WHERE user_id = $1
-       AND amount > 0
-       AND date >= NOW() - $2::interval
+    `SELECT t.name, t.amount, t.date, t.category, t.pending,
+            t.account_id,
+            COALESCE(a.account_name, 'Disconnected account') AS account_name,
+            a.bank_name
+     FROM transactions t
+     LEFT JOIN accounts a ON t.account_id = a.id AND a.user_id = t.user_id
+     WHERE t.user_id = $1
+       AND t.amount > 0
+       AND t.date >= NOW() - $2::interval
        ${NON_PENDING_FILTER}
-     ORDER BY date ASC`,
+     ORDER BY t.date ASC`,
     [userId, RECURRING_LOOKBACK_INTERVAL]
   )
 

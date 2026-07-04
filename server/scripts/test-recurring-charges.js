@@ -11,6 +11,7 @@ import {
   isHardExcludedPaymentName,
   isNoisyRecurringCategory,
   matchesExcludedRecurringName,
+  resolveSubscriptionMerchantKeyword,
 } from '../utils/recurringChargeFilters.js'
 import {
   buildComparisonFromTransactions,
@@ -24,8 +25,17 @@ function assert(condition, message) {
   }
 }
 
-function tx(name, amount, date, category = null, pending = false) {
-  return { name, amount, date, category, pending }
+function tx(name, amount, date, category = null, pending = false, account = null) {
+  return {
+    name,
+    amount,
+    date,
+    category,
+    pending,
+    account_id: account?.id ?? null,
+    account_name: account?.name ?? null,
+    bank_name: account?.bankName ?? null,
+  }
 }
 
 let passed = 0
@@ -43,6 +53,18 @@ try {
   assert(isNoisyRecurringCategory(null), 'NULL category treated as noisy/uncategorized')
   assert(isCoincidentalMerchantName("McDonald's"), 'McDonald\'s is coincidental merchant')
   assert(isCoincidentalMerchantName('Uber 072515 SF**POOL**'), 'Uber is coincidental merchant')
+  assert(
+    normalizeMerchantName(
+      'PURCHASE 0422 REPLIT, INC. REPLIT.COM CA XXXXX3461XXXXXXXXXX6827 RECURRING'
+    ) === 'replit inc replit com',
+    'Bank descriptor Replit charges normalize to shared merchant key'
+  )
+  assert(
+    normalizeMerchantName(
+      'CHECKCARD 0504 CLAUDE.AI SUBSCRIPTION ANTHROPIC.COMCA XXXXX3461XXXXXXXXXX1182 RECURRING'
+    ) === 'claude ai subscription anthropic',
+    'Bank descriptor Claude subscription maps to Claude subscription key'
+  )
   console.log('  pass: payment exclusions and null-category handling')
   passed++
 
@@ -54,6 +76,104 @@ try {
   assert(spotifyCharges.length === 1, 'Expected one Spotify subscription')
   assert(spotifyCharges[0].occurrenceCount === 3, 'Expected 3 Spotify charges')
   console.log('  pass: keyword subscription still detected with null categories')
+  passed++
+
+  const replit = detectRecurringChargesFromTransactions([
+    tx('REPLIT INC', 20, '2026-04-10', null),
+    tx('REPLIT INC', 20, '2026-05-10', null),
+  ])
+  assert(replit.length === 1, 'Replit detected via subscription keyword with 2 monthly hits')
+  assert(replit[0].confidence === 'medium', 'Replit at 2 hits is medium confidence')
+  console.log('  pass: Replit SaaS subscription detected by keyword')
+  passed++
+
+  const anthropic = detectRecurringChargesFromTransactions([
+    tx('ANTHROPIC', 20, '2026-04-10', null),
+    tx('ANTHROPIC', 20, '2026-05-10', null),
+  ])
+  assert(anthropic.length === 1, 'Anthropic detected via subscription keyword')
+  console.log('  pass: Anthropic SaaS subscription detected by keyword')
+  passed++
+
+  const railwayReplit = detectRecurringChargesFromTransactions([
+    tx(
+      'PURCHASE 0422 REPLIT, INC. REPLIT.COM CA XXXXX3461XXXXXXXXXX6827 RECURRING',
+      20.6,
+      '2026-04-23'
+    ),
+    tx(
+      'PURCHASE 0422 REPLIT, INC. REPLIT.COM CA XXXXX3461XXXXXXXXXX6827 RECURRING',
+      20.6,
+      '2026-04-23'
+    ),
+    tx(
+      'PURCHASE 0522 REPLIT, INC. REPLIT.COM CA XXXXX3461XXXXXXXXXX5660 RECURRING',
+      20.6,
+      '2026-05-26'
+    ),
+    tx(
+      'PURCHASE 0622 REPLIT, INC. REPLIT.COM CA XXXXX3461XXXXXXXXXX5699 RECURRING',
+      20.6,
+      '2026-06-23'
+    ),
+  ])
+  assert(railwayReplit.length === 1, 'Real Replit bank descriptors form one recurring charge')
+  assert(railwayReplit[0].merchant === 'Replit', 'Replit display label is human-readable')
+  assert(railwayReplit[0].occurrenceCount === 3, 'Replit dedupes same-day duplicates')
+  console.log('  pass: real-world Replit bank descriptor pattern detected')
+  passed++
+
+  const railwayClaude = detectRecurringChargesFromTransactions([
+    tx(
+      'CHECKCARD 0504 CLAUDE.AI SUBSCRIPTION ANTHROPIC.COMCA XXXXX3461XXXXXXXXXX1182 RECURRING',
+      21.2,
+      '2026-05-05'
+    ),
+    tx(
+      'CHECKCARD 0504 CLAUDE.AI SUBSCRIPTION ANTHROPIC.COMCA XXXXX3461XXXXXXXXXX1182 RECURRING',
+      21.2,
+      '2026-05-05'
+    ),
+    tx(
+      'PURCHASE 0604 ANTHROPIC* CLAUDE SUB ANTHROPIC.COMCA XXXXX3461XXXXXXXXXX7951 RECURRING',
+      21.2,
+      '2026-06-05'
+    ),
+    tx(
+      'PURCHASE 0604 ANTHROPIC* CLAUDE SUB ANTHROPIC.COMCA XXXXX3461XXXXXXXXXX7951 RECURRING',
+      21.2,
+      '2026-06-05'
+    ),
+  ])
+  assert(railwayClaude.length === 1, 'Real Claude/Anthropic descriptors form one recurring charge')
+  assert(
+    railwayClaude[0].merchant === 'Claude.ai Subscription',
+    'Claude subscription display label is human-readable'
+  )
+  assert(railwayClaude[0].occurrenceCount === 2, 'Claude monthly pair detected after dedupe')
+  console.log('  pass: real-world Claude bank descriptor pattern detected')
+  passed++
+
+  const anthropicProducts = detectRecurringChargesFromTransactions([
+    tx(
+      'CHECKCARD 0504 CLAUDE.AI SUBSCRIPTION ANTHROPIC.COMCA XXXXX3461XXXXXXXXXX1182 RECURRING',
+      21.2,
+      '2026-05-05'
+    ),
+    tx(
+      'PURCHASE 0604 ANTHROPIC* CLAUDE SUB ANTHROPIC.COMCA XXXXX3461XXXXXXXXXX7951 RECURRING',
+      21.2,
+      '2026-06-05'
+    ),
+    tx('PURCHASE 0617 ANTHROPIC ANTHROPIC.COMCA XXXXX3461XXXXXXXXXX1768', 5.15, '2026-06-18'),
+    tx('PURCHASE 0617 ANTHROPIC ANTHROPIC.COMCA XXXXX3461XXXXXXXXXX1768', 5.15, '2026-06-18'),
+  ])
+  assert(
+    anthropicProducts.length === 1,
+    'Only the Claude subscription pair is detected; $5.15 Anthropic API stays separate'
+  )
+  assert(anthropicProducts[0].averageAmount === 21.2, 'Detected Anthropic product is the subscription amount')
+  console.log('  pass: distinct Anthropic products are not merged')
   passed++
 
   const sparkfun = detectRecurringChargesFromTransactions([
@@ -129,6 +249,27 @@ try {
   ])
   assert(looseAmounts.length === 0, 'Non-keyword merchants need identical amounts')
   console.log('  pass: non-keyword merchants require identical amounts')
+  passed++
+
+  const multiAccount = detectRecurringChargesFromTransactions([
+    tx('SPOTIFY', 10.99, '2026-04-10', 'Subscriptions', false, {
+      id: 'acct-checking',
+      name: 'Checking',
+      bankName: 'Chase',
+    }),
+    tx('SPOTIFY', 10.99, '2026-05-10', 'Subscriptions', false, {
+      id: 'acct-checking',
+      name: 'Checking',
+      bankName: 'Chase',
+    }),
+  ])
+  assert(multiAccount.length === 1, 'Expected one Spotify recurring charge')
+  assert(
+    multiAccount[0].accountLabel === 'Chase · Checking',
+    'Recurring charge includes primary account label'
+  )
+  assert(multiAccount[0].accounts?.length === 1, 'Single account attached to recurring charge')
+  console.log('  pass: recurring charges include account attribution')
   passed++
 
   console.log(`\n${passed}/${passed} tests passed`)
