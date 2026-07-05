@@ -151,7 +151,109 @@ try {
     'Claude subscription display label is human-readable'
   )
   assert(railwayClaude[0].occurrenceCount === 2, 'Claude monthly pair detected after dedupe')
+  assert(railwayClaude[0].confidence === 'high', 'Two identical keyword hits with distinct bank descriptors are confirmed')
+  assert(railwayClaude[0].needsReview === false, 'Claude subscription should not be relegated to review')
   console.log('  pass: real-world Claude bank descriptor pattern detected')
+  passed++
+
+  const productionAnthropicClaudeRows = [
+    tx(
+      'CHECKCARD 0504 CLAUDE.AI SUBSCRIPTION ANTHROPIC.COMCA XXXXX3461XXXXXXXXXX1182 RECURRING',
+      21.2,
+      '2026-05-05'
+    ),
+    tx(
+      'CHECKCARD 0504 CLAUDE.AI SUBSCRIPTION ANTHROPIC.COMCA XXXXX3461XXXXXXXXXX1182 RECURRING',
+      21.2,
+      '2026-05-05'
+    ),
+    tx(
+      'PURCHASE 0604 ANTHROPIC* CLAUDE SUB ANTHROPIC.COMCA XXXXX3461XXXXXXXXXX7951 RECURRING',
+      21.2,
+      '2026-06-05'
+    ),
+    tx(
+      'PURCHASE 0604 ANTHROPIC* CLAUDE SUB ANTHROPIC.COMCA XXXXX3461XXXXXXXXXX7951 RECURRING',
+      21.2,
+      '2026-06-05'
+    ),
+    tx('PURCHASE 0617 ANTHROPIC ANTHROPIC.COMCA XXXXX3461XXXXXXXXXX1768', 5.15, '2026-06-18'),
+    tx('PURCHASE 0617 ANTHROPIC ANTHROPIC.COMCA XXXXX3461XXXXXXXXXX1768', 5.15, '2026-06-18'),
+    tx(
+      'PURCHASE 0422 REPLIT, INC. REPLIT.COM CA XXXXX3461XXXXXXXXXX6827 RECURRING',
+      20.6,
+      '2026-04-23'
+    ),
+    tx(
+      'PURCHASE 0422 REPLIT, INC. REPLIT.COM CA XXXXX3461XXXXXXXXXX6827 RECURRING',
+      20.6,
+      '2026-04-23'
+    ),
+    tx(
+      'PURCHASE 0422 REPLIT, INC. REPLIT.COM CA XXXXX3461XXXXXXXXXX9533 RECURRING',
+      25.36,
+      '2026-04-23'
+    ),
+    tx(
+      'PURCHASE 0422 REPLIT, INC. REPLIT.COM CA XXXXX3461XXXXXXXXXX9533 RECURRING',
+      25.36,
+      '2026-04-23'
+    ),
+    tx(
+      'PURCHASE 0522 REPLIT, INC. REPLIT.COM CA XXXXX3461XXXXXXXXXX5660 RECURRING',
+      20.6,
+      '2026-05-26'
+    ),
+    tx(
+      'PURCHASE 0522 REPLIT, INC. REPLIT.COM CA XXXXX3461XXXXXXXXXX5660 RECURRING',
+      20.6,
+      '2026-05-26'
+    ),
+    tx(
+      'PURCHASE 0622 REPLIT, INC. REPLIT.COM CA XXXXX3461XXXXXXXXXX5699 RECURRING',
+      23.02,
+      '2026-06-23'
+    ),
+    tx(
+      'PURCHASE 0622 REPLIT, INC. REPLIT.COM CA XXXXX3461XXXXXXXXXX5699 RECURRING',
+      23.02,
+      '2026-06-23'
+    ),
+    tx(
+      'PURCHASE 0622 REPLIT, INC. REPLIT.COM CA XXXXX3461XXXXXXXXXX6348 RECURRING',
+      20.6,
+      '2026-06-23'
+    ),
+    tx(
+      'PURCHASE 0622 REPLIT, INC. REPLIT.COM CA XXXXX3461XXXXXXXXXX6348 RECURRING',
+      20.6,
+      '2026-06-23'
+    ),
+  ]
+
+  const productionPayload = buildExpenseAnalyzerPayload(
+    buildComparisonFromTransactions(productionAnthropicClaudeRows),
+    productionAnthropicClaudeRows
+  )
+  const claudeConfirmed = productionPayload.recurringCharges.find(
+    (charge) => charge.merchant === 'Claude.ai Subscription'
+  )
+  assert(claudeConfirmed, 'real-world Anthropic Claude subscription with mixed charge amounts — confirmed recurring')
+  assert(claudeConfirmed.averageAmount === 21.2, 'Claude subscription amount is $21.20')
+  assert(claudeConfirmed.confidence === 'high', 'Claude subscription is high confidence in production-shaped data')
+  assert(
+    !productionPayload.reviewCharges.some((charge) => charge.merchant === 'Claude.ai Subscription'),
+    'Claude subscription must not be hidden in review when bank descriptors cross-match'
+  )
+  assert(
+    productionPayload.recurringCharges.some((charge) => charge.merchant === 'Replit'),
+    'Replit remains confirmed alongside Claude'
+  )
+  assert(
+    !productionPayload.recurringCharges.some((charge) => charge.averageAmount === 5.15),
+    '$5.15 Anthropic API charge must stay out of confirmed recurring'
+  )
+  console.log('  pass: real-world Anthropic Claude subscription with mixed charge amounts')
   passed++
 
   const anthropicProducts = detectRecurringChargesFromTransactions([

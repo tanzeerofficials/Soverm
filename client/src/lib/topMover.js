@@ -18,13 +18,15 @@ export function isNotableTopMover(topMover) {
 
 export function buildTopMoverHeadline(topMover) {
   const { category, direction, percent } = topMover
+  const displayCategory =
+    typeof topMover.displayCategory === 'string' ? topMover.displayCategory : category
 
   if (direction === 'down' && percent != null) {
-    return `${category} is your biggest spending improvement, down ${percent}% vs the prior 30 days`
+    return `${displayCategory} is your biggest spending improvement, down ${percent}% vs the prior 30 days`
   }
 
   if (direction === 'up' && percent != null) {
-    return `${category} is your fastest-growing category, up ${percent}% vs the prior 30 days`
+    return `${displayCategory} is your fastest-growing category, up ${percent}% vs the prior 30 days`
   }
 
   return null

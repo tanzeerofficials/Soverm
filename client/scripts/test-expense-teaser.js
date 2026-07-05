@@ -85,6 +85,13 @@ try {
     recurringCount: 3,
     totalRecurringMonthly: 124.97,
     topMover: { category: 'Dining', direction: 'up', percent: 32 },
+    recurringPreview: [
+      {
+        merchant: 'Replit',
+        accountLabel: 'Chase · Checking',
+        monthlyEquivalent: 20.6,
+      },
+    ],
   })
   assert(parts.length === 2, 'Teaser should include both top mover and subscriptions')
   console.log('  pass: combined teaser parts')

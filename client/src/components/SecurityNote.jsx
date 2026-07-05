@@ -44,7 +44,8 @@ function SecurityNote() {
         Soverm never sees or stores your bank login credentials. Plaid handles the
         secure connection to your bank and shares only your account balances and
         transactions with us. Your financial data is stored in an encrypted database
-        that only you can access. You can disconnect any account at any time.
+        that only you can access. You can disconnect any account at any time — disconnected
+        spending won&apos;t appear in new Expense Analyzer views, but your history is kept.
       </p>
     </div>
   )

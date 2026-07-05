@@ -46,7 +46,7 @@ const TRUST_PILLARS = [
   {
     title: 'You stay in control',
     description:
-      'Disconnect any bank from Settings in one click. Delete your entire Soverm account and all stored data whenever you want.',
+      'Disconnect any bank from Settings in one click — it stops syncing and drops out of your Expense Analyzer and category breakdowns, but past insights stay. Delete your entire Soverm account and all stored data whenever you want.',
     icon: (
       <path
         fillRule="evenodd"

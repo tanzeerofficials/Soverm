@@ -30,7 +30,7 @@ import { fetchExpenseAnalyzerSummary } from '../lib/fetchExpenseAnalyzer.js'
 import { isNotableTopMover } from '../lib/topMover.js'
 import { scrollToInsightChat } from '../lib/scrollToInsightChat.js'
 import { syncTransactions } from '../lib/syncTransactions.js'
-import { disconnectAccount } from '../lib/disconnectAccount.js'
+import { disconnectAccount, getDisconnectConfirmMessage } from '../lib/disconnectAccount.js'
 import { fetchUsage } from '../lib/fetchUsage.js'
 import { trackUpgradeProClick } from '../lib/analytics.js'
 import { getDisplayBalance, isCreditAccount } from '../lib/balanceHelpers.js'
@@ -366,25 +366,39 @@ function DashboardPage() {
                     </span>
                   </div>
                   {showExpenseTeaser && (
-                    <p className="mt-4 text-center text-xs text-[#9CA3AF]">
-                      {[
-                        notableTopMover
-                          ? `${notableTopMover.category} ${notableTopMover.direction} ${notableTopMover.percent}% vs prior 30 days`
-                          : null,
-                        (expenseTeaser?.recurringCount ?? 0) > 0
-                          ? `${expenseTeaser.recurringCount} subscription${expenseTeaser.recurringCount === 1 ? '' : 's'} detected · ${formatCurrency(expenseTeaser.totalRecurringMonthly)}/mo`
-                          : null,
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')}
-                      {' · '}
-                      <Link
-                        to="/expense-analyzer"
-                        className="text-[#8B5CF6] transition hover:text-[#A78BFA] hover:underline"
-                      >
-                        View Expense Analyzer →
-                      </Link>
-                    </p>
+                    <div className="mt-4 text-center">
+                      <p className="text-xs text-[#9CA3AF]">
+                        {[
+                          notableTopMover
+                            ? `${notableTopMover.category} ${notableTopMover.direction} ${notableTopMover.percent}% vs prior 30 days`
+                            : null,
+                          (expenseTeaser?.recurringCount ?? 0) > 0
+                            ? `${expenseTeaser.recurringCount} subscription${expenseTeaser.recurringCount === 1 ? '' : 's'} detected · ${formatCurrency(expenseTeaser.totalRecurringMonthly)}/mo`
+                            : null,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                        {' · '}
+                        <Link
+                          to="/expense-analyzer"
+                          className="text-[#8B5CF6] transition hover:text-[#A78BFA] hover:underline"
+                        >
+                          View Expense Analyzer →
+                        </Link>
+                      </p>
+                      {(expenseTeaser?.recurringPreview?.length ?? 0) > 0 && (
+                        <ul className="mx-auto mt-2 max-w-md space-y-1 text-xs text-[#6B7280]">
+                          {expenseTeaser.recurringPreview.map((item) => (
+                            <li key={`${item.merchant}-${item.accountLabel ?? 'unknown'}`}>
+                              {item.merchant}
+                              {item.accountLabel ? ` · ${item.accountLabel}` : ''}
+                              {' · '}
+                              {formatCurrency(item.monthlyEquivalent)}/mo
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   )}
                 </>
               )}
@@ -537,7 +551,11 @@ function DashboardPage() {
       <ConfirmModal
         isOpen={!!accountToDelete}
         title="Disconnect this account?"
-        message={`This will stop syncing "${accountToDelete?.account_name}". Your transaction history will be kept.`}
+        message={
+          accountToDelete
+            ? getDisconnectConfirmMessage(accountToDelete.account_name)
+            : ''
+        }
         confirmLabel="Disconnect"
         onCancel={() => setAccountToDelete(null)}
         onConfirm={async () => {

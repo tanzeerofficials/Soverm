@@ -9,7 +9,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test:insight-display": "node scripts/test-insight-display.js",
-    "test:badge-tone": "node scripts/test-badge-tone-logic.js"
+    "test:category-display-names": "node scripts/test-category-display-names.js",
+    "test:expense-analyzer-charts": "node scripts/test-expense-analyzer-charts.js",
+    "test:spending-visual-utils": "node scripts/test-spending-visual-utils.js"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.61.8",
