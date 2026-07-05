@@ -1,5 +1,6 @@
 import db from '../db/index.js'
 import { getDisplayBalance } from './balanceHelpers.js'
+import { CONNECTED_ACCOUNT_TRANSACTION_JOINS } from './connectedAccountTransactions.js'
 
 export { normalizeMerchantName } from './merchantNormalize.js'
 
@@ -160,71 +161,78 @@ export async function loadMonthOverMonthComparison(userId) {
     priorTransactionCountResult,
   ] = await Promise.all([
     db.query(
-      `SELECT COALESCE(SUM(amount), 0) AS total
-       FROM transactions
-       WHERE user_id = $1
-         AND amount > 0
+      `SELECT COALESCE(SUM(t.amount), 0) AS total
+       FROM transactions t
+       ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
+       WHERE t.user_id = $1
+         AND t.amount > 0
          ${NON_PENDING_FILTER}
-         AND date >= NOW() - $2::interval`,
+         AND t.date >= NOW() - $2::interval`,
       [userId, COMPARISON_PERIOD_INTERVAL]
     ),
     db.query(
-      `SELECT COALESCE(category, 'Uncategorized') AS category,
-              COALESCE(SUM(amount), 0) AS total
-       FROM transactions
-       WHERE user_id = $1
-         AND amount > 0
-         AND date >= NOW() - $2::interval
-       GROUP BY category`,
+      `SELECT COALESCE(t.category, 'Uncategorized') AS category,
+              COALESCE(SUM(t.amount), 0) AS total
+       FROM transactions t
+       ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
+       WHERE t.user_id = $1
+         AND t.amount > 0
+         AND t.date >= NOW() - $2::interval
+       GROUP BY t.category`,
       [userId, COMPARISON_PERIOD_INTERVAL]
     ),
     db.query(
-      `SELECT COALESCE(SUM(amount), 0) AS total
-       FROM transactions
-       WHERE user_id = $1
-         AND amount > 0
+      `SELECT COALESCE(SUM(t.amount), 0) AS total
+       FROM transactions t
+       ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
+       WHERE t.user_id = $1
+         AND t.amount > 0
          ${NON_PENDING_FILTER}
-         AND date >= NOW() - $3::interval
-         AND date < NOW() - $2::interval`,
+         AND t.date >= NOW() - $3::interval
+         AND t.date < NOW() - $2::interval`,
       [userId, COMPARISON_PERIOD_INTERVAL, '60 days']
     ),
     db.query(
-      `SELECT COALESCE(category, 'Uncategorized') AS category,
-              COALESCE(SUM(amount), 0) AS total
-       FROM transactions
-       WHERE user_id = $1
-         AND amount > 0
-         AND date >= NOW() - $3::interval
-         AND date < NOW() - $2::interval
-       GROUP BY category`,
+      `SELECT COALESCE(t.category, 'Uncategorized') AS category,
+              COALESCE(SUM(t.amount), 0) AS total
+       FROM transactions t
+       ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
+       WHERE t.user_id = $1
+         AND t.amount > 0
+         AND t.date >= NOW() - $3::interval
+         AND t.date < NOW() - $2::interval
+       GROUP BY t.category`,
       [userId, COMPARISON_PERIOD_INTERVAL, '60 days']
     ),
     db.query(
-      `SELECT COALESCE(SUM(ABS(amount)), 0) AS total
-       FROM transactions
-       WHERE user_id = $1
-         AND amount < 0
+      `SELECT COALESCE(SUM(ABS(t.amount)), 0) AS total
+       FROM transactions t
+       ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
+       WHERE t.user_id = $1
+         AND t.amount < 0
          ${NON_PENDING_FILTER}
-         AND date >= NOW() - $2::interval`,
+         AND t.date >= NOW() - $2::interval`,
       [userId, COMPARISON_PERIOD_INTERVAL]
     ),
     db.query(
-      `SELECT COALESCE(SUM(ABS(amount)), 0) AS total
-       FROM transactions
-       WHERE user_id = $1
-         AND amount < 0
+      `SELECT COALESCE(SUM(ABS(t.amount)), 0) AS total
+       FROM transactions t
+       ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
+       WHERE t.user_id = $1
+         AND t.amount < 0
          ${NON_PENDING_FILTER}
-         AND date >= NOW() - $3::interval
-         AND date < NOW() - $2::interval`,
+         AND t.date >= NOW() - $3::interval
+         AND t.date < NOW() - $2::interval`,
       [userId, COMPARISON_PERIOD_INTERVAL, '60 days']
     ),
     db.query(
       `SELECT COUNT(*)::int AS count
-       FROM transactions
-       WHERE user_id = $1
+       FROM transactions t
+       ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
+       WHERE t.user_id = $1
          ${NON_PENDING_FILTER}
-         AND date >= NOW() - $3::interval
-         AND date < NOW() - $2::interval`,
+         AND t.date >= NOW() - $3::interval
+         AND t.date < NOW() - $2::interval`,
       [userId, COMPARISON_PERIOD_INTERVAL, '60 days']
     ),
   ])

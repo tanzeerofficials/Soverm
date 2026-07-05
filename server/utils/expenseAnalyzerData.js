@@ -27,6 +27,10 @@ import {
   partitionRecurringCharges,
 } from './recurringDetectionMeta.js'
 import {
+  CONNECTED_ACCOUNT_TRANSACTION_JOINS,
+  EXPENSE_ANALYZER_TRANSACTION_SELECT,
+} from './connectedAccountTransactions.js'
+import {
   fetchPlaidRecurringOutflowsForUser,
   mergeRecurringCharges,
 } from '../services/plaidRecurring.js'
@@ -39,8 +43,8 @@ const RECURRING_AMOUNT_TOLERANCE = 0.05
 const KEYWORD_AMOUNT_TOLERANCE = 0.05
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 const CROSS_ACCOUNT_DEDUPE_DAYS = 3
-const STRICT_MONTHLY_MIN_DAYS = 27
-const STRICT_MONTHLY_MAX_DAYS = 32
+const STRICT_MONTHLY_MIN_DAYS = 26
+const STRICT_MONTHLY_MAX_DAYS = 34
 const IDENTICAL_AMOUNT_MIN_DAYS = 28
 const IDENTICAL_AMOUNT_MAX_DAYS = 31
 const MIN_STRICT_OCCURRENCES = 3
@@ -48,7 +52,7 @@ const MIN_STRICT_OCCURRENCES = 3
 const CADENCE_RULES = [
   { cadence: 'weekly', minDays: 6, maxDays: 8, averageGapDays: 7 },
   { cadence: 'biweekly', minDays: 13, maxDays: 15, averageGapDays: 14 },
-  { cadence: 'monthly', minDays: 27, maxDays: 33, averageGapDays: 30 },
+  { cadence: 'monthly', minDays: 26, maxDays: 34, averageGapDays: 30 },
   { cadence: 'annual', minDays: 350, maxDays: 380, averageGapDays: 365 },
 ]
 
@@ -413,14 +417,6 @@ function buildRecurringChargeFromMatch({ chain, rule }) {
   const merchantKey = normalizeMerchantName(chain[0]?.name ?? merchantName)
   const category = resolveCategoryFromChain(chain)
   const isIdenticalFallback = isIdenticalAmountFallbackChain(chain)
-  const confidence =
-    hasKeyword && chain.length >= 3
-      ? 'high'
-      : isIdenticalFallback
-        ? 'medium'
-        : chain.length >= 4 && amountsAreIdentical(amounts)
-          ? 'high'
-          : 'medium'
   const detectionReason = deriveHeuristicDetectionReason({
     chain,
     rule,
@@ -429,7 +425,21 @@ function buildRecurringChargeFromMatch({ chain, rule }) {
     amounts,
     category,
     isIdenticalFallback,
+    hasMultipleRawDescriptors: hasMultipleRawDescriptors(chain),
   })
+  const highConfidenceKeyword = isHighConfidenceKeywordChain({
+    chain,
+    rule,
+    hasKeyword,
+    amounts,
+  })
+  const confidence = highConfidenceKeyword
+    ? 'high'
+    : isIdenticalFallback
+      ? 'medium'
+      : chain.length >= 4 && amountsAreIdentical(amounts)
+        ? 'high'
+        : 'medium'
 
   return {
     merchant: resolveMerchantLabel(chain) || 'Unknown merchant',
@@ -450,6 +460,58 @@ function buildRecurringChargeFromMatch({ chain, rule }) {
   }
 }
 
+function clusterTransactionsByIdenticalAmount(transactions) {
+  const byAmountCents = new Map()
+
+  for (const row of transactions) {
+    const cents = Math.round(Number(row.amount) * 100)
+    const cluster = byAmountCents.get(cents) ?? []
+    cluster.push(row)
+    byAmountCents.set(cents, cluster)
+  }
+
+  return [...byAmountCents.values()]
+}
+
+function hasMultipleRawDescriptors(chain) {
+  return new Set(chain.map((row) => row.name)).size >= 2
+}
+
+function isHighConfidenceKeywordChain({ chain, rule, hasKeyword, amounts }) {
+  if (!hasKeyword || rule.cadence !== 'monthly') {
+    return false
+  }
+
+  if (!amountsAreIdentical(amounts) || !allGapsWithin(chain, rule.minDays, rule.maxDays)) {
+    return false
+  }
+
+  if (chain.length >= 3) {
+    return true
+  }
+
+  return chain.length >= 2 && hasMultipleRawDescriptors(chain)
+}
+
+function findBestRecurringMatchForTransactionGroup(group) {
+  let bestMatch = null
+
+  for (const amountCluster of clusterTransactionsByIdenticalAmount(group)) {
+    for (const rule of CADENCE_RULES) {
+      const match = findBestAcceptedChainForCadence(amountCluster, rule)
+      if (!match) {
+        continue
+      }
+
+      if (!bestMatch || match.chain.length > bestMatch.chain.length) {
+        bestMatch = match
+      }
+    }
+  }
+
+  return bestMatch
+}
+
 export function detectRecurringChargesFromTransactions(transactions) {
   const postedSpending = dedupeCrossAccountTransactions(
     transactions.filter(
@@ -468,18 +530,7 @@ export function detectRecurringChargesFromTransactions(transactions) {
   const recurring = []
 
   for (const group of byMerchant.values()) {
-    let bestMatch = null
-
-    for (const rule of CADENCE_RULES) {
-      const match = findBestAcceptedChainForCadence(group, rule)
-      if (!match) {
-        continue
-      }
-
-      if (!bestMatch || match.chain.length > bestMatch.chain.length) {
-        bestMatch = match
-      }
-    }
+    const bestMatch = findBestRecurringMatchForTransactionGroup(group)
 
     if (bestMatch) {
       recurring.push(buildRecurringChargeFromMatch(bestMatch))
@@ -902,14 +953,11 @@ export function buildExpenseAnalyzerSummary(payload) {
 }
 
 export async function loadExpenseAnalyzerData(userId) {
-  const [result, plaidRecurringCharges] = await Promise.all([
+  const [result, plaidRecurringCharges, latestInsightResult] = await Promise.all([
     db.query(
-      `SELECT t.name, t.amount, t.date, t.category, t.pending,
-              t.account_id,
-              COALESCE(a.account_name, 'Disconnected account') AS account_name,
-              a.bank_name
+      `SELECT ${EXPENSE_ANALYZER_TRANSACTION_SELECT}
        FROM transactions t
-       LEFT JOIN accounts a ON t.account_id = a.id AND a.user_id = t.user_id
+       ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
        WHERE t.user_id = $1
          AND t.date >= NOW() - $2::interval
          ${NON_PENDING_FILTER}
@@ -917,21 +965,25 @@ export async function loadExpenseAnalyzerData(userId) {
       [userId, RECURRING_LOOKBACK_INTERVAL]
     ),
     fetchPlaidRecurringOutflowsForUser(userId),
+    db.query(
+      `SELECT id FROM insights WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`,
+      [userId]
+    ),
   ])
 
   const comparison = buildComparisonFromTransactions(result.rows)
 
-  return buildExpenseAnalyzerPayload(comparison, result.rows, { plaidRecurringCharges })
+  return {
+    ...buildExpenseAnalyzerPayload(comparison, result.rows, { plaidRecurringCharges }),
+    latestInsightId: latestInsightResult.rows[0]?.id ?? null,
+  }
 }
 
 export async function loadRecentTransactionsForRecurring(userId) {
   const result = await db.query(
-    `SELECT t.name, t.amount, t.date, t.category, t.pending,
-            t.account_id,
-            COALESCE(a.account_name, 'Disconnected account') AS account_name,
-            a.bank_name
+    `SELECT ${EXPENSE_ANALYZER_TRANSACTION_SELECT}
      FROM transactions t
-     LEFT JOIN accounts a ON t.account_id = a.id AND a.user_id = t.user_id
+     ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
      WHERE t.user_id = $1
        AND t.amount > 0
        AND t.date >= NOW() - $2::interval

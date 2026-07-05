@@ -13,21 +13,34 @@ export function deriveHeuristicDetectionReason({
   amounts,
   category,
   isIdenticalFallback,
+  hasMultipleRawDescriptors = false,
 }) {
   const cadenceLabel = rule.cadence
 
   if (hasKeyword) {
     const keyword = resolveSubscriptionMerchantKeyword(merchantName)
-    const uncertain = chain.length < 3
+    const identicalAmounts = amounts.every(
+      (amount) => Math.round(amount * 100) === Math.round(amounts[0] * 100)
+    )
+    const confirmedTwoHitKeyword =
+      chain.length >= 2 &&
+      identicalAmounts &&
+      rule.cadence === 'monthly' &&
+      hasMultipleRawDescriptors
+    const confirmedThreeHit = chain.length >= 3
 
     return {
-      code: uncertain ? 'keyword_partial' : 'keyword_match',
-      summary: uncertain
-        ? `Possible subscription — keyword “${keyword}” but only ${chain.length} charges`
-        : `Subscription keyword “${keyword}” matched`,
-      detail: uncertain
-        ? `${chain.length} ${cadenceLabel} charges so far — we usually want 3+ before calling it confirmed`
-        : `${chain.length} ${cadenceLabel} charges at similar amounts`,
+      code: confirmedThreeHit || confirmedTwoHitKeyword ? 'keyword_match' : 'keyword_partial',
+      summary:
+        confirmedThreeHit || confirmedTwoHitKeyword
+          ? `Subscription keyword “${keyword}” matched`
+          : `Possible subscription — keyword “${keyword}” but only ${chain.length} charges`,
+      detail:
+        confirmedTwoHitKeyword && chain.length === 2
+          ? `2 identical ${cadenceLabel} charges with different bank descriptors — same subscription`
+          : confirmedThreeHit
+            ? `${chain.length} ${cadenceLabel} charges at similar amounts`
+            : `${chain.length} ${cadenceLabel} charges so far — need more history or matching descriptors`,
     }
   }
 

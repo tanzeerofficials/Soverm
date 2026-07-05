@@ -33,7 +33,8 @@
     "test:recurring-vs-one-time": "node scripts/test-recurring-vs-one-time.js",
     "test:recurring-detection-meta": "node scripts/test-recurring-detection-meta.js",
     "test:expense-analyzer-narrative": "node scripts/test-expense-analyzer-narrative.js",
-    "test:expense-analyzer": "npm run test:merchant-normalize && npm run test:recurring-charge-filters && npm run test:recurring-charges && npm run test:expense-analyzer-data && npm run test:category-breakdown-deltas && npm run test:plaid-category && npm run test:category-drilldown && npm run test:plaid-recurring-merge && npm run test:recurring-vs-one-time && npm run test:recurring-detection-meta && npm run test:expense-analyzer-narrative",
+    "test:expense-analyzer": "npm run test:merchant-normalize && npm run test:recurring-charge-filters && npm run test:recurring-charges && npm run test:expense-analyzer-data && npm run test:category-breakdown-deltas && npm run test:plaid-category && npm run test:category-drilldown && npm run test:plaid-recurring-merge && npm run test:recurring-vs-one-time && npm run test:recurring-detection-meta && npm run test:expense-analyzer-narrative && npm run test:connected-account-expense-filter",
+    "test:connected-account-expense-filter": "node scripts/test-connected-account-expense-filter.js",
     "test:all": "npm run test:delta-enforcement && npm run test:financial-context-window && npm run test:global-error-handler && npm run test:insight-persistence && npm run test:mom && npm run test:stat-type && npm run test:chat-frozen-context && npm run test:expense-analyzer && npm run verify:history-reload && npm run verify:stored-insights"
   },
   "keywords": [],

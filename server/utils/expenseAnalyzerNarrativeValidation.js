@@ -83,6 +83,20 @@ function isAllowedAmount(amount, allowedAmounts) {
   return false
 }
 
+function mentionsExistingReviewItems(text) {
+  const lower = text.toLowerCase()
+
+  if (/\b(no|zero|none|not any|without|are no|aren't any|nothing in)\b[^.\n]{0,45}\breview\b/.test(lower)) {
+    return false
+  }
+
+  if (/\breview\b[^.\n]{0,25}\b(none|zero|empty|nothing)\b/.test(lower)) {
+    return false
+  }
+
+  return /\b(in review|review items?|review charge|review pattern|items in review)\b/i.test(text)
+}
+
 export function validatePersonalNarrative({ paragraphs, lead, brief }) {
   if (!Array.isArray(paragraphs) || paragraphs.length < 2 || paragraphs.length > 3) {
     return { valid: false, reason: 'Expected 2-3 paragraphs' }
@@ -103,8 +117,8 @@ export function validatePersonalNarrative({ paragraphs, lead, brief }) {
 
   const lower = combined.toLowerCase()
 
-  if (brief.rules.reviewCount === 0 && lower.includes('review')) {
-    return { valid: false, reason: 'Mentioned Review when none exist' }
+  if (brief.rules.reviewCount === 0 && mentionsExistingReviewItems(combined)) {
+    return { valid: false, reason: 'Mentioned Review items when none exist' }
   }
 
   if (brief.rules.confirmedRecurringCount === 0 && /subscription|recurring charge/.test(lower)) {

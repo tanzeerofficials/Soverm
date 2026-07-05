@@ -127,6 +127,28 @@ try {
   console.log('  pass: review acknowledgment enforced')
   passed++
 
+  const noReviewExplicit = validatePersonalNarrative({
+    lead: 'Spending held flat at $40.50 in the last 30 days.',
+    paragraphs: [
+      'Confirmed recurring is $10.99/mo from Spotify.',
+      'There are no items currently in Review.',
+    ],
+    brief,
+  })
+  assert(noReviewExplicit.valid, `Explicit empty Review mention should pass: ${noReviewExplicit.reason}`)
+
+  const falseReviewClaim = validatePersonalNarrative({
+    lead: 'One item is in Review.',
+    paragraphs: [
+      'Overall one-time spend is $40.50 in the last 30 days.',
+      'Spotify is your only confirmed subscription.',
+    ],
+    brief,
+  })
+  assert(!falseReviewClaim.valid, 'Should reject implied Review items when none exist')
+  console.log('  pass: empty Review tier mention allowed when none exist')
+  passed++
+
   const allowed = collectAllowedAmounts(brief)
   assert(allowed.has(brief.overallSpending.oneTimeTotal), 'Allowed amounts include one-time total')
   console.log('  pass: allowed amount collection')

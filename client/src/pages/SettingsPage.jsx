@@ -12,7 +12,7 @@ import AppNavbar from '../components/AppNavbar.jsx'
 import ConfirmModal from '../components/ConfirmModal.jsx'
 import UsageBadge from '../components/UsageBadge.jsx'
 import { useToastContext } from '../context/ToastContext.jsx'
-import { disconnectAccount } from '../lib/disconnectAccount.js'
+import { disconnectAccount, getDisconnectConfirmMessage } from '../lib/disconnectAccount.js'
 import { deleteAccount } from '../lib/deleteAccount.js'
 import { fetchUsage } from '../lib/fetchUsage.js'
 import { dashboardQueryKey, usageQueryKey } from '../lib/queryKeys.js'
@@ -206,7 +206,11 @@ function SettingsPage() {
       <ConfirmModal
         isOpen={!!accountToDelete}
         title="Disconnect this account?"
-        message={`This will stop syncing "${accountToDelete?.account_name}". Your transaction history will be kept.`}
+        message={
+          accountToDelete
+            ? getDisconnectConfirmMessage(accountToDelete.account_name)
+            : ''
+        }
         confirmLabel="Disconnect"
         onCancel={() => setAccountToDelete(null)}
         onConfirm={handleDisconnectConfirm}
