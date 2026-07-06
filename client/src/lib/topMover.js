@@ -34,8 +34,8 @@ export function buildTopMoverHeadline(topMover) {
 
 export function topMoverHeadlineStyles(direction) {
   if (direction === 'down') {
-    return { color: 'text-[#10B981]', icon: '📈' }
+    return { color: 'text-[#10B981]', badgeVariant: 'improvement' }
   }
 
-  return { color: 'text-[#F59E0B]', icon: '⚠️' }
+  return { color: 'text-[#F59E0B]', badgeVariant: 'spike' }
 }

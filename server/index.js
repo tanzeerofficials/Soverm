@@ -61,6 +61,7 @@ const { default: historyRouter } = await import('./routes/history.js')
 const { default: chatRouter } = await import('./routes/chat.js')
 const { default: userRouter } = await import('./routes/user.js')
 const { default: expenseAnalyzerRouter } = await import('./routes/expenseAnalyzer.js')
+const { default: notificationsRouter } = await import('./routes/notifications.js')
 const { startSyncJob } = await import('./jobs/syncAllUsers.js')
 const { GENERIC_ERROR_MESSAGE } = await import('./utils/apiErrors.js')
 
@@ -165,6 +166,9 @@ app.use('/api/user', userRouter)
 
 // Expense Analyzer data lives under /api/expense-analyzer
 app.use('/api/expense-analyzer', expenseAnalyzerRouter)
+
+// Proactive notifications live under /api/notifications
+app.use('/api/notifications', notificationsRouter)
 
 app.use('/', healthRoutes)
 

@@ -4,6 +4,7 @@
  * Usage: node scripts/test-expense-analyzer-narrative.js
  */
 
+import 'dotenv/config'
 import {
   buildComparisonFromTransactions,
   buildExpenseAnalyzerPayload,

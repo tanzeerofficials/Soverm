@@ -13,6 +13,7 @@ import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import AppLoadingScreen from './components/AppLoadingScreen.jsx'
 import Footer from './components/Footer.jsx'
 import AnalyticsPageView from './components/AnalyticsPageView.jsx'
+import PageTransitionLayout from './components/PageTransitionLayout.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
 import HistoryPage from './pages/HistoryPage.jsx'
@@ -47,20 +48,22 @@ function PrivateRoutes() {
  */
 function App() {
   return (
-    <div className="flex min-h-screen flex-col bg-[#0A0F1C]">
+    <div className="flex min-h-screen flex-col bg-app">
       <div className="flex-1">
         <AnalyticsPageView />
         <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/privacy" element={<PrivacyPage />} />
-          <Route path="/terms" element={<TermsPage />} />
-          <Route element={<PrivateRoutes />}>
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/history" element={<HistoryPage />} />
-            <Route path="/expense-analyzer" element={<ExpenseAnalyzerPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
+          <Route element={<PageTransitionLayout />}>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/terms" element={<TermsPage />} />
+            <Route element={<PrivateRoutes />}>
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/history" element={<HistoryPage />} />
+              <Route path="/expense-analyzer" element={<ExpenseAnalyzerPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+            </Route>
+            <Route path="*" element={<NotFoundPage />} />
           </Route>
-          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </div>
       <Footer />

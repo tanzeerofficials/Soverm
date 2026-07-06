@@ -7,7 +7,7 @@
  * Uses a throwaway port and invalid ANTHROPIC_API_KEY — does not modify .env.
  */
 
-import dotenv from 'dotenv'
+import 'dotenv/config'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { createClerkClient } from '@clerk/backend'
@@ -15,7 +15,6 @@ import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
 import { scrubSentryEvent, Sentry } from '../utils/sentry.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-dotenv.config({ path: path.join(__dirname, '../.env') })
 
 process.env.PORT = '3099'
 process.env.ANTHROPIC_API_KEY = 'sk-ant-invalid-sentry-verification'

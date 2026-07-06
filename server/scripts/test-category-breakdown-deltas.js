@@ -4,6 +4,7 @@
  * Usage: node scripts/test-category-breakdown-deltas.js
  */
 
+import 'dotenv/config'
 import {
   buildCategoryBreakdownFromComparison,
   computeSpendingDelta,

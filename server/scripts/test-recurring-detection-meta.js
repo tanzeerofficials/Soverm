@@ -4,6 +4,7 @@
  * Usage: node scripts/test-recurring-detection-meta.js
  */
 
+import 'dotenv/config'
 import {
   buildComparisonFromTransactions,
   buildExpenseAnalyzerPayload,

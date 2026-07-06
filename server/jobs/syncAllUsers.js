@@ -8,6 +8,7 @@
 import cron from 'node-cron'
 import db from '../db/index.js'
 import { syncAllAccountsForUser } from '../services/plaid.js'
+import { evaluateAndCreateProactiveNotifications } from '../services/proactiveNotifications.js'
 
 export function startSyncJob() {
   // TESTING ONLY — change back to '0 */4 * * *' after testing (every 4 hours)
@@ -24,6 +25,13 @@ export function startSyncJob() {
           console.log(
             `Synced for user ${userId}: ${added} added, ${modified} modified, ${removed} removed`
           )
+
+          const notificationResult = await evaluateAndCreateProactiveNotifications(userId)
+          if (notificationResult.created > 0) {
+            console.log(
+              `Created ${notificationResult.created} proactive notification(s) for user ${userId}`
+            )
+          }
         } catch (userErr) {
           console.error(`Scheduled sync failed for user ${userId}:`, userErr.message)
         }

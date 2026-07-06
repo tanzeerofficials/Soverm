@@ -4,6 +4,7 @@
  * Usage: node scripts/test-recurring-charge-filters.js
  */
 
+import 'dotenv/config'
 import {
   isCoincidentalMerchantName,
   isExcludedFromRecurringDetection,

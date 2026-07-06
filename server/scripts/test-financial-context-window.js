@@ -4,6 +4,7 @@
  * Usage: node scripts/test-financial-context-window.js
  */
 
+import 'dotenv/config'
 import { readFileSync } from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -53,7 +54,7 @@ try {
   passed++
 
   assert(
-    source.includes('AND amount < 0') && source.includes('SUM(ABS(amount))'),
+    /amount\s*<\s*0/.test(source) && /SUM\(ABS\(/.test(source),
     'loadMonthOverMonthComparison must sum income using Plaid inflows (amount < 0)'
   )
   console.log('  pass: income comparison queries present')

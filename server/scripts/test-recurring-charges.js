@@ -4,6 +4,7 @@
  * Usage: node scripts/test-recurring-charges.js
  */
 
+import 'dotenv/config'
 import { normalizeMerchantName } from '../utils/merchantNormalize.js'
 import {
   isCoincidentalMerchantName,

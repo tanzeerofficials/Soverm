@@ -4,12 +4,11 @@
  * Usage: node scripts/diagnose-saas-subscriptions.js
  */
 
-import dotenv from 'dotenv'
+import 'dotenv/config'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-dotenv.config({ path: path.join(__dirname, '../.env') })
 
 const dbModule = await import('../db/index.js')
 const db = dbModule.pool ?? dbModule.default

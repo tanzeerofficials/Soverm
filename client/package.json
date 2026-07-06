@@ -12,7 +12,9 @@
     "test:category-display-names": "node scripts/test-category-display-names.js",
     "test:expense-analyzer-charts": "node scripts/test-expense-analyzer-charts.js",
     "test:recurring-annual": "node scripts/test-recurring-annual.js",
-    "test:spending-visual-utils": "node scripts/test-spending-visual-utils.js"
+    "test:spending-visual-utils": "node scripts/test-spending-visual-utils.js",
+    "test:spending-sparkline": "node scripts/test-spending-sparkline.js",
+    "test:cash-flow-summary": "node scripts/test-cash-flow-summary.js"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.61.8",

@@ -5,13 +5,15 @@
  * If someone is already logged in, we immediately send them to /dashboard.
  */
 
-import { SignedIn, SignedOut, SignInButton, SignUpButton } from '@clerk/clerk-react'
+import { SignedIn, SignedOut, SignUpButton } from '@clerk/clerk-react'
 import { Navigate } from 'react-router-dom'
 import AppLoadingScreen from '../components/AppLoadingScreen.jsx'
 import LandingComparison from '../components/LandingComparison.jsx'
 import LandingCompoundSection from '../components/LandingCompoundSection.jsx'
+import LandingHero from '../components/LandingHero.jsx'
 import LandingInsightPreview from '../components/LandingInsightPreview.jsx'
 import LandingNavbar from '../components/LandingNavbar.jsx'
+import RevealOnScroll from '../components/RevealOnScroll.jsx'
 import SecurityFaq from '../components/SecurityFaq.jsx'
 import SecurityTrustSection from '../components/SecurityTrustSection.jsx'
 import PricingSection from '../components/PricingSection.jsx'
@@ -37,8 +39,6 @@ const HOW_IT_WORKS = [
   },
 ]
 
-const HERO_TRUST_CHIPS = ['Free to start', 'No credit card', 'Read-only access']
-
 function LandingPage() {
   return (
     <>
@@ -48,90 +48,31 @@ function LandingPage() {
       </SignedIn>
       <SignedOut>
         <LandingNavbar />
-        <main className="bg-[#0A0F1C] px-6 pb-16 text-white">
-          {/* Hero */}
-          <div className="relative mx-auto max-w-4xl pt-16 text-center sm:pt-24">
-            <div
-              className="pointer-events-none absolute inset-x-0 -top-8 h-72 bg-[radial-gradient(ellipse_at_top,_rgba(16,185,129,0.14)_0%,_transparent_65%)]"
-              aria-hidden="true"
-            />
-
-            <p className="relative text-sm font-medium uppercase tracking-wide text-emerald-500">
-              Your Personal Accountant
-            </p>
-            <h1 className="relative mt-3 text-4xl font-bold leading-tight tracking-tight text-[#F9FAFB] sm:text-5xl lg:text-6xl">
-              Your personal accountant tells you the truth about your money.
-            </h1>
-            <p className="relative mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-[#9CA3AF]">
-              Accounting intelligence that monitors your transactions, analyzes where your
-              money actually goes, and delivers financial insights — so you can make smarter
-              decisions with every dollar.
-            </p>
-            <p className="relative mx-auto mt-4 max-w-2xl text-lg leading-relaxed text-[#F9FAFB]">
-              And you know what&apos;s even more interesting? It gets sharper every single day
-              you use it.
-            </p>
-
-            <div className="relative mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
-              <SignUpButton mode="modal">
-                <button
-                  type="button"
-                  className="w-full rounded-lg bg-emerald-500 px-8 py-3.5 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 sm:w-auto"
-                >
-                  Get started free
-                </button>
-              </SignUpButton>
-              <SignInButton mode="modal">
-                <button
-                  type="button"
-                  className="w-full rounded-lg border border-[#1E2D45] bg-[#111827] px-8 py-3.5 text-sm font-medium text-[#F9FAFB] transition hover:border-[#2D3F5C] hover:bg-[#1A2236] sm:w-auto"
-                >
-                  Sign In
-                </button>
-              </SignInButton>
-            </div>
-
-            <ul className="relative mt-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
-              {HERO_TRUST_CHIPS.map((chip) => (
-                <li
-                  key={chip}
-                  className="flex items-center gap-1.5 text-xs text-[#6B7280]"
-                >
-                  <svg
-                    className="h-3.5 w-3.5 text-emerald-500"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    aria-hidden="true"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  {chip}
-                </li>
-              ))}
-            </ul>
-          </div>
+        <main className="bg-app px-6 pb-16 text-fg">
+          <LandingHero />
 
           <LandingInsightPreview />
 
-          <LandingCompoundSection />
+          <RevealOnScroll delay={80}>
+            <LandingCompoundSection />
+          </RevealOnScroll>
 
-          <LandingComparison />
+          <RevealOnScroll delay={120}>
+            <LandingComparison />
+          </RevealOnScroll>
 
           {/* How it works */}
+          <RevealOnScroll delay={80}>
           <section
             id="how-it-works"
             className="mx-auto mt-24 max-w-4xl"
             aria-labelledby="how-it-works-heading"
           >
             <div className="text-center">
-              <h2 id="how-it-works-heading" className="text-2xl font-bold text-[#F9FAFB] sm:text-3xl">
+              <h2 id="how-it-works-heading" className="text-2xl font-bold text-fg sm:text-3xl">
                 How it works
               </h2>
-              <p className="mt-3 text-sm text-[#9CA3AF]">
+              <p className="mt-3 text-sm text-fg-muted">
                 Three steps from bank connection to actionable advice.
               </p>
             </div>
@@ -140,31 +81,39 @@ function LandingPage() {
               {HOW_IT_WORKS.map(({ step, title, description }) => (
                 <article
                   key={step}
-                  className="relative flex flex-col rounded-xl border border-[#1E2D45] bg-[#111827] p-6 text-left"
+                  className="relative flex flex-col rounded-xl border border-border-default bg-surface p-6 text-left transition hover:border-[#2D3A52] hover:bg-surface-elevated/40"
                 >
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-500/40 bg-emerald-500/10 text-sm font-bold text-emerald-400">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-brand/40 bg-brand/10 text-sm font-bold text-brand-soft">
                     {step}
                   </span>
-                  <h3 className="mt-4 font-semibold text-[#F9FAFB]">{title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-[#9CA3AF]">{description}</p>
+                  <h3 className="mt-4 font-semibold text-fg">{title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-fg-muted">{description}</p>
                 </article>
               ))}
             </div>
           </section>
+          </RevealOnScroll>
 
-          <SecurityTrustSection />
+          <RevealOnScroll>
+            <SecurityTrustSection />
+          </RevealOnScroll>
 
-          <PricingSection />
+          <RevealOnScroll delay={60}>
+            <PricingSection />
+          </RevealOnScroll>
 
-          <SecurityFaq />
+          <RevealOnScroll delay={80}>
+            <SecurityFaq />
+          </RevealOnScroll>
 
           {/* Final CTA */}
+          <RevealOnScroll delay={100}>
           <section className="mx-auto mb-8 mt-24 max-w-2xl text-center">
-            <div className="rounded-2xl border border-[#1E2D45] bg-gradient-to-b from-[#111827] to-[#0A0F1C] px-6 py-12 sm:px-10">
-              <h2 className="text-2xl font-bold text-[#F9FAFB] sm:text-3xl">
+            <div className="rounded-2xl border border-border-default bg-gradient-to-b from-surface to-app px-6 py-12 sm:px-10">
+              <h2 className="text-2xl font-bold text-fg sm:text-3xl">
                 Ready to know where you actually stand?
               </h2>
-              <p className="mx-auto mt-3 max-w-md text-sm text-[#9CA3AF]">
+              <p className="mx-auto mt-3 max-w-md text-sm text-fg-muted">
                 Accounting intelligence that watches your transactions and turns them into
                 clear insights — so you always know the smartest move for your money.
               </p>
@@ -172,17 +121,18 @@ function LandingPage() {
                 <SignUpButton mode="modal">
                   <button
                     type="button"
-                    className="rounded-lg bg-emerald-500 px-8 py-4 text-base font-semibold text-slate-950 transition hover:bg-emerald-400"
+                    className="rounded-lg bg-brand px-8 py-4 text-base font-semibold text-slate-950 transition hover:bg-brand-soft"
                   >
                     Get started free
                   </button>
                 </SignUpButton>
               </div>
-              <p className="mt-3 text-xs text-[#6B7280]">
+              <p className="mt-3 text-xs text-fg-subtle">
                 No credit card required · Cancel anytime
               </p>
             </div>
           </section>
+          </RevealOnScroll>
         </main>
       </SignedOut>
     </>

@@ -7,6 +7,7 @@
  */
 
 import { SignInButton, SignUpButton } from '@clerk/clerk-react'
+import BrandMark from './BrandMark.jsx'
 
 const NAV_LINKS = [
   { href: '#how-it-works', label: 'How it works' },
@@ -17,14 +18,10 @@ const NAV_LINKS = [
 
 function LandingNavbar() {
   return (
-    <header className="sticky top-0 z-50 border-b border-[#1E2D45]/80 bg-[#0A0F1C]/90 backdrop-blur-md">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-4">
-        <a
-          href="/"
-          className="text-sm font-bold tracking-wide text-[#F9FAFB] transition hover:text-emerald-400"
-        >
-          SOVERM
-        </a>
+    <header className="relative sticky top-0 z-50 border-b border-[#1E2D45]/70 bg-[#0A0F1C]/88 shadow-[0_4px_24px_rgba(0,0,0,0.2)] backdrop-blur-xl">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-emerald-500/35 to-transparent" />
+      <div className="relative mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+        <BrandMark to="/" />
 
         <nav
           className="hidden items-center gap-6 text-sm text-[#9CA3AF] md:flex"

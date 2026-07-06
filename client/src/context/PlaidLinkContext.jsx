@@ -10,6 +10,7 @@ import { usePlaidLink } from 'react-plaid-link'
 import { useAuth } from '@clerk/clerk-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { dashboardQueryKey } from '../lib/queryKeys.js'
+import { getCachedAccountCount, markFirstConnectCelebration } from '../lib/firstConnectCelebration.js'
 import { useToastContext } from './ToastContext.jsx'
 import { captureClientError } from '../lib/sentry.js'
 
@@ -30,6 +31,7 @@ export function PlaidLinkProvider({ children }) {
       showToast('Bank connected — syncing your transactions…', 'info')
 
       try {
+        const priorAccountCount = getCachedAccountCount(queryClient)
         const token = await getToken()
         const response = await fetch(`${import.meta.env.VITE_API_URL}/api/plaid/exchange-public-token`, {
           method: 'POST',
@@ -52,6 +54,14 @@ export function PlaidLinkProvider({ children }) {
             `Connected ${count} account${count === 1 ? '' : 's'}${syncDetail}`,
             'success'
           )
+
+          if (priorAccountCount === 0 && count > 0) {
+            markFirstConnectCelebration({
+              accountsConnected: count,
+              syncedAdded: synced?.added ?? 0,
+            })
+          }
+
           await queryClient.invalidateQueries({ queryKey: dashboardQueryKey })
         } else {
           console.error('Failed to connect bank account:', data.error || response.status)

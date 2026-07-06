@@ -11,6 +11,8 @@
  * any /api/ request → copy the Bearer token from Authorization header.
  */
 
+import 'dotenv/config'
+
 const apiUrl = (process.env.API_URL || '').replace(/\/$/, '')
 const token = process.env.CLERK_SESSION_TOKEN
 const insightId = process.env.INSIGHT_ID

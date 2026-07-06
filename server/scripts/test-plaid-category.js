@@ -4,6 +4,7 @@
  * Usage: node scripts/test-plaid-category.js
  */
 
+import 'dotenv/config'
 import { resolvePlaidTransactionCategory } from '../utils/plaidCategory.js'
 
 function assert(condition, message) {

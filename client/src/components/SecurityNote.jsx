@@ -14,17 +14,17 @@ function SecurityNote() {
   if (dismissed) return null
 
   return (
-    <div className="relative rounded-lg border border-[#1E2D45] bg-[#111827] p-4 text-sm">
+    <div className="relative rounded-xl border border-border-default border-l-4 border-l-brand bg-surface p-4 text-sm">
       <button
         type="button"
         onClick={() => setDismissed(true)}
-        className="absolute right-3 top-3 text-xs text-[#9CA3AF] transition hover:text-white"
+        className="absolute right-3 top-3 text-xs text-fg-muted transition hover:text-fg"
       >
         Got it
       </button>
 
       <svg
-        className="h-4 w-4 text-[#10B981]"
+        className="h-4 w-4 text-brand"
         viewBox="0 0 20 20"
         fill="currentColor"
         aria-hidden="true"
@@ -36,11 +36,11 @@ function SecurityNote() {
         />
       </svg>
 
-      <h3 className="mt-2 text-sm font-semibold text-[#F9FAFB]">
+      <h3 className="mt-2 text-sm font-semibold text-fg">
         How Soverm keeps your data safe
       </h3>
 
-      <p className="mt-2 text-xs leading-relaxed text-[#9CA3AF]">
+      <p className="mt-2 text-xs leading-relaxed text-fg-muted">
         Soverm never sees or stores your bank login credentials. Plaid handles the
         secure connection to your bank and shares only your account balances and
         transactions with us. Your financial data is stored in an encrypted database
