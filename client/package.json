@@ -11,6 +11,7 @@
     "test:insight-display": "node scripts/test-insight-display.js",
     "test:category-display-names": "node scripts/test-category-display-names.js",
     "test:expense-analyzer-charts": "node scripts/test-expense-analyzer-charts.js",
+    "test:recurring-annual": "node scripts/test-recurring-annual.js",
     "test:spending-visual-utils": "node scripts/test-spending-visual-utils.js"
   },
   "dependencies": {

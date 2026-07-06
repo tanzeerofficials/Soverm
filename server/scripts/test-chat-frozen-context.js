@@ -39,7 +39,11 @@ try {
     chatRouteSource.includes('resolveInsightGeneratedAt'),
     'chat.js must resolve generatedAt from persisted metadata'
   )
-  console.log('  pass: chat route uses stored insight only')
+  assert(
+    chatRouteSource.includes('loadChatFinancialContext'),
+    'chat.js must load live Expense Analyzer context for recurring questions'
+  )
+  console.log('  pass: chat route uses stored insight for MoM and live Expense Analyzer data')
 
   const persisted = buildPersistedInsightContent(
     {
@@ -93,8 +97,8 @@ try {
     'prompt must include frozen MoM figures'
   )
   assert(
-    prompt.includes('Do not imply the figures below reflect their finances today'),
-    'prompt must warn that numbers are not current'
+    prompt.includes('Insight snapshot reflects finances as of'),
+    'prompt must clarify insight snapshot timing'
   )
   assert(
     !prompt.includes('"monthOverMonthComparison"'),

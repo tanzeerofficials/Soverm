@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import Skeleton from './Skeleton.jsx'
 import ChatPanel from './ChatPanel.jsx'
 import ChatBubbleIcon from './ChatBubbleIcon.jsx'
+import { buildExpenseAnalyzerSuggestedPrompts } from '../lib/chatSuggestedPrompts.js'
 import {
   formatCurrency,
   formatGeneratedAt,
@@ -36,6 +37,7 @@ function ExpenseAnalyzerNarrativeSection({
 
   const displayTemplate = resolvedTemplate ?? templateSummary
   const generatedLabel = formatGeneratedAt(personalNarrative?.generatedAt)
+  const suggestedPrompts = buildExpenseAnalyzerSuggestedPrompts({ totalRecurringMonthly })
   const hasNarrativeContent =
     showPersonalized || displayTemplate || awaitingCacheCheck || isGenerating
 
@@ -152,6 +154,8 @@ function ExpenseAnalyzerNarrativeSection({
               insightId={latestInsightId}
               expanded={chatExpanded}
               onExpandedChange={setChatExpanded}
+              suggestedPrompts={suggestedPrompts}
+              contextLabel="Grounded in your synced transactions, recurring charges, and category breakdown."
             />
           ) : (
             <div className="rounded-lg border border-[#1E2D45] bg-[#0A0F1C]/40 px-4 py-4">

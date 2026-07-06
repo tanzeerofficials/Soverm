@@ -10,6 +10,7 @@ import ActionChecklist from './ActionChecklist.jsx'
 import ChatPanel from './ChatPanel.jsx'
 import InsightQuickQuestions from './InsightQuickQuestions.jsx'
 import StatDeltaBadge from './StatDeltaBadge.jsx'
+import { buildDashboardSuggestedPrompts } from '../lib/chatSuggestedPrompts.js'
 import {
   formatInsightSnapshotFootnote,
   normalizePeriodCopy,
@@ -157,6 +158,7 @@ function InsightCard({
             onError={onChatError}
             expanded={chatExpanded}
             onExpandedChange={setChatExpanded}
+            suggestedPrompts={buildDashboardSuggestedPrompts()}
           />
           <InsightQuickQuestions
             insightId={insight.id}

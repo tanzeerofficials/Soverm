@@ -163,8 +163,8 @@ async function main() {
       'Chat prompt must not reference live transaction dump'
     )
     assert(
-      prompt.includes('Do not imply the figures below reflect their finances today'),
-      'Chat prompt must warn numbers are not current'
+      prompt.includes('Insight snapshot reflects finances as of'),
+      'Chat prompt must clarify insight snapshot timing'
     )
     assert(
       liveMom.currentPeriod.spending.total !== 9999,

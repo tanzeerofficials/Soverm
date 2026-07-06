@@ -8,6 +8,7 @@
 import { useEffect } from 'react'
 import ChatPanel from './ChatPanel.jsx'
 import ChatBubbleIcon from './ChatBubbleIcon.jsx'
+import { buildDashboardSuggestedPrompts } from '../lib/chatSuggestedPrompts.js'
 
 function FloatingCfoChatButton({ onClick }) {
   return (
@@ -90,6 +91,8 @@ function FloatingCfoChatModal({ isOpen, onClose, insightId, onChatError }) {
               insightId={insightId}
               onError={onChatError}
               expanded
+              suggestedPrompts={buildDashboardSuggestedPrompts()}
+              contextLabel="Grounded in your synced accounts, recent transactions, and Expense Analyzer data."
               onExpandedChange={(expanded) => {
                 if (!expanded) {
                   onClose()

@@ -16,6 +16,9 @@
     "test:mom": "node scripts/test-mom-integration.js",
     "test:stat-type": "node scripts/test-stat-type.js",
     "test:chat-frozen-context": "node scripts/test-chat-frozen-context.js",
+    "test:chat-expense-analyzer-context": "node scripts/test-chat-expense-analyzer-context.js",
+    "test:chat-financial-context": "node scripts/test-chat-financial-context.js",
+    "test:chat-context-audit": "node scripts/test-chat-context-audit.js",
     "verify:history-reload": "node scripts/verify-history-reload.js",
     "verify:migrations": "node scripts/verify-migrations.js",
     "verify:production-api": "node scripts/verify-production-api.js",
@@ -35,7 +38,7 @@
     "test:expense-analyzer-narrative": "node scripts/test-expense-analyzer-narrative.js",
     "test:expense-analyzer": "npm run test:merchant-normalize && npm run test:recurring-charge-filters && npm run test:recurring-charges && npm run test:expense-analyzer-data && npm run test:category-breakdown-deltas && npm run test:plaid-category && npm run test:category-drilldown && npm run test:plaid-recurring-merge && npm run test:recurring-vs-one-time && npm run test:recurring-detection-meta && npm run test:expense-analyzer-narrative && npm run test:connected-account-expense-filter",
     "test:connected-account-expense-filter": "node scripts/test-connected-account-expense-filter.js",
-    "test:all": "npm run test:delta-enforcement && npm run test:financial-context-window && npm run test:global-error-handler && npm run test:insight-persistence && npm run test:mom && npm run test:stat-type && npm run test:chat-frozen-context && npm run test:expense-analyzer && npm run verify:history-reload && npm run verify:stored-insights"
+    "test:all": "npm run test:delta-enforcement && npm run test:financial-context-window && npm run test:global-error-handler && npm run test:insight-persistence && npm run test:mom && npm run test:stat-type && npm run test:chat-frozen-context && npm run test:chat-expense-analyzer-context && npm run test:chat-financial-context && npm run test:chat-context-audit && npm run test:expense-analyzer && npm run verify:history-reload && npm run verify:stored-insights"
   },
   "keywords": [],
   "author": "",
