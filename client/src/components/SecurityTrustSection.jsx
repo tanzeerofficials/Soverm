@@ -108,32 +108,20 @@ function SecurityTrustSection() {
         <p className="text-center text-xs font-medium uppercase tracking-wider text-[#6B7280]">
           How your bank connects
         </p>
-        <ol className="mt-6 flex flex-col items-stretch gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+        <ol className="mt-6 grid grid-cols-1 gap-8 sm:grid-cols-3 sm:gap-6">
           {[
             { step: '1', label: 'You choose your bank', detail: 'Plaid opens a secure login' },
             { step: '2', label: 'Plaid verifies you', detail: 'Encrypted, bank-grade connection' },
             { step: '3', label: 'Soverm receives data', detail: 'Balances & transactions only' },
-          ].map((item, index) => (
-            <li key={item.step} className="flex flex-1 flex-col items-center text-center">
-              <div className="flex w-full items-center gap-2 sm:flex-col sm:gap-3">
-                {index > 0 && (
-                  <span
-                    className="hidden flex-1 border-t border-dashed border-[#1E2D45] sm:block"
-                    aria-hidden="true"
-                  />
-                )}
-                <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-sm font-semibold text-emerald-400">
-                  {item.step}
-                </span>
-                {index < 2 && (
-                  <span
-                    className="hidden flex-1 border-t border-dashed border-[#1E2D45] sm:block"
-                    aria-hidden="true"
-                  />
-                )}
-              </div>
-              <p className="mt-3 text-sm font-semibold text-[#F9FAFB]">{item.label}</p>
-              <p className="mt-1 text-xs text-[#9CA3AF]">{item.detail}</p>
+          ].map((item) => (
+            <li key={item.step} className="flex flex-col items-center text-center">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand/30 bg-brand/10 text-sm font-semibold text-brand-soft">
+                {item.step}
+              </span>
+              <p className="mt-3 text-sm font-semibold text-fg">{item.label}</p>
+              <p className="mt-1 max-w-[12rem] text-xs leading-relaxed text-fg-muted">
+                {item.detail}
+              </p>
             </li>
           ))}
         </ol>

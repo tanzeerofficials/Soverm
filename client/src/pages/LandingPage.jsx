@@ -11,33 +11,13 @@ import AppLoadingScreen from '../components/AppLoadingScreen.jsx'
 import LandingComparison from '../components/LandingComparison.jsx'
 import LandingCompoundSection from '../components/LandingCompoundSection.jsx'
 import LandingHero from '../components/LandingHero.jsx'
+import LandingHowItWorks from '../components/LandingHowItWorks.jsx'
 import LandingInsightPreview from '../components/LandingInsightPreview.jsx'
 import LandingNavbar from '../components/LandingNavbar.jsx'
 import RevealOnScroll from '../components/RevealOnScroll.jsx'
 import SecurityFaq from '../components/SecurityFaq.jsx'
 import SecurityTrustSection from '../components/SecurityTrustSection.jsx'
 import PricingSection from '../components/PricingSection.jsx'
-
-const HOW_IT_WORKS = [
-  {
-    step: '1',
-    title: 'Connect your bank',
-    description:
-      'Link through Plaid in under a minute — the same secure technology used by Venmo, Coinbase, and major banks.',
-  },
-  {
-    step: '2',
-    title: 'Soverm reads your activity',
-    description:
-      'Every transaction and balance is analyzed for patterns — not just what you have, but where money is actually going.',
-  },
-  {
-    step: '3',
-    title: 'Get honest, specific advice',
-    description:
-      'A plain-English insight with real numbers, risks, and three concrete actions you can take this week.',
-  },
-]
 
 function LandingPage() {
   return (
@@ -48,9 +28,10 @@ function LandingPage() {
       </SignedIn>
       <SignedOut>
         <LandingNavbar />
-        <main className="bg-app px-6 pb-16 text-fg">
+        <main className="bg-app pb-16 text-fg">
           <LandingHero />
 
+          <div className="px-6">
           <LandingInsightPreview />
 
           <RevealOnScroll delay={80}>
@@ -63,35 +44,9 @@ function LandingPage() {
 
           {/* How it works */}
           <RevealOnScroll delay={80}>
-          <section
-            id="how-it-works"
-            className="mx-auto mt-24 max-w-4xl"
-            aria-labelledby="how-it-works-heading"
-          >
-            <div className="text-center">
-              <h2 id="how-it-works-heading" className="text-2xl font-bold text-fg sm:text-3xl">
-                How it works
-              </h2>
-              <p className="mt-3 text-sm text-fg-muted">
-                Three steps from bank connection to actionable advice.
-              </p>
+            <div className="mt-24">
+              <LandingHowItWorks />
             </div>
-
-            <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3">
-              {HOW_IT_WORKS.map(({ step, title, description }) => (
-                <article
-                  key={step}
-                  className="relative flex flex-col rounded-xl border border-border-default bg-surface p-6 text-left transition hover:border-[#2D3A52] hover:bg-surface-elevated/40"
-                >
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-brand/40 bg-brand/10 text-sm font-bold text-brand-soft">
-                    {step}
-                  </span>
-                  <h3 className="mt-4 font-semibold text-fg">{title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-fg-muted">{description}</p>
-                </article>
-              ))}
-            </div>
-          </section>
           </RevealOnScroll>
 
           <RevealOnScroll>
@@ -133,6 +88,7 @@ function LandingPage() {
             </div>
           </section>
           </RevealOnScroll>
+          </div>
         </main>
       </SignedOut>
     </>
