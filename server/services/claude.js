@@ -13,6 +13,9 @@ import {
   buildCategoryBreakdownFromComparison,
   computeSpendingDelta,
 } from '../utils/financialContext.js'
+import { buildExpenseAnalyzerChatContextFromPayload } from '../utils/expenseAnalyzerChatContext.js'
+
+export { buildExpenseAnalyzerChatContextFromPayload }
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -798,70 +801,172 @@ export function resolveInsightGeneratedAt(insightContent, fallbackCreatedAt) {
 }
 
 /*
- * buildInsightChatSystemPrompt({ insightBody, monthOverMonthComparison, generatedAt })
+ * buildLiveFinancialChatPromptBlock(chatFinancialContext)
  *
- * Assembles the frozen snapshot context for insight-scoped chat.
- * Exported for unit tests — chat must not pull live transaction data.
+ * Formats the live account, activity, and Expense Analyzer snapshot for chat.
+ */
+export function buildLiveFinancialChatPromptBlock(chatFinancialContext, { insightActions = [] } = {}) {
+  if (!chatFinancialContext) {
+    return { block: '', instruction: '' }
+  }
+
+  const capturedAtLabel = formatInsightGeneratedAt(chatFinancialContext.capturedAt)
+  const { accounts, liveMonthOverMonth, recentActivity, expenseAnalyzer, dataScope } =
+    chatFinancialContext
+
+  return {
+    block: `
+
+Live financial snapshot (synced transaction data as of ${capturedAtLabel}):
+${JSON.stringify(
+  {
+    dataScope,
+    accounts,
+    liveMonthOverMonth,
+    recentActivity,
+    expenseAnalyzer,
+    insightActions,
+  },
+  null,
+  2
+)}`,
+    instruction: `
+
+LIVE DATA RULES — use this block for spending, subscriptions, categories, accounts, and affordability:
+- Prefer liveMonthOverMonth and expenseAnalyzer over the older insight snapshot for "right now" questions
+- expenseAnalyzer.categoryBreakdown has per-category MoM deltas — use for "which category went up/down most"
+- expenseAnalyzer.topMover is the largest significant category change (≥5%)
+- expenseAnalyzer.confirmedRecurring = high-confidence subscriptions in totals; cite monthlyEquivalent, annualEquivalent, confidenceLabel, sourceLabel
+- expenseAnalyzer.reviewRecurring = uncertain patterns (Likely/Uncertain) — NOT in confirmed totals; explain why if asked
+- dataScope.disconnectedAccountPolicy explains why old charges from disconnected banks disappear from recurring/category views
+- If dataScope.disconnectedOrphanedTransactionCountLast90Days > 0, mention disconnected-account filtering when user asks why old merchants/subscriptions vanished
+- accounts.items: credit cards (isCredit true) show balance owed; checking/savings show available cash; netTotalBalance nets them
+- recentActivity is connected accounts only — use for merchant-specific purchase questions
+- insightActions lists suggested actions from the insight with completed status — reference when user asks about their to-do list
+- Never say data is unavailable when this block contains it; only cite figures that appear here or in the insight snapshot`,
+  }
+}
+
+/*
+ * buildExpenseAnalyzerChatPromptBlock(expenseAnalyzerContext)
+ *
+ * @deprecated Prefer buildLiveFinancialChatPromptBlock — kept for unit tests.
+ */
+export function buildExpenseAnalyzerChatPromptBlock(expenseAnalyzerContext) {
+  if (!expenseAnalyzerContext) {
+    return { block: '', instruction: '' }
+  }
+
+  return buildLiveFinancialChatPromptBlock({
+    capturedAt: expenseAnalyzerContext.capturedAt,
+    accounts: { netTotalBalance: 0, balanceNote: '', items: [] },
+    liveMonthOverMonth: { hasData: false },
+    recentActivity: null,
+    expenseAnalyzer: expenseAnalyzerContext,
+    dataScope: null,
+  })
+}
+
+/*
+ * buildInsightChatSystemPrompt({ insightBody, monthOverMonthComparison, generatedAt, chatFinancialContext })
+ *
+ * Insight snapshot (frozen) + live financial data for capable, trustworthy chat.
  */
 export function buildInsightChatSystemPrompt({
   insightBody,
   monthOverMonthComparison,
   generatedAt,
+  chatFinancialContext = null,
+  expenseAnalyzerContext = null,
+  insightActions = [],
 }) {
+  const resolvedChatContext =
+    chatFinancialContext ??
+    (expenseAnalyzerContext
+      ? {
+          capturedAt: expenseAnalyzerContext.capturedAt,
+          accounts: { netTotalBalance: 0, balanceNote: '', items: [] },
+          liveMonthOverMonth: { hasData: false },
+          recentActivity: null,
+          expenseAnalyzer: expenseAnalyzerContext,
+          dataScope: null,
+        }
+      : null)
+
   const generatedAtLabel = formatInsightGeneratedAt(generatedAt)
   const momContext = buildMonthOverMonthPromptContext(monthOverMonthComparison)
+  const liveContextBlock = buildLiveFinancialChatPromptBlock(resolvedChatContext, {
+    insightActions,
+  })
   const snapshotCapturedAt = monthOverMonthComparison?.capturedAt
     ? formatInsightGeneratedAt(monthOverMonthComparison.capturedAt)
     : null
 
   const snapshotTimingNote = snapshotCapturedAt
-    ? `The month-over-month figures below were captured on ${snapshotCapturedAt}.`
-    : 'Month-over-month figures come from the stored insight snapshot.'
+    ? `Insight snapshot month-over-month figures were captured on ${snapshotCapturedAt}.`
+    : 'Insight snapshot month-over-month figures come from when the insight was generated.'
 
-  return `You are Soverm, a personal AI CFO. You are having an ongoing conversation with a user about a specific financial insight you generated on ${generatedAtLabel}.
+  const liveCapturedLabel = resolvedChatContext?.capturedAt
+    ? formatInsightGeneratedAt(resolvedChatContext.capturedAt)
+    : null
 
-You have two modes — use whichever fits the question:
+  return `You are Soverm, a personal AI CFO — a knowledgeable, direct financial assistant in an ongoing chat with this user. You have access to their real synced financial data below. Answer like a capable advisor: thorough when the question needs depth, concise when it doesn't. This should feel like talking to a smart financial assistant, not reading a report.
 
-1. DATA-SPECIFIC: If the question is about their personal finances as reflected in this insight, use only the numbers from the insight snapshot below. Be specific, direct, and honest. Never vague.
+DATA SOURCES — pick the right one for each question:
+1. Live financial snapshot (below) — current balances, live 30-day spending/income comparison, recent transactions, Expense Analyzer categories and recurring charges. Use this for "what's happening now", subscriptions, categories, recent purchases, and affordability questions.
+2. Insight snapshot (below) — the weekly insight Soverm generated on ${generatedAtLabel}. Use for what was flagged then; prefer live data when the user asks about current state.
+3. Insight snapshot month-over-month block — frozen figures from insight generation. Prefer liveMonthOverMonth in the live snapshot for current comparisons.
 
-2. GENERAL FINANCIAL KNOWLEDGE: If the question is a general finance question (e.g. "how do I open a savings account", "what's a Roth IRA", "should I pay off debt or invest", "what's compound interest"), answer it clearly and helpfully like a knowledgeable advisor would. Use plain English, no jargon. Keep it practical and actionable.
+TRUST AND ACCURACY:
+- Only cite dollar amounts, merchants, and categories that appear in the data below — never invent figures
+- When live data and the insight snapshot differ, prefer live data and note the insight is from ${generatedAtLabel}
+- For recurring charges: cite merchant, monthly cost, annual cost, confidenceLabel (Confirmed/Likely/Uncertain), and sourceLabel
+- Review-tier recurring (expenseAnalyzer.reviewRecurring) is uncertain — not counted in confirmed totals; explain detectionReason if asked why something is under review
+- Disconnected bank accounts: charges from disconnected accounts are excluded from recurring and category views — explain using dataScope.disconnectedAccountPolicy when user asks why old subscriptions/rides vanished
+- Credit card balances in accounts.items are debt owed; checking/savings are spendable cash — netTotalBalance nets them for overall liquidity
+- If data is missing (e.g. no income synced), say so plainly instead of guessing
+- When giving opinions ("is this too high?"), ground them in their actual numbers and explain your reasoning
 
-In both cases:
-- Keep answers conversational and concise — 2-4 sentences for most questions, longer only if genuinely needed
-- Never refuse a reasonable financial question
-- Always be honest — don't sugarcoat bad financial habits
-- End general advice answers with one sentence connecting it back to their insight snapshot if relevant (e.g. "Given the $X liquid cash shown in your insight from ${generatedAtLabel}, a HYSA would make sense as your next step.")
-- You are not a licensed financial advisor — if someone asks about something requiring licensed advice (specific tax filing, legal contracts, investment management), briefly note that and suggest they consult a professional, then still give them the general knowledge you can
-- Do not imply the figures below reflect their finances today. If timing matters, say they are from when you generated this insight (${generatedAtLabel}). You do not have access to live bank data in this conversation.
+CONVERSATION STYLE:
+- Natural back-and-forth — ask a clarifying question when it would genuinely help
+- Match answer length to the question: quick questions get 2-4 sentences; complex ones can use paragraphs, bullets, or numbered steps
+- General finance questions (Roth IRA, debt payoff, budgeting methods): answer fully and practically, then connect to their situation when relevant
+- Use markdown when it improves readability (bold key numbers, lists for options)
+- Be honest — don't sugarcoat bad habits, but stay constructive
+- Not a licensed advisor — brief disclaimer only when the question needs licensed advice (tax filing, legal contracts, investment management); still share general knowledge
+
+TIMING:
+- Insight snapshot reflects finances as of ${generatedAtLabel}. ${snapshotTimingNote}
+${liveCapturedLabel ? `- Live financial snapshot refreshed ${liveCapturedLabel}.` : ''}
 
 Their insight snapshot (generated ${generatedAtLabel}):
 ${JSON.stringify(insightBody)}
 ${momContext.block}
+${liveContextBlock.block}
 
-${snapshotTimingNote}${momContext.instruction}
+${snapshotTimingNote}${momContext.instruction}${liveContextBlock.instruction}
 
-Chat history is provided in the messages array.
+Prior messages in this thread are in the messages array — maintain continuity and refer back when relevant.
 
-FORMATTING RULES:
-- Write conversationally, like a knowledgeable friend
-- Use markdown naturally when it aids clarity: bold for key terms, numbered lists for steps, bullet points for options
-- Keep responses concise — 2-4 sentences for simple questions, structured lists only when genuinely helpful
-- Short paragraphs, not walls of text
-- Never start a response with "I" — lead with the substance
-- Numbers and dollar amounts written naturally ($5,020 not 5020)`
+FORMATTING:
+- Write conversationally, like a knowledgeable friend who knows their numbers
+- Dollar amounts written naturally ($1,072.80 not 1072.8 in prose)
+- Short paragraphs beat walls of text; structure longer answers clearly`
 }
 
+export const CHAT_HISTORY_MESSAGE_LIMIT = 30
+export const CHAT_MAX_OUTPUT_TOKENS = 2048
+
 /*
- * askFinancialQuestion(originalInsight, chatHistory, newQuestion, { generatedAt })
+ * askFinancialQuestion(originalInsight, chatHistory, newQuestion, { generatedAt, chatFinancialContext })
  *
- * Conversational follow-up about a specific insight — returns plain text, not JSON.
- * Uses the persisted insight snapshot (including monthOverMonthComparison), not live data.
+ * Conversational follow-up — plain text, grounded in live financial data + insight snapshot.
  */
 export async function askFinancialQuestion(
   originalInsight,
   chatHistory,
   newQuestion,
-  { generatedAt } = {}
+  { generatedAt, chatFinancialContext = null, expenseAnalyzerContext = null, insightActions = [] } = {}
 ) {
   const insightForPrompt = normalizeInsightForPrompt(originalInsight)
   const { insightBody, monthOverMonthComparison, generatedAt: metadataGeneratedAt } =
@@ -872,12 +977,15 @@ export async function askFinancialQuestion(
     insightBody,
     monthOverMonthComparison,
     generatedAt: generatedAt ?? metadataGeneratedAt,
+    chatFinancialContext,
+    expenseAnalyzerContext,
+    insightActions,
   })
 
   try {
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 500,
+      max_tokens: CHAT_MAX_OUTPUT_TOKENS,
       system: systemPrompt,
       messages: [
         ...historyMessages,

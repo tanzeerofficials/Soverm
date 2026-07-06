@@ -16,6 +16,7 @@ import StatDeltaBadge from '../components/StatDeltaBadge.jsx'
 import Skeleton from '../components/Skeleton.jsx'
 import { expenseAnalyzerQueryKey } from '../lib/queryKeys.js'
 import { fetchExpenseAnalyzer } from '../lib/fetchExpenseAnalyzer.js'
+import { annualizeRecurringMonthly } from '../lib/recurringAnnual.js'
 import {
   buildTopMoverHeadline,
   isNotableTopMover,
@@ -218,6 +219,7 @@ function ExpenseAnalyzerPage() {
       })
     : null
   const totalRecurringMonthly = data?.totalRecurringMonthly ?? 0
+  const totalRecurringAnnual = annualizeRecurringMonthly(totalRecurringMonthly)
   const totalReviewMonthly = data?.totalReviewMonthly ?? 0
   const overallSpending = data?.overallSpending ?? null
   const narrativeSummary = data?.narrativeSummary ?? null
@@ -520,12 +522,29 @@ function ExpenseAnalyzerPage() {
                 <h2 className="text-xs font-semibold uppercase tracking-[0.3em] text-[#9CA3AF]">
                   Recurring charges
                 </h2>
-                {recurringCharges.length > 0 && (
-                  <p className="font-mono text-sm font-semibold text-[#F9FAFB]">
+              </div>
+
+              {recurringCharges.length > 0 && (
+                <>
+                  <div className="mt-4 rounded-xl border border-[#8B5CF6]/30 bg-[#8B5CF6]/10 px-5 py-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#C4B5FD]">
+                      Annual subscription cost
+                    </p>
+                    <p className="mt-2 font-mono text-3xl font-bold tracking-tight text-[#F9FAFB]">
+                      {formatCurrency(totalRecurringAnnual)}/year
+                    </p>
+                    <p className="mt-1 text-sm text-[#D1D5DB]">
+                      {formatCurrency(totalRecurringMonthly)}/mo
+                      {recurringCharges.length === 1
+                        ? ' · 1 confirmed subscription'
+                        : ` · ${recurringCharges.length} confirmed subscriptions`}
+                    </p>
+                  </div>
+                  <p className="mt-3 font-mono text-sm font-semibold text-[#9CA3AF]">
                     Total recurring: {formatCurrency(totalRecurringMonthly)}/mo
                   </p>
-                )}
-              </div>
+                </>
+              )}
 
               {recurringCharges.length === 0 ? (
                 <div className="mt-4 rounded-xl border border-[#1E2D45] bg-[#111827] px-6 py-10 text-center">

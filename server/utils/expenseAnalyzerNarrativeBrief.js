@@ -29,6 +29,10 @@ export function buildExpenseAnalyzerNarrativeBrief(payload) {
       hasComparisonData: payload.overallSpending?.hasComparisonData === true,
       delta: formatDelta(payload.overallSpending?.delta),
       confirmedRecurringMonthly: roundCurrency(payload.totalRecurringMonthly ?? 0),
+      confirmedRecurringAnnual:
+        (payload.totalRecurringMonthly ?? 0) > 0
+          ? roundCurrency((payload.totalRecurringMonthly ?? 0) * 12)
+          : 0,
       oneTimeTotal: roundCurrency(payload.overallSpending?.oneTimeTotal ?? 0),
     },
     topMover:

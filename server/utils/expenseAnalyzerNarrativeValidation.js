@@ -14,6 +14,7 @@ function collectAllowedAmounts(brief) {
   add(brief.overallSpending.currentTotal)
   add(brief.overallSpending.priorTotal)
   add(brief.overallSpending.confirmedRecurringMonthly)
+  add(brief.overallSpending.confirmedRecurringAnnual)
   add(brief.overallSpending.oneTimeTotal)
 
   if (brief.topMover) {

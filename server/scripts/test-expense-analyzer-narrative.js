@@ -62,7 +62,40 @@ try {
   )
   assert(brief.overallSpending.confirmedRecurringMonthly > 0, 'Brief includes confirmed recurring')
   assert(brief.confirmedRecurring.length === 1, 'Brief lists confirmed recurring merchants')
+  assert(
+    brief.overallSpending.confirmedRecurringAnnual ===
+      Math.round(brief.overallSpending.confirmedRecurringMonthly * 12 * 100) / 100,
+    'Annual recurring should be monthly × 12'
+  )
   console.log('  pass: narrative brief and fingerprint')
+  passed++
+
+  const sparkFunBrief = {
+    ...brief,
+    overallSpending: {
+      ...brief.overallSpending,
+      confirmedRecurringMonthly: 89.4,
+      confirmedRecurringAnnual: 1072.8,
+    },
+    confirmedRecurring: [
+      {
+        merchant: 'SparkFun',
+        monthlyEquivalent: 89.4,
+        category: 'General Merchandise',
+      },
+    ],
+  }
+
+  const annualNarrative = validatePersonalNarrative({
+    lead: 'Your subscriptions add up to $1,072.80 a year.',
+    paragraphs: [
+      'Overall one-time spend is $40.50 in the last 30 days vs the prior 30 days.',
+      'SparkFun runs $89.40/mo — that is $1,072.80 a year in confirmed recurring charges.',
+    ],
+    brief: sparkFunBrief,
+  })
+  assert(annualNarrative.valid, `Annual narrative should pass: ${annualNarrative.reason}`)
+  console.log('  pass: annual recurring in narrative')
   passed++
 
   const valid = validatePersonalNarrative({
@@ -151,6 +184,10 @@ try {
 
   const allowed = collectAllowedAmounts(brief)
   assert(allowed.has(brief.overallSpending.oneTimeTotal), 'Allowed amounts include one-time total')
+  assert(
+    allowed.has(brief.overallSpending.confirmedRecurringAnnual),
+    'Allowed amounts include annual recurring'
+  )
   console.log('  pass: allowed amount collection')
   passed++
 

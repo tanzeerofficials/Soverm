@@ -45,12 +45,14 @@ Return ONLY this JSON shape:
   "paragraphs": [
     "Paragraph 1 (35-55 words): What changed overall — overall spending direction, and whether the shift is mostly one-time or confirmed recurring",
     "Paragraph 2 (35-55 words): The top category mover OR the biggest category, with recurring vs one-time split when relevant",
-    "Paragraph 3 (optional, 25-45 words): Confirmed recurring total with merchant names if any; if reviewItems exist, clearly separate them and say they are not counted in confirmed recurring"
+    "Paragraph 3 (optional, 25-45 words): Confirmed recurring — when confirmedRecurring is non-empty, mention confirmedRecurringAnnual as an annual total in natural prose (e.g. subscriptions add up to $X a year), and you may also reference confirmedRecurringMonthly; include merchant names if helpful. If reviewItems exist, clearly separate them and say they are not counted in confirmed recurring"
   ]
 }
 
 Rules:
 - Use exact figures from the brief (you may format with $ and commas)
+- When confirmedRecurring is non-empty, the recurring paragraph must mention confirmedRecurringAnnual at least once as a yearly total
+- Keep recurring framing factual — do not compare annual totals to unrelated purchases (flights, gadgets, etc.)
 - If reviewItems is non-empty, you MUST mention Review items separately from confirmed recurring
 - If confirmedRecurring is empty, do not imply subscriptions exist
 - Compare using "${brief.periodLabel}" — never say "last month" (calendar month)

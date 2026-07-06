@@ -8,6 +8,7 @@ import { Router } from 'express'
 import { getAuth, requireAuth } from '@clerk/express'
 import db from '../db/index.js'
 import { askFinancialQuestion, resolveInsightGeneratedAt } from '../services/claude.js'
+import { loadChatFinancialContext, loadInsightActionsForChat } from '../utils/chatFinancialContext.js'
 import { chatRateLimitMiddleware } from '../utils/rateLimit.js'
 import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
 import { reportServerError } from '../utils/sentry.js'
@@ -50,7 +51,8 @@ router.post('/:insightId', chatRateLimitMiddleware(), async (req, res) => {
 
     const trimmedMessage = message.trim()
 
-    const [insightResult, historyResult] = await Promise.all([
+    const [insightResult, historyResult, chatFinancialContext, insightActionsResult] =
+      await Promise.all([
       db.query(
         `SELECT content, created_at FROM insights WHERE id = $1 AND user_id = $2`,
         [insightId, userId]
@@ -62,11 +64,13 @@ router.post('/:insightId', chatRateLimitMiddleware(), async (req, res) => {
            FROM chat_messages
            WHERE insight_id = $1 AND user_id = $2
            ORDER BY created_at DESC
-           LIMIT 15
+           LIMIT 30
          ) recent
          ORDER BY created_at ASC`,
         [insightId, userId]
       ),
+      loadChatFinancialContext(userId),
+      loadInsightActionsForChat(userId, insightId),
     ])
 
     if (insightResult.rows.length === 0) {
@@ -84,6 +88,8 @@ router.post('/:insightId', chatRateLimitMiddleware(), async (req, res) => {
           insightRow.content,
           insightRow.created_at
         ),
+        chatFinancialContext,
+        insightActions: insightActionsResult,
       }
     )
 

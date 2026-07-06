@@ -150,6 +150,13 @@ export async function detectRecurringCharges(userId) {
   return detectRecurringChargesFromTransactions(rows)
 }
 
+/*
+ * loadExpenseAnalyzerChatContext(userId)
+ *
+ * Re-exported from expenseAnalyzerChatContext for callers that already import here.
+ */
+export { loadExpenseAnalyzerChatContext } from './expenseAnalyzerChatContext.js'
+
 export async function loadMonthOverMonthComparison(userId) {
   const [
     currentSpendingTotalResult,
