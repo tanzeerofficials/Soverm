@@ -4,6 +4,7 @@
  * Usage: node scripts/test-chat-context-audit.js
  */
 
+import 'dotenv/config'
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'

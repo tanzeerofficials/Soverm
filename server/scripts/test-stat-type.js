@@ -4,6 +4,7 @@
  * Usage: node scripts/test-stat-type.js
  */
 
+import 'dotenv/config'
 import { enforceStatDeltas, inferStatType } from '../services/claude.js'
 
 const sampleComparison = {

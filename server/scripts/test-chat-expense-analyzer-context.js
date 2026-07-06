@@ -4,6 +4,7 @@
  * Usage: node scripts/test-chat-expense-analyzer-context.js
  */
 
+import 'dotenv/config'
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'

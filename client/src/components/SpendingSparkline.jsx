@@ -1,0 +1,77 @@
+import { useId } from 'react'
+import { buildSparklineGeometry, formatSparklineTotal } from '../lib/spendingSparkline.js'
+
+function formatCurrency(amount) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(amount)
+}
+
+function SpendingSparkline({ series = [], className = '' }) {
+  const gradientId = useId()
+  const values = series.map((point) => point.amount)
+  const geometry = buildSparklineGeometry(values)
+  const total = formatSparklineTotal(values)
+
+  if (!geometry || values.every((value) => value === 0)) {
+    return (
+      <div
+        className={`rounded-xl border border-border-default/80 bg-app/40 px-4 py-6 text-center ${className}`}
+      >
+        <p className="text-xs text-fg-subtle">No spending in this period yet</p>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className={`rounded-xl border border-border-default/80 bg-app/40 px-4 py-3 ${className}`}
+      aria-label={`Daily spending trend, ${formatCurrency(total)} total in this period`}
+    >
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-fg-subtle">
+          Daily spending
+        </p>
+        <p className="font-mono text-xs tabular-nums text-fg-muted">{formatCurrency(total)} total</p>
+      </div>
+
+      <svg
+        viewBox={`0 0 ${geometry.width} ${geometry.height}`}
+        className="mx-auto h-[4.5rem] w-full max-w-[18rem]"
+        preserveAspectRatio="none"
+        role="img"
+        aria-hidden="true"
+      >
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#8B5CF6" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="#8B5CF6" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <polygon points={geometry.area} fill={`url(#${gradientId})`} />
+        <polyline
+          points={geometry.line}
+          fill="none"
+          stroke="#A78BFA"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        {geometry.coords.length > 0 && (
+          <circle
+            cx={geometry.coords[geometry.coords.length - 1].x}
+            cy={geometry.coords[geometry.coords.length - 1].y}
+            r="3.5"
+            fill="#C4B5FD"
+            stroke="#0A0F1C"
+            strokeWidth="2"
+          />
+        )}
+      </svg>
+    </div>
+  )
+}
+
+export default SpendingSparkline

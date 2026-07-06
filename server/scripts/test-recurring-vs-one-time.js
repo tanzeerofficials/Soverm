@@ -4,6 +4,7 @@
  * Usage: node scripts/test-recurring-vs-one-time.js
  */
 
+import 'dotenv/config'
 import {
   buildComparisonFromTransactions,
   buildExpenseAnalyzerPayload,

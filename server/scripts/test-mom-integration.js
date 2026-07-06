@@ -5,6 +5,7 @@
  * Usage: node scripts/test-mom-integration.js
  */
 
+import 'dotenv/config'
 import {
   buildPersistedInsightContent,
   enforceStatDeltas,

@@ -2,7 +2,7 @@ import Skeleton from './Skeleton.jsx'
 
 function AccountCardSkeleton() {
   return (
-    <article className="rounded-xl border border-[#1E2D45] bg-[#111827] p-4 sm:p-5">
+    <article className="rounded-xl border border-border-default bg-surface p-4 sm:p-5">
       <Skeleton className="h-3 w-20" />
       <Skeleton className="mt-1 h-4 w-32" />
       <Skeleton className="mt-2 h-5 w-16 rounded-full" />

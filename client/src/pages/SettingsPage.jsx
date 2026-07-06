@@ -6,16 +6,20 @@
 
 import { useState } from 'react'
 import { useAuth, useClerk } from '@clerk/clerk-react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import AppNavbar from '../components/AppNavbar.jsx'
 import ConfirmModal from '../components/ConfirmModal.jsx'
+import PageHeader from '../components/PageHeader.jsx'
+import SettingsSection from '../components/SettingsSection.jsx'
+import Skeleton from '../components/Skeleton.jsx'
 import UsageBadge from '../components/UsageBadge.jsx'
 import { useToastContext } from '../context/ToastContext.jsx'
 import { disconnectAccount, getDisconnectConfirmMessage } from '../lib/disconnectAccount.js'
 import { deleteAccount } from '../lib/deleteAccount.js'
 import { fetchUsage } from '../lib/fetchUsage.js'
-import { dashboardQueryKey, usageQueryKey } from '../lib/queryKeys.js'
+import { fetchNotifications, updateNotificationPreferences } from '../lib/fetchNotifications.js'
+import { dashboardQueryKey, notificationsQueryKey, usageQueryKey } from '../lib/queryKeys.js'
 import { getDisplayBalance } from '../lib/balanceHelpers.js'
 
 function formatCurrency(amount) {
@@ -23,6 +27,26 @@ function formatCurrency(amount) {
     style: 'currency',
     currency: 'USD',
   }).format(amount)
+}
+
+function SettingsAccountSkeleton() {
+  return (
+    <div className="space-y-3" aria-hidden="true">
+      {[0, 1].map((index) => (
+        <div
+          key={index}
+          className="flex items-start justify-between gap-3 rounded-xl border border-border-default bg-surface-elevated p-4"
+        >
+          <div className="min-w-0 flex-1 space-y-2">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-4 w-36" />
+            <Skeleton className="h-5 w-20" />
+          </div>
+          <Skeleton className="h-11 w-24 rounded-lg" />
+        </div>
+      ))}
+    </div>
+  )
 }
 
 function SettingsPage() {
@@ -39,6 +63,24 @@ function SettingsPage() {
   const { data: usage } = useQuery({
     queryKey: usageQueryKey,
     queryFn: () => fetchUsage(getToken),
+  })
+
+  const { data: notificationData } = useQuery({
+    queryKey: notificationsQueryKey,
+    queryFn: () => fetchNotifications(getToken),
+  })
+
+  const proactiveEnabled = notificationData?.preferences?.proactiveEnabled ?? true
+
+  const preferencesMutation = useMutation({
+    mutationFn: (enabled) =>
+      updateNotificationPreferences(getToken, { proactiveEnabled: enabled }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: notificationsQueryKey })
+    },
+    onError: () => {
+      showToast('Couldn’t update notification settings — please try again', 'error')
+    },
   })
 
   const { data: dashboardData, isPending: accountsLoading } = useQuery({
@@ -92,115 +134,124 @@ function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0A0F1C] text-[#F9FAFB]">
-      <AppNavbar
-        backTo="/dashboard"
-        backLabel="Dashboard"
-        leftContent={
-          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-            <Link
-              to="/dashboard"
-              className="shrink-0 text-xs text-[#9CA3AF] transition hover:text-white sm:text-sm"
-            >
-              ← Dashboard
-            </Link>
-            <span className="truncate text-sm font-semibold uppercase tracking-[0.35em] text-[#10B981]">
-              Soverm
-            </span>
-          </div>
-        }
-      />
+    <div className="min-h-screen bg-app text-fg">
+      <AppNavbar backTo="/dashboard" backLabel="Dashboard" />
 
       <main className="mx-auto max-w-2xl px-4 pb-16 pt-24 sm:px-6 sm:pt-28">
-        <div className="mb-10">
-          <h1 className="text-2xl font-bold text-[#F9FAFB]">Settings</h1>
-          <p className="mt-2 text-sm text-[#9CA3AF]">
-            Manage your plan, connected banks, and account data.
-          </p>
-        </div>
+        <PageHeader
+          title="Settings"
+          description="Manage your plan, connected banks, notifications, and account data."
+        />
 
-        <section className="rounded-xl border border-[#1E2D45] bg-[#111827] p-5 sm:p-6">
-          <h2 className="text-xs font-semibold uppercase tracking-[0.3em] text-[#9CA3AF]">
-            Your plan
-          </h2>
-          <div className="mt-4 flex flex-col gap-3">
-            <p className="text-lg font-semibold text-[#F9FAFB]">
-              {usage?.isPro ? 'Soverm Pro' : 'Free'}
-            </p>
-            <UsageBadge usage={usage} />
-            {usage && !usage.isPro && (
-              <p className="text-xs text-[#6B7280]">
-                {usage.generatedToday ?? 0} insight
-                {(usage.generatedToday ?? 0) === 1 ? '' : 's'} generated today
+        <div className="space-y-8">
+          <SettingsSection title="Your plan">
+            <div className="flex flex-col gap-3">
+              <p className="text-lg font-semibold text-fg">
+                {usage?.isPro ? 'Soverm Pro' : 'Free'}
+              </p>
+              <UsageBadge usage={usage} />
+              {usage && !usage.isPro && (
+                <p className="text-xs text-fg-subtle">
+                  {usage.generatedToday ?? 0} insight
+                  {(usage.generatedToday ?? 0) === 1 ? '' : 's'} generated today
+                </p>
+              )}
+            </div>
+          </SettingsSection>
+
+          <SettingsSection title="Notifications">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-fg">Proactive alerts</p>
+                <p className="mt-1 text-sm leading-relaxed text-fg-muted">
+                  Soverm flags unusual charges, low balance, new subscriptions, and spending
+                  spikes after each sync. Alerts appear in the bell icon and on your dashboard.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={proactiveEnabled}
+                aria-label="Proactive alerts"
+                disabled={preferencesMutation.isPending}
+                onClick={() => preferencesMutation.mutate(!proactiveEnabled)}
+                className={`relative mt-0.5 h-7 w-12 shrink-0 rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 disabled:opacity-60 ${
+                  proactiveEnabled ? 'bg-brand' : 'bg-surface-elevated ring-1 ring-border-default'
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform duration-200 ${
+                    proactiveEnabled ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+            {!proactiveEnabled && (
+              <p className="mt-3 text-xs text-fg-subtle">
+                Paused — you won&apos;t receive new alerts until you turn this back on. Existing
+                notifications stay in your history.
               </p>
             )}
-          </div>
-        </section>
+          </SettingsSection>
 
-        <section className="mt-8 rounded-xl border border-[#1E2D45] bg-[#111827] p-5 sm:p-6">
-          <h2 className="text-xs font-semibold uppercase tracking-[0.3em] text-[#9CA3AF]">
-            Connected banks
-          </h2>
-
-          {accountsLoading ? (
-            <p className="mt-4 text-sm text-[#9CA3AF]">Loading accounts…</p>
-          ) : accounts.length === 0 ? (
-            <div className="mt-4 rounded-lg border border-dashed border-[#1E2D45] px-4 py-8 text-center">
-              <p className="text-sm text-[#9CA3AF]">No banks connected yet.</p>
-              <Link
-                to="/dashboard"
-                className="mt-3 inline-block text-sm font-medium text-[#10B981] transition hover:text-emerald-400"
-              >
-                Connect a bank on your dashboard
-              </Link>
-            </div>
-          ) : (
-            <ul className="mt-4 space-y-3">
-              {accounts.map((account) => (
-                <li
-                  key={account.id}
-                  className="flex items-start justify-between gap-3 rounded-lg border border-[#1E2D45] bg-[#1A2236] p-4"
+          <SettingsSection title="Connected banks">
+            {accountsLoading ? (
+              <SettingsAccountSkeleton />
+            ) : accounts.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border-default px-4 py-8 text-center">
+                <p className="text-sm text-fg-muted">No banks connected yet.</p>
+                <Link
+                  to="/dashboard"
+                  className="mt-3 inline-block text-sm font-medium text-brand transition hover:text-brand-soft"
                 >
-                  <div className="min-w-0">
-                    <p className="truncate text-xs font-medium uppercase tracking-wide text-[#9CA3AF]">
-                      {account.bank_name}
-                    </p>
-                    <p className="mt-1 truncate text-sm font-medium text-[#F9FAFB]">
-                      {account.account_name}
-                    </p>
-                    <p className="mt-2 font-mono text-sm text-[#10B981]">
-                      {formatCurrency(getDisplayBalance(account))}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setAccountToDelete(account)}
-                    className="min-h-11 shrink-0 rounded-lg border border-[#1E2D45] px-3 py-2 text-xs font-medium text-[#9CA3AF] transition hover:border-red-500/40 hover:text-red-400"
+                  Connect a bank on your dashboard
+                </Link>
+              </div>
+            ) : (
+              <ul className="space-y-3">
+                {accounts.map((account) => (
+                  <li
+                    key={account.id}
+                    className="flex items-start justify-between gap-3 rounded-xl border border-border-default bg-surface-elevated p-4"
                   >
-                    Disconnect
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-medium uppercase tracking-wide text-fg-muted">
+                        {account.bank_name}
+                      </p>
+                      <p className="mt-1 truncate text-sm font-medium text-fg">
+                        {account.account_name}
+                      </p>
+                      <p className="mt-2 font-mono text-sm tabular-nums text-brand-soft">
+                        {formatCurrency(getDisplayBalance(account))}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAccountToDelete(account)}
+                      className="min-h-11 shrink-0 rounded-lg border border-border-default px-3 py-2 text-xs font-medium text-fg-muted transition hover:border-danger/40 hover:text-danger"
+                    >
+                      Disconnect
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </SettingsSection>
 
-        <section className="mt-8 rounded-xl border border-red-500/30 bg-[#111827] p-5 sm:p-6">
-          <h2 className="text-xs font-semibold uppercase tracking-[0.3em] text-red-400">
-            Danger zone
-          </h2>
-          <p className="mt-3 text-sm leading-relaxed text-[#9CA3AF]">
-            Permanently delete your Soverm account, all connected banks, transactions,
-            insights, and chat history. This cannot be undone.
-          </p>
-          <button
-            type="button"
-            onClick={() => setShowDeleteAccountModal(true)}
-            className="mt-4 min-h-11 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-2.5 text-sm font-medium text-red-400 transition hover:bg-red-500/20"
-          >
-            Delete my account
-          </button>
-        </section>
+          <SettingsSection title="Danger zone" variant="danger">
+            <p className="text-sm leading-relaxed text-fg-muted">
+              Permanently delete your Soverm account, all connected banks, transactions,
+              insights, and chat history. This cannot be undone.
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowDeleteAccountModal(true)}
+              className="mt-4 min-h-11 rounded-lg border border-danger/40 bg-danger/10 px-4 py-2.5 text-sm font-medium text-danger transition hover:bg-danger/20"
+            >
+              Delete my account
+            </button>
+          </SettingsSection>
+        </div>
       </main>
 
       <ConfirmModal

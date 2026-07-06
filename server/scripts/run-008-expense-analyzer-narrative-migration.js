@@ -4,6 +4,7 @@
  * Usage: node scripts/run-008-expense-analyzer-narrative-migration.js
  */
 
+import 'dotenv/config'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'

@@ -4,6 +4,7 @@
  * Usage: node scripts/test-expense-analyzer-data.js
  */
 
+import 'dotenv/config'
 import { buildExpenseAnalyzerPromptBlock } from '../services/claude.js'
 import {
   buildComparisonFromTransactions,

@@ -30,7 +30,7 @@ function ConnectBankButton({ className = '', highlighted = false, showSecurityNo
         type="button"
         onClick={handleClick}
         disabled={!ready || isExchanging}
-        className={`min-h-11 w-full rounded-lg bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60 ${
+        className={`min-h-11 w-full rounded-lg bg-emerald-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 ${
           highlighted && !isExchanging ? 'animate-pulse' : ''
         } ${className}`}
       >

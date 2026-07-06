@@ -107,11 +107,11 @@ function GenerateInsightButton({
       type="button"
       onClick={handleGenerate}
       disabled={loading}
-      className={`min-h-11 rounded-lg bg-purple-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-60 ${
-        highlighted && !loading ? 'animate-pulse ring-2 ring-[#8B5CF6] ring-offset-2 ring-offset-[#0A0F1C]' : ''
+      className={`min-h-11 rounded-lg border border-ai/45 bg-ai/12 px-4 py-3 text-sm font-semibold text-ai-soft transition hover:border-ai/65 hover:bg-ai/22 disabled:cursor-not-allowed disabled:opacity-60 ${
+        highlighted && !loading ? 'animate-pulse ring-2 ring-ai/50 ring-offset-2 ring-offset-app' : ''
       } ${className}`}
     >
-      {loading ? 'Analyzing...' : 'Generate Summary'}
+      {loading ? 'Generating summary…' : 'Generate Summary'}
     </button>
   )
 

@@ -10,8 +10,16 @@ import { useAuth } from '@clerk/clerk-react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import AppNavbar from '../components/AppNavbar.jsx'
+import PageHeader from '../components/PageHeader.jsx'
+import ProactiveNoticeBanner from '../components/ProactiveNoticeBanner.jsx'
 import ExpenseAnalyzerNarrativeSection from '../components/ExpenseAnalyzerNarrativeSection.jsx'
 import ExpenseAnalyzerVisuals from '../components/expenseAnalyzer/ExpenseAnalyzerVisuals.jsx'
+import {
+  EXPENSE_ANALYZER_TABS,
+  ExpenseAnalyzerTabBar,
+  ExpenseAnalyzerTabPanel,
+} from '../components/expenseAnalyzer/ExpenseAnalyzerTabs.jsx'
+import HeadlineTypeBadge from '../components/HeadlineTypeBadge.jsx'
 import StatDeltaBadge from '../components/StatDeltaBadge.jsx'
 import Skeleton from '../components/Skeleton.jsx'
 import { expenseAnalyzerQueryKey } from '../lib/queryKeys.js'
@@ -202,6 +210,7 @@ function ExpenseAnalyzerPage() {
   const { getToken } = useAuth()
   const navigate = useNavigate()
   const [expandedCategory, setExpandedCategory] = useState(null)
+  const [activeTab, setActiveTab] = useState(EXPENSE_ANALYZER_TABS.OVERVIEW)
 
   const { data, isLoading, isError } = useQuery({
     queryKey: expenseAnalyzerQueryKey,
@@ -249,44 +258,34 @@ function ExpenseAnalyzerPage() {
   const topMoverStyles = topMoverHeadline ? topMoverHeadlineStyles(topMover.direction) : null
 
   return (
-    <div className="min-h-screen bg-[#0A0F1C] text-[#F9FAFB]">
+    <div className="min-h-screen bg-app text-fg">
       <AppNavbar
         backTo="/dashboard"
         backLabel="Dashboard"
         onChatClick={() => navigate('/dashboard?chat=open')}
-        leftContent={
-          <div className="flex items-center gap-4">
-            <Link
-              to="/dashboard"
-              className="text-sm text-[#9CA3AF] transition hover:text-white"
-            >
-              ← Back to Dashboard
-            </Link>
-            <span className="text-sm font-semibold uppercase tracking-[0.35em] text-[#10B981]">
-              Soverm
-            </span>
-          </div>
-        }
       />
 
       <main className="mx-auto max-w-3xl px-4 pb-16 pt-24 sm:px-6 sm:pt-28">
-        <div className="mb-10">
-          <h1 className="text-2xl font-bold text-[#F9FAFB]">Expense Analyzer</h1>
-          <p className="mt-2 text-sm text-[#9CA3AF]">
-            Where your money actually goes — compared to the prior 30 days.
-          </p>
+        <PageHeader title="Expense Analyzer" description="Where your money actually goes — compared to the prior 30 days.">
           {overallSpendingLine && (
-            <p className="mt-3 text-sm leading-relaxed text-[#D1D5DB]">{overallSpendingLine}</p>
+            <p className="mt-3 text-sm leading-relaxed text-fg-muted">{overallSpendingLine}</p>
           )}
           {overallRecurringLine && (
-            <p className="mt-2 text-sm text-[#8B5CF6]">{overallRecurringLine}</p>
+            <p className="mt-2 text-sm text-ai">{overallRecurringLine}</p>
           )}
-        </div>
+        </PageHeader>
+
+        <ProactiveNoticeBanner />
 
         {isLoading ? (
-          <div className="space-y-8" aria-busy="true" aria-label="Loading expense analyzer">
+          <div className="space-y-6 sm:space-y-8" aria-busy="true" aria-label="Loading expense analyzer">
+            <div className="flex gap-1.5 overflow-hidden rounded-2xl border border-[#1E2D45] bg-[#111827] p-1.5">
+              <Skeleton className="h-14 min-w-[5.75rem] flex-1 rounded-xl" />
+              <Skeleton className="h-14 min-w-[5.75rem] flex-1 rounded-xl" />
+              <Skeleton className="h-14 min-w-[5.75rem] flex-1 rounded-xl" />
+              <Skeleton className="hidden h-14 flex-1 rounded-xl sm:block" />
+            </div>
             <Skeleton className="h-72 w-full rounded-2xl" />
-            <Skeleton className="h-48 w-full rounded-xl" />
             <div className="space-y-3">
               <Skeleton className="h-14 w-full rounded-lg" />
               <Skeleton className="h-14 w-full rounded-lg" />
@@ -300,46 +299,58 @@ function ExpenseAnalyzerPage() {
             </p>
           </div>
         ) : (
-          <div className="space-y-10">
-            <ExpenseAnalyzerVisuals
-              categoryBreakdown={categoryBreakdown}
-              overallSpending={overallSpending}
-              recurringCharges={recurringCharges}
-              totalRecurringMonthly={totalRecurringMonthly}
+          <div className="space-y-6 sm:space-y-8">
+            <ExpenseAnalyzerTabBar
+              activeTab={activeTab}
+              onChange={setActiveTab}
+              categoryCount={categoryBreakdown.length}
+              recurringCount={recurringCharges.length}
+              summaryReady={Boolean(narrativeSummary || narrativeMeta?.fingerprint)}
             />
 
-            {(narrativeSummary || narrativeMeta) && (
-              <ExpenseAnalyzerNarrativeSection
-                templateSummary={narrativeSummary}
-                narrativeMeta={narrativeMeta}
+            <ExpenseAnalyzerTabPanel
+              tabId={EXPENSE_ANALYZER_TABS.OVERVIEW}
+              activeTab={activeTab}
+              className="space-y-6"
+            >
+              <ExpenseAnalyzerVisuals
+                categoryBreakdown={categoryBreakdown}
+                overallSpending={overallSpending}
+                recurringCharges={recurringCharges}
                 totalRecurringMonthly={totalRecurringMonthly}
-                latestInsightId={latestInsightId}
               />
-            )}
 
-            {topMoverHeadline && topMoverStyles && (
-              <section
-                className="rounded-xl border border-[#1E2D45] bg-[#111827] p-5 sm:p-6"
-                aria-label="Top spending mover"
-              >
-                <p
-                  className={`break-words text-xl font-bold leading-snug sm:text-2xl ${topMoverStyles.color}`}
+              {topMoverHeadline && topMoverStyles && (
+                <section
+                  className="rounded-xl border border-[#1E2D45] bg-[#111827] p-5 sm:p-6"
+                  aria-label="Top spending mover"
                 >
-                  <span className="mr-2">{topMoverStyles.icon}</span>
-                  {topMoverHeadline}
-                </p>
-              </section>
-            )}
+                  <HeadlineTypeBadge variant={topMoverStyles.badgeVariant} className="mb-3" />
+                  <p
+                    className={`break-words text-xl font-bold leading-snug sm:text-2xl ${topMoverStyles.color}`}
+                  >
+                    {topMoverHeadline}
+                  </p>
+                </section>
+              )}
+            </ExpenseAnalyzerTabPanel>
 
-            <section aria-label="Category breakdown">
-              <h2 className="text-xs font-semibold uppercase tracking-[0.3em] text-[#9CA3AF]">
-                Category breakdown
-              </h2>
-
-              {categoryBreakdown.length === 0 ? (
-                <div className="mt-4 rounded-xl border border-[#1E2D45] bg-[#111827] px-6 py-10 text-center">
+            <ExpenseAnalyzerTabPanel
+              tabId={EXPENSE_ANALYZER_TABS.SUMMARY}
+              activeTab={activeTab}
+            >
+              {(narrativeSummary || narrativeMeta) ? (
+                <ExpenseAnalyzerNarrativeSection
+                  templateSummary={narrativeSummary}
+                  narrativeMeta={narrativeMeta}
+                  totalRecurringMonthly={totalRecurringMonthly}
+                  latestInsightId={latestInsightId}
+                />
+              ) : (
+                <div className="rounded-xl border border-[#1E2D45] bg-[#111827] px-6 py-12 text-center">
                   <p className="text-sm leading-relaxed text-[#9CA3AF]">
-                    Connect a bank and sync transactions to see your expense breakdown.
+                    Connect a bank and sync transactions to unlock your expense summary and Ask
+                    Soverm chat.
                   </p>
                   <Link
                     to="/dashboard"
@@ -348,8 +359,28 @@ function ExpenseAnalyzerPage() {
                     Go to Dashboard
                   </Link>
                 </div>
-              ) : (
-                <ul className="mt-4 space-y-3">
+              )}
+            </ExpenseAnalyzerTabPanel>
+
+            <ExpenseAnalyzerTabPanel
+              tabId={EXPENSE_ANALYZER_TABS.CATEGORIES}
+              activeTab={activeTab}
+            >
+              <section aria-label="Category breakdown">
+                {categoryBreakdown.length === 0 ? (
+                  <div className="rounded-xl border border-[#1E2D45] bg-[#111827] px-6 py-10 text-center">
+                    <p className="text-sm leading-relaxed text-[#9CA3AF]">
+                      Connect a bank and sync transactions to see your expense breakdown.
+                    </p>
+                    <Link
+                      to="/dashboard"
+                      className="mt-4 inline-flex rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-600"
+                    >
+                      Go to Dashboard
+                    </Link>
+                  </div>
+                ) : (
+                  <ul className="space-y-3">
                   {[...categoryBreakdown]
                     .sort((left, right) => right.currentTotal - left.currentTotal)
                     .map((entry) => {
@@ -514,86 +545,87 @@ function ExpenseAnalyzerPage() {
                       )
                     })}
                 </ul>
-              )}
-            </section>
-
-            <section aria-label="Recurring charges">
-              <div className="flex flex-wrap items-end justify-between gap-2">
-                <h2 className="text-xs font-semibold uppercase tracking-[0.3em] text-[#9CA3AF]">
-                  Recurring charges
-                </h2>
-              </div>
-
-              {recurringCharges.length > 0 && (
-                <>
-                  <div className="mt-4 rounded-xl border border-[#8B5CF6]/30 bg-[#8B5CF6]/10 px-5 py-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#C4B5FD]">
-                      Annual subscription cost
-                    </p>
-                    <p className="mt-2 font-mono text-3xl font-bold tracking-tight text-[#F9FAFB]">
-                      {formatCurrency(totalRecurringAnnual)}/year
-                    </p>
-                    <p className="mt-1 text-sm text-[#D1D5DB]">
-                      {formatCurrency(totalRecurringMonthly)}/mo
-                      {recurringCharges.length === 1
-                        ? ' · 1 confirmed subscription'
-                        : ` · ${recurringCharges.length} confirmed subscriptions`}
-                    </p>
-                  </div>
-                  <p className="mt-3 font-mono text-sm font-semibold text-[#9CA3AF]">
-                    Total recurring: {formatCurrency(totalRecurringMonthly)}/mo
-                  </p>
-                </>
-              )}
-
-              {recurringCharges.length === 0 ? (
-                <div className="mt-4 rounded-xl border border-[#1E2D45] bg-[#111827] px-6 py-10 text-center">
-                  <p className="text-sm leading-relaxed text-[#9CA3AF]">
-                    No recurring charges detected yet — check back after a couple months of
-                    transaction history.
-                  </p>
-                </div>
-              ) : (
-                <ul className="mt-4 space-y-3">
-                  {recurringCharges.map((charge) => (
-                    <RecurringChargeCard
-                      key={`${charge.merchant}-${charge.lastChargedDate}`}
-                      charge={charge}
-                    />
-                  ))}
-                </ul>
-              )}
-            </section>
-
-            {reviewCharges.length > 0 && (
-              <section aria-label="Review recurring patterns">
-                <div className="flex flex-wrap items-end justify-between gap-2">
-                  <div>
-                    <h2 className="text-xs font-semibold uppercase tracking-[0.3em] text-amber-300">
-                      Review
-                    </h2>
-                    <p className="mt-2 max-w-xl text-sm leading-relaxed text-[#9CA3AF]">
-                      These patterns might be subscriptions — or repeat one-offs (like frequent
-                      rides or coffee). We don&apos;t count them in your recurring total until
-                      there&apos;s stronger evidence.
-                    </p>
-                  </div>
-                  <p className="font-mono text-sm font-semibold text-amber-200">
-                    If confirmed: {formatCurrency(totalReviewMonthly)}/mo
-                  </p>
-                </div>
-
-                <ul className="mt-4 space-y-3">
-                  {reviewCharges.map((charge) => (
-                    <RecurringChargeCard
-                      key={`review-${charge.merchant}-${charge.lastChargedDate}`}
-                      charge={charge}
-                      variant="review"
-                    />
-                  ))}
-                </ul>
+                )}
               </section>
-            )}
+            </ExpenseAnalyzerTabPanel>
+
+            <ExpenseAnalyzerTabPanel
+              tabId={EXPENSE_ANALYZER_TABS.RECURRING}
+              activeTab={activeTab}
+              className="space-y-8"
+            >
+              <section aria-label="Recurring charges">
+                {recurringCharges.length > 0 && (
+                  <>
+                    <div className="rounded-xl border border-[#8B5CF6]/30 bg-[#8B5CF6]/10 px-5 py-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#C4B5FD]">
+                        Annual subscription cost
+                      </p>
+                      <p className="mt-2 font-mono text-3xl font-bold tracking-tight text-[#F9FAFB]">
+                        {formatCurrency(totalRecurringAnnual)}/year
+                      </p>
+                      <p className="mt-1 text-sm text-[#D1D5DB]">
+                        {formatCurrency(totalRecurringMonthly)}/mo
+                        {recurringCharges.length === 1
+                          ? ' · 1 confirmed subscription'
+                          : ` · ${recurringCharges.length} confirmed subscriptions`}
+                      </p>
+                    </div>
+                    <p className="mt-3 font-mono text-sm font-semibold text-[#9CA3AF]">
+                      Total recurring: {formatCurrency(totalRecurringMonthly)}/mo
+                    </p>
+                  </>
+                )}
+
+                {recurringCharges.length === 0 ? (
+                  <div className="rounded-xl border border-[#1E2D45] bg-[#111827] px-6 py-10 text-center">
+                    <p className="text-sm leading-relaxed text-[#9CA3AF]">
+                      No recurring charges detected yet — check back after a couple months of
+                      transaction history.
+                    </p>
+                  </div>
+                ) : (
+                  <ul className="mt-4 space-y-3">
+                    {recurringCharges.map((charge) => (
+                      <RecurringChargeCard
+                        key={`${charge.merchant}-${charge.lastChargedDate}`}
+                        charge={charge}
+                      />
+                    ))}
+                  </ul>
+                )}
+              </section>
+
+              {reviewCharges.length > 0 && (
+                <section aria-label="Review recurring patterns">
+                  <div className="flex flex-wrap items-end justify-between gap-2">
+                    <div>
+                      <h2 className="text-xs font-semibold uppercase tracking-[0.3em] text-amber-300">
+                        Review
+                      </h2>
+                      <p className="mt-2 max-w-xl text-sm leading-relaxed text-[#9CA3AF]">
+                        These patterns might be subscriptions — or repeat one-offs (like frequent
+                        rides or coffee). We don&apos;t count them in your recurring total until
+                        there&apos;s stronger evidence.
+                      </p>
+                    </div>
+                    <p className="font-mono text-sm font-semibold text-amber-200">
+                      If confirmed: {formatCurrency(totalReviewMonthly)}/mo
+                    </p>
+                  </div>
+
+                  <ul className="mt-4 space-y-3">
+                    {reviewCharges.map((charge) => (
+                      <RecurringChargeCard
+                        key={`review-${charge.merchant}-${charge.lastChargedDate}`}
+                        charge={charge}
+                        variant="review"
+                      />
+                    ))}
+                  </ul>
+                </section>
+              )}
+            </ExpenseAnalyzerTabPanel>
           </div>
         )}
       </main>

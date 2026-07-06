@@ -8,32 +8,38 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@clerk/clerk-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { formatDistanceToNow } from 'date-fns'
 import { Link, useSearchParams } from 'react-router-dom'
 import AppNavbar from '../components/AppNavbar.jsx'
+import DashboardHero from '../components/DashboardHero.jsx'
+import DashboardSectionHeader from '../components/DashboardSectionHeader.jsx'
+import DashboardAccountCard from '../components/DashboardAccountCard.jsx'
+import FirstInsightCelebration from '../components/FirstInsightCelebration.jsx'
+import ProactiveNoticeBanner from '../components/ProactiveNoticeBanner.jsx'
 import ConnectBankButton from '../components/ConnectBankButton.jsx'
 import SyncTransactionsButton from '../components/SyncTransactionsButton'
 import GenerateInsightButton from '../components/GenerateInsightButton'
+import InsightGeneratingPanel from '../components/InsightGeneratingPanel.jsx'
 import InsightCard from '../components/InsightCard'
 import SecurityNote from '../components/SecurityNote'
 import UsageBadge from '../components/UsageBadge.jsx'
 import PaywallCard from '../components/PaywallCard.jsx'
 import { useToastContext } from '../context/ToastContext.jsx'
+import FirstConnectCelebration from '../components/FirstConnectCelebration.jsx'
 import ConfirmModal from '../components/ConfirmModal'
 import DashboardOnboarding from '../components/DashboardOnboarding.jsx'
 import DashboardHeroSkeleton from '../components/DashboardHeroSkeleton.jsx'
 import AccountCardSkeleton from '../components/AccountCardSkeleton.jsx'
 import InsightCardSkeleton from '../components/InsightCardSkeleton.jsx'
 import Skeleton from '../components/Skeleton.jsx'
-import { dashboardQueryKey, expenseAnalyzerSummaryQueryKey, usageQueryKey } from '../lib/queryKeys.js'
+import { dashboardQueryKey, expenseAnalyzerSummaryQueryKey, notificationsQueryKey, usageQueryKey } from '../lib/queryKeys.js'
 import { fetchExpenseAnalyzerSummary } from '../lib/fetchExpenseAnalyzer.js'
 import { isNotableTopMover } from '../lib/topMover.js'
 import { scrollToInsightChat } from '../lib/scrollToInsightChat.js'
 import { syncTransactions } from '../lib/syncTransactions.js'
+import { consumeFirstConnectCelebration } from '../lib/firstConnectCelebration.js'
 import { disconnectAccount, getDisconnectConfirmMessage } from '../lib/disconnectAccount.js'
 import { fetchUsage } from '../lib/fetchUsage.js'
 import { trackUpgradeProClick } from '../lib/analytics.js'
-import { getDisplayBalance, isCreditAccount } from '../lib/balanceHelpers.js'
 import {
   FloatingCfoChatButton,
   FloatingCfoChatModal,
@@ -44,28 +50,6 @@ function formatCurrency(amount) {
     style: 'currency',
     currency: 'USD',
   }).format(amount)
-}
-
-function isBalanceWarning(account) {
-  const balance = getDisplayBalance(account)
-  if (isCreditAccount(account)) {
-    return balance > 0
-  }
-  return balance < 0
-}
-
-const RANGE_OPTIONS = [
-  { value: '7d', label: '7D' },
-  { value: '30d', label: '30D' },
-  { value: '3m', label: '3M' },
-  { value: '1y', label: '1Y' },
-]
-
-const RANGE_LABELS = {
-  '7d': 'in the last 7 days',
-  '30d': 'in the last 30 days',
-  '3m': 'in the last 3 months',
-  '1y': 'in the last year',
 }
 
 const AUTO_SYNC_STALE_MINUTES = 5
@@ -92,9 +76,12 @@ function DashboardPage() {
   const [selectedRange, setSelectedRange] = useState('30d')
   const { showToast } = useToastContext()
   const [accountToDelete, setAccountToDelete] = useState(null)
+  const [firstConnectCelebration, setFirstConnectCelebration] = useState(null)
+  const [firstInsightCelebration, setFirstInsightCelebration] = useState(false)
   const syncInFlight = useRef(false)
   const lastAutoSyncAttempt = useRef(0)
   const prevAccountCount = useRef(null)
+  const celebrateFirstInsightRef = useRef(false)
 
   const { data: usage } = useQuery({
     queryKey: usageQueryKey,
@@ -155,6 +142,7 @@ function DashboardPage() {
         syncInFlight.current = false
         await queryClient.invalidateQueries({ queryKey: ['dashboard'] })
         await queryClient.invalidateQueries({ queryKey: expenseAnalyzerSummaryQueryKey })
+        await queryClient.invalidateQueries({ queryKey: notificationsQueryKey })
       }
     }
 
@@ -203,12 +191,21 @@ function DashboardPage() {
     (expenseTeaser?.recurringCount ?? 0) > 0 || notableTopMover != null
 
   useEffect(() => {
-    if (prevAccountCount.current === null) {
+    if (accountCount === 0 || hasInsight) {
       prevAccountCount.current = accountCount
       return
     }
 
-    if (prevAccountCount.current === 0 && accountCount > 0 && !hasInsight) {
+    const wasFirstAccountLink =
+      prevAccountCount.current !== null &&
+      prevAccountCount.current === 0 &&
+      accountCount > 0
+
+    const celebrationMeta = consumeFirstConnectCelebration()
+
+    if (celebrationMeta) {
+      setFirstConnectCelebration(celebrationMeta)
+    } else if (wasFirstAccountLink) {
       document.getElementById('generate-insight-action')?.scrollIntoView({
         behavior: 'smooth',
         block: 'center',
@@ -217,6 +214,36 @@ function DashboardPage() {
 
     prevAccountCount.current = accountCount
   }, [accountCount, hasInsight])
+
+  function handleInsightLoadingChange(loading) {
+    setInsightLoading(loading)
+
+    if (loading && !hasInsight) {
+      celebrateFirstInsightRef.current = true
+    }
+  }
+
+  useEffect(() => {
+    if (!insightLoading && hasInsight && celebrateFirstInsightRef.current) {
+      celebrateFirstInsightRef.current = false
+      setFirstInsightCelebration(true)
+    }
+  }, [insightLoading, hasInsight])
+
+  function handleFirstConnectClose() {
+    setFirstConnectCelebration(null)
+  }
+
+  function handleFirstConnectGenerate() {
+    setFirstConnectCelebration(null)
+    document.getElementById('generate-insight-action')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+    })
+    window.setTimeout(() => {
+      document.querySelector('#generate-insight-action button')?.click()
+    }, 450)
+  }
 
   function handleNavbarChat() {
     if (!dashboardData?.latestInsight?.id) {
@@ -232,26 +259,14 @@ function DashboardPage() {
   const showFailedState = isError && dashboardData === undefined && !isPending
 
   return (
-    <div className="min-h-screen bg-[#0A0F1C] text-[#F9FAFB]">
-      <AppNavbar
-        onChatClick={handleNavbarChat}
-        leftContent={
-          <span className="text-sm font-semibold uppercase tracking-[0.35em] text-[#10B981]">
-            Soverm
-          </span>
-        }
-      >
-        <Link
-          to="/history"
-          className="shrink-0 text-sm text-[#9CA3AF] transition hover:text-white"
-        >
-          View History
-        </Link>
-      </AppNavbar>
+    <div className="min-h-screen bg-app text-fg">
+      <AppNavbar onChatClick={handleNavbarChat} />
 
       <main className="mx-auto max-w-6xl px-4 pb-16 pt-24 sm:px-6 sm:pt-28">
+        <ProactiveNoticeBanner />
+
         {isError && isFetching && dashboardData && (
-          <p className="mb-4 text-center text-sm text-[#9CA3AF]" role="status">
+          <p className="mb-4 text-center text-sm text-fg-muted" role="status">
             Couldn&apos;t refresh — retrying...
           </p>
         )}
@@ -267,9 +282,7 @@ function DashboardPage() {
             </section>
 
             <section className="mt-12">
-              <h2 className="text-xs font-semibold uppercase tracking-[0.3em] text-[#9CA3AF]">
-                Your Accounts
-              </h2>
+              <DashboardSectionHeader title="Your Accounts" />
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {[0, 1, 2, 3].map((index) => (
                   <AccountCardSkeleton key={index} />
@@ -278,24 +291,19 @@ function DashboardPage() {
             </section>
 
             <section className="mt-12">
-              <div className="mb-4 flex items-center gap-2">
-                <h2 className="text-xs font-semibold uppercase tracking-[0.3em] text-[#9CA3AF]">
-                  Soverm Insight
-                </h2>
-                <span className="h-2 w-2 rounded-full bg-[#8B5CF6]" aria-hidden="true" />
-              </div>
+              <DashboardSectionHeader title="Soverm Insight" accent="ai" />
               <InsightCardSkeleton />
             </section>
           </>
         ) : showFailedState ? (
           <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center">
-            <p className="text-sm text-[#EF4444]" role="alert">
+            <p className="text-sm text-danger" role="alert">
               Couldn&apos;t load your dashboard. Check your connection and try again.
             </p>
             <button
               type="button"
               onClick={() => refetch()}
-              className="rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-600"
+              className="rounded-lg bg-brand px-5 py-2.5 text-sm font-medium text-slate-950 transition hover:bg-brand-soft"
             >
               Try again
             </button>
@@ -303,106 +311,52 @@ function DashboardPage() {
         ) : dashboardData ? (
           <>
             {/* Hero */}
-            <section className="text-center">
-              {!hasAccounts ? (
-                <>
-                  <p className="text-xs font-medium uppercase tracking-[0.3em] text-[#10B981]">
-                    Step 1
-                  </p>
-                  <h2 className="mt-3 text-2xl font-bold text-[#F9FAFB] sm:text-3xl">
-                    Connect your bank to get started
-                  </h2>
-                  <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-[#9CA3AF]">
-                    Soverm needs your accounts linked before it can analyze your finances.
-                    Your bank login stays with Plaid — we never see it.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="text-xs font-medium uppercase tracking-[0.3em] text-[#9CA3AF]">
-                    Total Balance
-                  </p>
-                  <p className="mt-3 font-mono text-4xl font-light tracking-tight text-[#F9FAFB] sm:text-6xl md:text-7xl">
-                    {formatCurrency(dashboardData?.totalBalance ?? 0)}
-                  </p>
-                  {dashboardData?.lastSyncedAt && (
-                    <>
-                      <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-[#9CA3AF]">
-                        <span className="text-emerald-500" aria-hidden="true">
-                          ●
-                        </span>
-                        Last synced{' '}
-                        {formatDistanceToNow(new Date(dashboardData.lastSyncedAt))} ago
-                      </p>
-                      <p className="mt-1 text-center text-xs text-[#6B7280]">
-                        Recent transactions may take a few minutes to appear
-                      </p>
-                    </>
-                  )}
-                  <div className="mt-5 mb-2 flex justify-center gap-2">
-                    {RANGE_OPTIONS.map(({ value, label }) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => setSelectedRange(value)}
-                        className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                          selectedRange === value
-                            ? 'bg-emerald-500 text-slate-950'
-                            : 'bg-[#1A2236] text-[#9CA3AF] hover:text-white'
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-8">
-                    <span className="text-sm text-[#10B981]">
-                      ↑ {formatCurrency(dashboardData?.income ?? 0)} income{' '}
-                      {RANGE_LABELS[selectedRange]}
-                    </span>
-                    <span className="text-sm text-[#EF4444]">
-                      ↓ {formatCurrency(dashboardData?.spent ?? 0)} spent{' '}
-                      {RANGE_LABELS[selectedRange]}
-                    </span>
-                  </div>
-                  {showExpenseTeaser && (
-                    <div className="mt-4 text-center">
-                      <p className="text-xs text-[#9CA3AF]">
-                        {[
-                          notableTopMover
-                            ? `${notableTopMover.category} ${notableTopMover.direction} ${notableTopMover.percent}% vs prior 30 days`
-                            : null,
-                          (expenseTeaser?.recurringCount ?? 0) > 0
-                            ? `${expenseTeaser.recurringCount} subscription${expenseTeaser.recurringCount === 1 ? '' : 's'} detected · ${formatCurrency(expenseTeaser.totalRecurringMonthly)}/mo`
-                            : null,
-                        ]
-                          .filter(Boolean)
-                          .join(' · ')}
+            <DashboardHero
+              hasAccounts={hasAccounts}
+              totalBalance={dashboardData?.totalBalance ?? 0}
+              lastSyncedAt={dashboardData?.lastSyncedAt}
+              selectedRange={selectedRange}
+              onRangeChange={setSelectedRange}
+              income={dashboardData?.income ?? 0}
+              spent={dashboardData?.spent ?? 0}
+              spendingSeries={dashboardData?.spendingSeries ?? []}
+            />
+
+            {hasAccounts && showExpenseTeaser && (
+              <div className="mt-4 text-center">
+                <p className="text-xs text-fg-muted">
+                  {[
+                    notableTopMover
+                      ? `${notableTopMover.category} ${notableTopMover.direction} ${notableTopMover.percent}% vs prior 30 days`
+                      : null,
+                    (expenseTeaser?.recurringCount ?? 0) > 0
+                      ? `${expenseTeaser.recurringCount} subscription${expenseTeaser.recurringCount === 1 ? '' : 's'} detected · ${formatCurrency(expenseTeaser.totalRecurringMonthly)}/mo`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                  {' · '}
+                  <Link
+                    to="/expense-analyzer"
+                    className="text-ai-soft transition hover:text-ai hover:underline"
+                  >
+                    View Expense Analyzer →
+                  </Link>
+                </p>
+                {(expenseTeaser?.recurringPreview?.length ?? 0) > 0 && (
+                  <ul className="mx-auto mt-2 max-w-md space-y-1 text-xs text-fg-subtle">
+                    {expenseTeaser.recurringPreview.map((item) => (
+                      <li key={`${item.merchant}-${item.accountLabel ?? 'unknown'}`}>
+                        {item.merchant}
+                        {item.accountLabel ? ` · ${item.accountLabel}` : ''}
                         {' · '}
-                        <Link
-                          to="/expense-analyzer"
-                          className="text-[#8B5CF6] transition hover:text-[#A78BFA] hover:underline"
-                        >
-                          View Expense Analyzer →
-                        </Link>
-                      </p>
-                      {(expenseTeaser?.recurringPreview?.length ?? 0) > 0 && (
-                        <ul className="mx-auto mt-2 max-w-md space-y-1 text-xs text-[#6B7280]">
-                          {expenseTeaser.recurringPreview.map((item) => (
-                            <li key={`${item.merchant}-${item.accountLabel ?? 'unknown'}`}>
-                              {item.merchant}
-                              {item.accountLabel ? ` · ${item.accountLabel}` : ''}
-                              {' · '}
-                              {formatCurrency(item.monthlyEquivalent)}/mo
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  )}
-                </>
-              )}
-            </section>
+                        {formatCurrency(item.monthlyEquivalent)}/mo
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
 
             <div className="mx-auto mt-8 max-w-xl space-y-4">
               <DashboardOnboarding
@@ -436,7 +390,7 @@ function DashboardPage() {
                   showToast={showToast}
                   highlighted={highlightGenerate}
                   onError={setInsightError}
-                  onLoadingChange={setInsightLoading}
+                  onLoadingChange={handleInsightLoadingChange}
                   onLimitReached={setLimitReached}
                   onUsageUpdated={(updatedUsage) =>
                     queryClient.setQueryData(usageQueryKey, updatedUsage)
@@ -447,78 +401,48 @@ function DashboardPage() {
 
             {/* Accounts */}
             <section className="mt-12">
-              <h2 className="text-xs font-semibold uppercase tracking-[0.3em] text-[#9CA3AF]">
-                Your Accounts
-              </h2>
+              <DashboardSectionHeader title="Your Accounts" />
               {(dashboardData?.accounts ?? []).length === 0 ? (
-                <div className="mt-4 rounded-xl border border-dashed border-[#1E2D45] bg-[#111827] px-6 py-10 text-center">
-                  <p className="text-sm font-medium text-[#F9FAFB]">
+                <div className="mt-4 rounded-xl border border-dashed border-border-default bg-surface px-6 py-10 text-center">
+                  <p className="text-sm font-medium text-fg">
                     No bank connected yet
                   </p>
-                  <p className="mt-2 text-sm text-[#9CA3AF]">
-                    Tap <span className="text-[#10B981]">Connect Your Bank</span> above —
+                  <p className="mt-2 text-sm text-fg-muted">
+                    Tap <span className="text-brand-soft">Connect Your Bank</span> above —
                     that&apos;s your first step.
                   </p>
                 </div>
               ) : (
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {(dashboardData?.accounts ?? []).map((account) => {
-                  const balanceIsWarning = isBalanceWarning(account)
-                  return (
-                    <article
-                      key={account.id}
-                      className="relative min-w-0 rounded-xl border border-[#1E2D45] bg-[#111827] p-4 sm:p-5 transition hover:border-[#10B981]/40 hover:bg-[#1A2236]"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => setAccountToDelete(account)}
-                        className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center text-sm text-[#9CA3AF] transition hover:text-red-400"
-                        aria-label={`Disconnect ${account.account_name}`}
-                      >
-                        ×
-                      </button>
-                      <p className="truncate pr-8 text-xs font-medium uppercase tracking-wide text-[#9CA3AF]">
-                        {account.bank_name}
-                      </p>
-                      <p className="mt-1 truncate pr-8 text-sm font-medium text-[#F9FAFB]">
-                        {account.account_name}
-                      </p>
-                      <span className="mt-2 inline-block max-w-full truncate rounded-full border border-[#1E2D45] bg-[#1A2236] px-2.5 py-0.5 text-xs capitalize text-[#9CA3AF]">
-                        {account.account_type}
-                      </span>
-                      <p
-                        className={`mt-4 break-all font-mono text-xl font-semibold sm:text-2xl ${
-                          balanceIsWarning ? 'text-[#EF4444]' : 'text-[#10B981]'
-                        }`}
-                      >
-                        {formatCurrency(getDisplayBalance(account))}
-                      </p>
-                    </article>
-                  )
-                })}
+                {(dashboardData?.accounts ?? []).map((account) => (
+                  <DashboardAccountCard
+                    key={account.id}
+                    account={account}
+                    onDisconnect={setAccountToDelete}
+                  />
+                ))}
               </div>
               )}
             </section>
 
             {/* AI Insight */}
             <section className="mt-12">
-              <div className="mb-4 flex items-center gap-2">
-                <h2 className="text-xs font-semibold uppercase tracking-[0.3em] text-[#9CA3AF]">
-                  Soverm Insight
-                </h2>
-                <span className="h-2 w-2 rounded-full bg-[#8B5CF6]" aria-hidden="true" />
-              </div>
+              <DashboardSectionHeader title="Soverm Insight" accent="ai" />
 
               {insightError && (
-                <p className="mb-4 text-sm text-[#EF4444]" role="alert">
+                <p className="mb-4 text-sm text-danger" role="alert">
                   {insightError}
                 </p>
               )}
 
               {insightLoading ? (
-                <InsightCardSkeleton />
+                <InsightGeneratingPanel />
               ) : (
                 <>
+                  <FirstInsightCelebration
+                    isOpen={firstInsightCelebration}
+                    onDismiss={() => setFirstInsightCelebration(false)}
+                  />
                   <InsightCard
                     insight={dashboardData?.latestInsight}
                     onChatError={(message) => showToast(message, 'error')}
@@ -527,7 +451,7 @@ function DashboardPage() {
                   />
                   {showPaywall && (
                     <div className="mt-6">
-                      <p className="mb-3 text-xs font-semibold uppercase tracking-[0.3em] text-[#6B7280]">
+                      <p className="mb-3 text-xs font-semibold uppercase tracking-[0.3em] text-fg-subtle">
                         Want another insight today?
                       </p>
                       <PaywallCard
@@ -548,6 +472,13 @@ function DashboardPage() {
           </>
         ) : null}
       </main>
+      <FirstConnectCelebration
+        isOpen={Boolean(firstConnectCelebration)}
+        accountsConnected={firstConnectCelebration?.accountsConnected ?? 1}
+        syncedAdded={firstConnectCelebration?.syncedAdded ?? 0}
+        onClose={handleFirstConnectClose}
+        onGenerateInsight={handleFirstConnectGenerate}
+      />
       <ConfirmModal
         isOpen={!!accountToDelete}
         title="Disconnect this account?"

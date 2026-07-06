@@ -4,6 +4,7 @@
  * Usage: node scripts/test-insight-persistence.js
  */
 
+import 'dotenv/config'
 import { buildPersistedInsightContent } from '../services/claude.js'
 
 const sampleComparison = {

@@ -9,8 +9,11 @@ import { Router } from 'express'
 import { getAuth } from '@clerk/express'
 import db from '../db/index.js'
 import { calculateTotalBalance, getDisplayBalance } from '../utils/balanceHelpers.js'
+import { CONNECTED_ACCOUNT_TRANSACTION_JOINS } from '../utils/connectedAccountTransactions.js'
 import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
 import { reportServerError } from '../utils/sentry.js'
+
+const NON_PENDING_FILTER = 'AND (t.pending IS NOT TRUE)'
 
 const router = Router()
 
@@ -68,13 +71,66 @@ router.get('/summary', async (req, res) => {
     const appliedRange = resolveRange(req.query.range)
     const interval = RANGE_INTERVALS[appliedRange]
 
-    const accountsResult = await db.query(
+    const [accountsResult, incomeResult, spentResult, spendingSeriesResult, insightResult, lastSyncedResult] =
+      await Promise.all([
+    db.query(
       `SELECT id, bank_name, account_name, account_type,
               balance_current, balance_available, currency
        FROM accounts
        WHERE user_id = $1`,
       [userId]
-    )
+    ),
+    db.query(
+      `SELECT COALESCE(SUM(ABS(t.amount)), 0) AS total
+       FROM transactions t
+       ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
+       WHERE t.user_id = $1
+         AND t.amount < 0
+         ${NON_PENDING_FILTER}
+         AND t.date >= NOW() - $2::interval`,
+      [userId, interval]
+    ),
+    db.query(
+      `SELECT COALESCE(SUM(t.amount), 0) AS total
+       FROM transactions t
+       ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
+       WHERE t.user_id = $1
+         AND t.amount > 0
+         ${NON_PENDING_FILTER}
+         AND t.date >= NOW() - $2::interval`,
+      [userId, interval]
+    ),
+    db.query(
+      `SELECT t.date::date AS date, COALESCE(SUM(t.amount), 0)::numeric AS amount
+       FROM transactions t
+       ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
+       WHERE t.user_id = $1
+         AND t.amount > 0
+         ${NON_PENDING_FILTER}
+         AND t.date >= NOW() - $2::interval
+       GROUP BY t.date::date
+       ORDER BY t.date::date ASC`,
+      [userId, interval]
+    ),
+    db.query(
+      `SELECT id, content, created_at
+       FROM insights
+       WHERE user_id = $1
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [userId]
+    ),
+    db.query(
+      `SELECT MAX(last_synced_at) AS last_synced
+       FROM (
+         SELECT last_synced_at FROM accounts WHERE user_id = $1
+         UNION ALL
+         SELECT last_synced_at FROM plaid_items WHERE user_id = $1
+       ) AS combined
+       WHERE last_synced_at IS NOT NULL`,
+      [userId]
+    ),
+  ])
 
     const accounts = accountsResult.rows.map((account) => ({
       ...account,
@@ -82,35 +138,12 @@ router.get('/summary', async (req, res) => {
     }))
     const totalBalance = calculateTotalBalance(accounts)
 
-    const incomeResult = await db.query(
-      `SELECT COALESCE(SUM(amount), 0) AS total
-       FROM transactions
-       WHERE user_id = $1
-         AND amount < 0
-         AND date >= NOW() - $2::interval`,
-      [userId, interval]
-    )
-
-    const spentResult = await db.query(
-      `SELECT COALESCE(SUM(amount), 0) AS total
-       FROM transactions
-       WHERE user_id = $1
-         AND amount > 0
-         AND date >= NOW() - $2::interval`,
-      [userId, interval]
-    )
-
-    const insightResult = await db.query(
-      `SELECT id, content, created_at
-       FROM insights
-       WHERE user_id = $1
-       ORDER BY created_at DESC
-       LIMIT 1`,
-      [userId]
-    )
-
-    const income = Math.abs(Number(incomeResult.rows[0].total))
+    const income = Number(incomeResult.rows[0].total)
     const spent = Number(spentResult.rows[0].total)
+    const spendingSeries = spendingSeriesResult.rows.map((row) => ({
+      date: row.date,
+      amount: Number(row.amount),
+    }))
     const insightRow = insightResult.rows[0]
 
     let latestInsight = null
@@ -129,23 +162,13 @@ router.get('/summary', async (req, res) => {
       }
     }
 
-    const lastSyncedResult = await db.query(
-      `SELECT MAX(last_synced_at) AS last_synced
-       FROM (
-         SELECT last_synced_at FROM accounts WHERE user_id = $1
-         UNION ALL
-         SELECT last_synced_at FROM plaid_items WHERE user_id = $1
-       ) AS combined
-       WHERE last_synced_at IS NOT NULL`,
-      [userId]
-    )
-
     const lastSyncedAt = lastSyncedResult.rows[0].last_synced ?? null
 
     res.json({
       totalBalance,
       income,
       spent,
+      spendingSeries,
       accounts,
       latestInsight,
       lastSyncedAt,

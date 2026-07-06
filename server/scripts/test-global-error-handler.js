@@ -7,7 +7,7 @@
  *   node scripts/test-global-error-handler.js after
  */
 
-import dotenv from 'dotenv'
+import 'dotenv/config'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import express from 'express'
@@ -16,7 +16,6 @@ import insightsRouter from '../routes/insights.js'
 import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-dotenv.config({ path: path.join(__dirname, '../.env') })
 
 const mode = process.argv[2] || 'before'
 const withErrorHandler = mode === 'after'

@@ -7,6 +7,7 @@
 
 import { SignedIn, SignedOut, SignUpButton } from '@clerk/clerk-react'
 import { Link, useLocation } from 'react-router-dom'
+import BrandMark from './BrandMark.jsx'
 
 const PRODUCT_LINKS_PUBLIC = [
   { to: '/#how-it-works', label: 'How it works' },
@@ -17,6 +18,7 @@ const PRODUCT_LINKS_PUBLIC = [
 
 const PRODUCT_LINKS_APP = [
   { to: '/dashboard', label: 'Dashboard' },
+  { to: '/expense-analyzer', label: 'Expenses' },
   { to: '/history', label: 'History' },
   { to: '/settings', label: 'Settings' },
 ]
@@ -111,13 +113,8 @@ function Footer() {
         <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-12 lg:gap-8">
           {/* Brand */}
           <div className="lg:col-span-4">
-            <Link
-              to="/"
-              className="text-base font-bold tracking-wide text-[#F9FAFB] transition hover:text-emerald-400"
-            >
-              SOVERM
-            </Link>
-            <p className="mt-3 max-w-xs text-sm leading-relaxed text-[#9CA3AF]">
+            <BrandMark to="/" className="inline-flex" />
+            <p className="mt-3 max-w-xs text-sm leading-relaxed text-fg-muted">
               Your personal accountant — accounting intelligence that monitors your
               transactions and helps you put your money to better use.
             </p>

@@ -4,6 +4,7 @@
  * Usage: node scripts/test-plaid-recurring-merge.js
  */
 
+import 'dotenv/config'
 import { mergeRecurringCharges } from '../services/plaidRecurring.js'
 import { detectRecurringChargesFromTransactions } from '../utils/expenseAnalyzerData.js'
 

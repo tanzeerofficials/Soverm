@@ -4,6 +4,7 @@
  * Usage: node scripts/test-merchant-normalize.js
  */
 
+import 'dotenv/config'
 import {
   formatMerchantDisplayLabel,
   formatSubscriptionMerchantLabel,

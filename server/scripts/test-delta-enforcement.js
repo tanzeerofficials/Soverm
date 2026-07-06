@@ -5,6 +5,7 @@
  * Usage: node scripts/test-delta-enforcement.js
  */
 
+import 'dotenv/config'
 import { enforceStatDeltas } from '../services/claude.js'
 
 const sampleComparison = {

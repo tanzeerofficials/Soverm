@@ -3,6 +3,89 @@ import { SignOutButton, useUser } from '@clerk/clerk-react'
 import { Link, useLocation } from 'react-router-dom'
 import ChatWithCfoButton from './ChatWithCfoButton.jsx'
 import ChatBubbleIcon from './ChatBubbleIcon.jsx'
+import NotificationBell from './NotificationBell.jsx'
+import BrandMark from './BrandMark.jsx'
+
+const PRIMARY_NAV = [
+  {
+    to: '/dashboard',
+    label: 'Dashboard',
+    match: (path) => path === '/dashboard',
+  },
+  {
+    to: '/expense-analyzer',
+    label: 'Expenses',
+    match: (path) => path.startsWith('/expense-analyzer'),
+  },
+  {
+    to: '/history',
+    label: 'History',
+    match: (path) => path.startsWith('/history'),
+  },
+  {
+    to: '/settings',
+    label: 'Settings',
+    match: (path) => path.startsWith('/settings'),
+  },
+]
+
+function NavIcon({ name, className = 'h-4 w-4' }) {
+  const props = {
+    className,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 1.75,
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round',
+    'aria-hidden': true,
+  }
+
+  if (name === 'dashboard') {
+    return (
+      <svg {...props}>
+        <path d="M3 10.5 12 3l9 7.5" />
+        <path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5" />
+      </svg>
+    )
+  }
+
+  if (name === 'expenses') {
+    return (
+      <svg {...props}>
+        <path d="M3 3v18h18" />
+        <path d="M7 16l4-8 4 5 5-7" />
+      </svg>
+    )
+  }
+
+  if (name === 'history') {
+    return (
+      <svg {...props}>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 2" />
+      </svg>
+    )
+  }
+
+  if (name === 'settings') {
+    return (
+      <svg {...props}>
+        <circle cx="12" cy="12" r="3" />
+        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+      </svg>
+    )
+  }
+
+  return null
+}
+
+const NAV_ICONS = {
+  '/dashboard': 'dashboard',
+  '/expense-analyzer': 'expenses',
+  '/history': 'history',
+  '/settings': 'settings',
+}
 
 function MenuToggleIcon({ open }) {
   if (open) {
@@ -26,13 +109,32 @@ function MenuToggleIcon({ open }) {
 
 function BackArrowIcon() {
   return (
-    <svg className="h-4 w-4 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+    <svg className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
       <path
         fillRule="evenodd"
         d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z"
         clipRule="evenodd"
       />
     </svg>
+  )
+}
+
+function NavPill({ to, label, icon, active, onNavigate }) {
+  return (
+    <Link
+      to={to}
+      onClick={onNavigate}
+      aria-current={active ? 'page' : undefined}
+      className={`flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-medium transition-all duration-200 xl:px-4 ${
+        active
+          ? 'bg-[#1A2236] text-[#F9FAFB] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-emerald-500/35'
+          : 'text-[#9CA3AF] hover:bg-[#1A2236]/55 hover:text-white'
+      }`}
+    >
+      <NavIcon name={icon} className={`h-4 w-4 shrink-0 ${active ? 'text-emerald-400' : ''}`} />
+      <span className="hidden xl:inline">{label}</span>
+      <span className="xl:hidden">{label.split(' ')[0]}</span>
+    </Link>
   )
 }
 
@@ -76,151 +178,189 @@ function AppNavbar({ leftContent, onChatClick, backTo, backLabel, children }) {
     setMenuOpen(false)
   }
 
+  function closeMenu() {
+    setMenuOpen(false)
+  }
+
   return (
-    <header className="fixed inset-x-0 top-0 z-50 h-16 border-b border-[#1E2D45] bg-[#0A0F1C]">
-      <div className="relative mx-auto flex h-full max-w-6xl items-center justify-between gap-2 px-3 sm:gap-4 sm:px-6">
-        {/* Mobile / tablet: compact left zone */}
-        <div className="flex min-w-0 items-center lg:hidden">
-          {mobileBackNav ? (
-            <Link
-              to={backTo}
-              className="flex min-w-0 items-center gap-1.5 text-sm text-[#9CA3AF] transition hover:text-white"
-            >
-              <BackArrowIcon />
-              <span className="truncate">{backLabel}</span>
-            </Link>
-          ) : (
-            <Link
-              to="/dashboard"
-              className="truncate text-sm font-semibold uppercase tracking-[0.35em] text-[#10B981]"
-            >
-              Soverm
-            </Link>
-          )}
-        </div>
+    <header className="fixed inset-x-0 top-0 z-50 border-b border-[#1E2D45]/70 bg-[#0A0F1C]/88 shadow-[0_8px_32px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-emerald-500/35 to-transparent" />
 
-        {/* Desktop: full left zone */}
-        <div className="hidden min-w-0 items-center gap-2 lg:flex lg:gap-4">
-          {leftContent && (
-            <div className="flex min-w-0 items-center gap-2 lg:gap-4">{leftContent}</div>
-          )}
-          {onChatClick && <ChatWithCfoButton variant="compact" onClick={onChatClick} />}
-        </div>
-
-        {/* Desktop: inline actions */}
-        <div className="hidden shrink-0 items-center gap-3 lg:flex">
-          {children}
-          <Link
-            to="/expense-analyzer"
-            className="shrink-0 text-sm text-[#9CA3AF] transition hover:text-white"
-          >
-            Expense Analyzer
-          </Link>
-          <Link
-            to="/settings"
-            className="shrink-0 text-sm text-[#9CA3AF] transition hover:text-white"
-          >
-            Settings
-          </Link>
-          <span className="hidden text-sm text-[#9CA3AF] xl:inline">{firstName}</span>
-          <div
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#1A2236] text-sm font-semibold text-[#10B981] ring-1 ring-[#1E2D45]"
-            aria-hidden="true"
-          >
-            {initials}
+      <div className="relative mx-auto flex h-16 max-w-6xl items-center gap-3 px-3 sm:px-6 lg:gap-6">
+        {/* Brand + optional page context */}
+        <div className="flex min-w-0 flex-1 items-center gap-3 lg:flex-none">
+          <div className="lg:hidden">
+            {mobileBackNav ? (
+              <Link
+                to={backTo}
+                className="flex min-w-0 items-center gap-1.5 rounded-lg px-1 py-1 text-sm text-[#9CA3AF] transition hover:text-white"
+              >
+                <BackArrowIcon />
+                <span className="truncate">{backLabel}</span>
+              </Link>
+            ) : (
+              <BrandMark compact />
+            )}
           </div>
+
+          <div className="hidden lg:flex lg:items-center lg:gap-4">
+            <BrandMark />
+            {leftContent && (
+              <>
+                <span className="h-6 w-px bg-[#1E2D45]" aria-hidden="true" />
+                <div className="min-w-0 text-sm text-[#9CA3AF]">{leftContent}</div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Desktop center navigation */}
+        <nav
+          className="hidden items-center gap-1 rounded-full border border-[#1E2D45]/80 bg-[#111827]/70 p-1 lg:flex"
+          aria-label="Primary"
+        >
+          {PRIMARY_NAV.map((item) => (
+            <NavPill
+              key={item.to}
+              to={item.to}
+              label={item.label}
+              icon={NAV_ICONS[item.to]}
+              active={item.match(location.pathname)}
+            />
+          ))}
+        </nav>
+
+        {/* Desktop actions */}
+        <div className="hidden shrink-0 items-center gap-2 lg:flex lg:gap-3">
+          {children}
+          {onChatClick && <ChatWithCfoButton variant="compact" onClick={onChatClick} />}
+
+          <span className="mx-0.5 h-6 w-px bg-[#1E2D45]" aria-hidden="true" />
+
+          <NotificationBell />
+
+          <div className="flex items-center gap-2.5 rounded-full border border-[#1E2D45] bg-[#111827]/80 py-1 pl-1 pr-2">
+            <div
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#1A2236] to-[#111827] text-sm font-semibold text-emerald-400 ring-1 ring-[#2D3A52]"
+              aria-hidden="true"
+            >
+              {initials}
+            </div>
+            <span className="hidden max-w-[7rem] truncate text-sm text-[#D1D5DB] xl:inline">
+              {firstName}
+            </span>
+          </div>
+
           <SignOutButton>
             <button
               type="button"
-              className="min-h-11 rounded-lg border border-[#1E2D45] bg-[#111827] px-4 py-2 text-sm font-medium text-[#F9FAFB] transition hover:bg-[#1A2236]"
+              className="rounded-full border border-[#1E2D45] bg-[#111827]/80 px-4 py-2 text-sm font-medium text-[#9CA3AF] transition hover:border-[#374151] hover:bg-[#1A2236] hover:text-white"
             >
-              Sign Out
+              Sign out
             </button>
           </SignOutButton>
         </div>
 
-        {/* Mobile / tablet: menu toggle */}
-        <button
-          type="button"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#1E2D45] bg-[#111827] text-[#9CA3AF] transition hover:bg-[#1A2236] hover:text-white lg:hidden"
-          aria-expanded={menuOpen}
-          aria-controls={menuId}
-          aria-label={menuOpen ? 'Close menu' : 'Open menu'}
-          onClick={() => setMenuOpen((open) => !open)}
-        >
-          <MenuToggleIcon open={menuOpen} />
-        </button>
+        {/* Mobile actions */}
+        <div className="flex shrink-0 items-center gap-2 lg:hidden">
+          <NotificationBell />
+          <button
+            type="button"
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#1E2D45] bg-[#111827] text-[#9CA3AF] transition hover:border-[#374151] hover:bg-[#1A2236] hover:text-white"
+            aria-expanded={menuOpen}
+            aria-controls={menuId}
+            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            <MenuToggleIcon open={menuOpen} />
+          </button>
+        </div>
       </div>
 
       {menuOpen && (
         <>
           <button
             type="button"
-            className="fixed inset-0 top-16 z-40 bg-black/50 lg:hidden"
+            className="fixed inset-0 top-16 z-40 bg-black/55 backdrop-blur-[2px] lg:hidden"
             aria-label="Close menu"
-            onClick={() => setMenuOpen(false)}
+            onClick={closeMenu}
           />
 
           <nav
             id={menuId}
-            className="absolute right-0 top-full z-50 w-full border-b border-[#1E2D45] bg-[#111827] shadow-2xl sm:right-4 sm:w-72 sm:rounded-b-xl sm:border sm:border-t-0 lg:hidden"
+            className="absolute inset-x-3 top-[calc(100%+0.5rem)] z-50 overflow-hidden rounded-2xl border border-[#1E2D45] bg-[#111827]/95 shadow-2xl backdrop-blur-xl sm:inset-x-auto sm:right-4 sm:w-80 lg:hidden"
             aria-label="App navigation"
           >
-            <div className="flex items-center gap-3 border-b border-[#1E2D45] px-4 py-4">
-              <div
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#1A2236] text-sm font-semibold text-[#10B981] ring-1 ring-[#1E2D45]"
-                aria-hidden="true"
-              >
-                {initials}
-              </div>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-[#F9FAFB]">{firstName}</p>
-                <p className="truncate text-xs text-[#9CA3AF]">Signed in</p>
+            <div className="border-b border-[#1E2D45] bg-gradient-to-r from-[#1A2236] to-[#111827] px-4 py-4">
+              <div className="flex items-center gap-3">
+                <div
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#1A2236] to-[#0A0F1C] text-sm font-semibold text-emerald-400 ring-1 ring-[#2D3A52]"
+                  aria-hidden="true"
+                >
+                  {initials}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-[#F9FAFB]">{firstName}</p>
+                  <p className="truncate text-xs text-[#9CA3AF]">Signed in to Soverm</p>
+                </div>
               </div>
             </div>
 
-            <div className="py-2">
-              {onChatClick && (
-                <button
-                  type="button"
-                  onClick={handleChatClick}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-[#F9FAFB] transition hover:bg-[#1A2236]"
-                >
-                  <ChatBubbleIcon className="h-5 w-5 flex-shrink-0 text-[#8B5CF6]" />
-                  Ask Soverm
-                </button>
-              )}
+            <div className="p-2">
+              <p className="px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.25em] text-[#6B7280]">
+                Navigate
+              </p>
+              {PRIMARY_NAV.map((item) => {
+                const active = item.match(location.pathname)
+
+                return (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    onClick={closeMenu}
+                    aria-current={active ? 'page' : undefined}
+                    className={`mb-1 flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition ${
+                      active
+                        ? 'bg-[#1A2236] text-[#F9FAFB] ring-1 ring-emerald-500/30'
+                        : 'text-[#D1D5DB] hover:bg-[#1A2236]/70'
+                    }`}
+                  >
+                    <NavIcon
+                      name={NAV_ICONS[item.to]}
+                      className={`h-5 w-5 shrink-0 ${active ? 'text-emerald-400' : 'text-[#6B7280]'}`}
+                    />
+                    {item.label}
+                  </Link>
+                )
+              })}
 
               {children && (
-                <div className="[&_a]:flex [&_a]:w-full [&_a]:items-center [&_a]:px-4 [&_a]:py-3 [&_a]:text-sm [&_a]:text-[#F9FAFB] [&_a]:transition hover:[&_a]:bg-[#1A2236]">
+                <div className="mt-2 border-t border-[#1E2D45] pt-2 [&_a]:mb-1 [&_a]:flex [&_a]:items-center [&_a]:rounded-xl [&_a]:px-3 [&_a]:py-3 [&_a]:text-sm [&_a]:font-medium [&_a]:text-[#D1D5DB] [&_a]:transition hover:[&_a]:bg-[#1A2236]/70">
                   {children}
                 </div>
               )}
-
-              <Link
-                to="/expense-analyzer"
-                onClick={() => setMenuOpen(false)}
-                className="flex w-full items-center px-4 py-3 text-sm text-[#F9FAFB] transition hover:bg-[#1A2236]"
-              >
-                Expense Analyzer
-              </Link>
-
-              <Link
-                to="/settings"
-                onClick={() => setMenuOpen(false)}
-                className="flex w-full items-center px-4 py-3 text-sm text-[#F9FAFB] transition hover:bg-[#1A2236]"
-              >
-                Settings
-              </Link>
             </div>
 
-            <div className="border-t border-[#1E2D45] py-2">
+            {onChatClick && (
+              <div className="border-t border-[#1E2D45] p-3">
+                <button
+                  type="button"
+                  onClick={handleChatClick}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#8B5CF6]/35 bg-[#8B5CF6]/10 px-4 py-3 text-sm font-medium text-[#C4B5FD] transition hover:bg-[#8B5CF6]/20"
+                >
+                  <ChatBubbleIcon className="h-5 w-5 shrink-0 text-[#8B5CF6]" />
+                  Ask Soverm
+                </button>
+              </div>
+            )}
+
+            <div className="border-t border-[#1E2D45] p-2">
               <SignOutButton>
                 <button
                   type="button"
-                  className="flex w-full items-center px-4 py-3 text-left text-sm font-medium text-[#F87171] transition hover:bg-[#1A2236]"
+                  className="flex w-full items-center rounded-xl px-3 py-3 text-left text-sm font-medium text-red-400 transition hover:bg-red-500/10"
                 >
-                  Sign Out
+                  Sign out
                 </button>
               </SignOutButton>
             </div>

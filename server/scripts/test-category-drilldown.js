@@ -4,6 +4,7 @@
  * Usage: node scripts/test-category-drilldown.js
  */
 
+import 'dotenv/config'
 import {
   buildCategoryAccountBreakdowns,
   buildCategoryDrillDownMaps,

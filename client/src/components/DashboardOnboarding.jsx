@@ -41,9 +41,9 @@ function DashboardOnboarding({ hasAccounts, hasSynced, hasInsight }) {
         : 'Follow these steps to see your first personalized financial insight.'
 
   return (
-    <section className="rounded-xl border border-[#1E2D45] border-l-4 border-l-[#10B981] bg-[#111827] p-6">
-      <h2 className="text-sm font-semibold text-[#F9FAFB]">{heading}</h2>
-      <p className="mt-1 text-sm text-[#9CA3AF]">{subheading}</p>
+    <section className="rounded-xl border border-border-default border-l-4 border-l-brand bg-surface p-6">
+      <h2 className="text-sm font-semibold text-fg">{heading}</h2>
+      <p className="mt-1 text-sm text-fg-muted">{subheading}</p>
       <ol className="mt-5 space-y-4">
         {steps.map((step) => {
           const isCurrent = step.number === currentStep && !step.done
@@ -52,16 +52,16 @@ function DashboardOnboarding({ hasAccounts, hasSynced, hasInsight }) {
             <li
               key={step.number}
               className={`flex gap-3 rounded-lg p-2 -mx-2 ${
-                isCurrent ? 'bg-[#1A2236] ring-1 ring-[#10B981]/40' : ''
+                isCurrent ? 'bg-surface-elevated ring-1 ring-brand/40' : ''
               }`}
             >
               <span
                 className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
                   step.done
-                    ? 'bg-[#10B981] text-slate-950'
+                    ? 'bg-brand text-slate-950'
                     : isCurrent
-                      ? 'border border-[#10B981] bg-[#10B981]/10 text-[#10B981]'
-                      : 'border border-[#1E2D45] bg-[#1A2236] text-[#9CA3AF]'
+                      ? 'border border-brand bg-brand/10 text-brand-soft'
+                      : 'border border-border-default bg-surface-elevated text-fg-muted'
                 }`}
               >
                 {step.done ? '✓' : step.number}
@@ -69,15 +69,15 @@ function DashboardOnboarding({ hasAccounts, hasSynced, hasInsight }) {
               <div>
                 <p
                   className={`text-sm font-medium ${
-                    step.done ? 'text-[#9CA3AF]' : 'text-[#F9FAFB]'
+                    step.done ? 'text-fg-muted' : 'text-fg'
                   }`}
                 >
                   {step.title}
                   {isCurrent && (
-                    <span className="ml-2 text-xs font-normal text-[#10B981]">← next</span>
+                    <span className="ml-2 text-xs font-normal text-brand-soft">← next</span>
                   )}
                 </p>
-                <p className="mt-0.5 text-xs text-[#9CA3AF]">{step.detail}</p>
+                <p className="mt-0.5 text-xs text-fg-muted">{step.detail}</p>
               </div>
             </li>
           )

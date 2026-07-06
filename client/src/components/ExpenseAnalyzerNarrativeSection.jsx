@@ -48,31 +48,31 @@ function ExpenseAnalyzerNarrativeSection({
   return (
     <section
       className="rounded-xl border border-[#1E2D45] bg-[#111827]"
-      aria-label="AI spending narrative"
+      aria-label="Expense analysis and summary"
     >
       <div className="px-5 py-5 sm:px-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-[#6B7280]">
-              AI narrative
+              Analyze &amp; Summary
             </p>
             <p className="mt-1 text-sm text-[#9CA3AF]">
               {showPersonalized
-                ? 'Soverm’s read of your spending, last 30 days'
-                : 'From your synced transactions — get a personalized read below'}
+                ? 'Soverm’s summary of your spending, last 30 days'
+                : 'From your synced transactions — get a detailed expense summary below'}
             </p>
           </div>
 
           {showPersonalized ? (
             <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-300">
-              Personalized
+              Your summary
             </span>
           ) : null}
         </div>
 
         <div className="mt-4">
           {awaitingCacheCheck || isGenerating ? (
-            <div className="space-y-3" aria-busy="true" aria-label="Loading narrative">
+            <div className="space-y-3" aria-busy="true" aria-label="Loading summary">
               <Skeleton className="h-5 w-4/5" />
               <Skeleton className="h-4 w-full" />
               <Skeleton className="h-4 w-3/4" />
@@ -117,14 +117,14 @@ function ExpenseAnalyzerNarrativeSection({
                 disabled={isGenerating || !fingerprint}
                 className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isGenerating ? 'Preparing your read…' : 'Get your AI read'}
+                {isGenerating ? 'Preparing your summary…' : 'Get expense summary'}
               </button>
             )}
 
             {generationError && (
               <p className="max-w-xs text-right text-xs leading-relaxed text-amber-200/90">
                 {generationError.message ||
-                  'Couldn’t generate your read right now. The breakdown below is still accurate.'}
+                  'Couldn’t generate your summary right now. The breakdown below is still accurate.'}
               </p>
             )}
 
