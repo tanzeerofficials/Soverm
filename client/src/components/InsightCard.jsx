@@ -56,6 +56,7 @@ function InsightCard({
   onChatError,
   chatExpanded: controlledChatExpanded,
   onChatExpandedChange,
+  showActions = true,
 }) {
   const [expanded, setExpanded] = useState(false)
   const [internalChatExpanded, setInternalChatExpanded] = useState(false)
@@ -66,7 +67,8 @@ function InsightCard({
     return (
       <div className="rounded-xl border border-border-default bg-surface px-6 py-10 text-center">
         <p className="text-sm leading-relaxed text-fg-muted">
-          No insight generated yet. Click Generate above to analyze your finances.
+          No insight generated yet. Go to Overview, connect your bank if needed, then tap
+          Generate Summary.
         </p>
       </div>
     )
@@ -176,7 +178,7 @@ function InsightCard({
           )}
         </div>
       </article>
-      {insight.actions?.length > 0 && (
+      {showActions && insight.actions?.length > 0 && (
         <ActionChecklist actions={insight.actions} />
       )}
       {insight.id && (

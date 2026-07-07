@@ -202,7 +202,7 @@ export function formatCompactDelta(delta) {
 
 export function compactDeltaToneClass(statType, delta) {
   if (!delta?.direction) {
-    return 'text-[#9CA3AF]'
+    return 'text-fg-muted'
   }
 
   const isNew = delta.direction === 'up' && (delta.percent === null || delta.percent === undefined)
@@ -216,5 +216,5 @@ export function compactDeltaToneClass(statType, delta) {
     return 'text-red-400'
   }
 
-  return 'text-[#9CA3AF]'
+  return 'text-fg-muted'
 }

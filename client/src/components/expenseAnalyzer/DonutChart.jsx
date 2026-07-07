@@ -43,8 +43,8 @@ function DonutChart({
       >
         <defs>
           <radialGradient id={gradientId} cx="50%" cy="40%" r="60%">
-            <stop offset="0%" stopColor="#1A2236" />
-            <stop offset="100%" stopColor="#0A0F1C" />
+            <stop offset="0%" stopColor="var(--color-surface-elevated)" />
+            <stop offset="100%" stopColor="var(--color-app)" />
           </radialGradient>
         </defs>
 
@@ -80,18 +80,18 @@ function DonutChart({
           )
         })}
 
-        <circle cx={center} cy={center} r={innerRadius - 2 * scale} fill="#111827" />
+        <circle cx={center} cy={center} r={innerRadius - 2 * scale} fill="var(--color-surface)" />
       </svg>
 
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-4 text-center">
         {centerSubLabel && (
-          <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#6B7280]">
+          <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-fg-subtle">
             {centerSubLabel}
           </p>
         )}
         {centerLabel && (
           <p
-            className={`font-mono font-bold tabular-nums text-[#F9FAFB] ${
+            className={`font-mono font-bold tabular-nums text-fg ${
               isCompact ? 'text-sm leading-tight' : 'text-2xl'
             }`}
           >

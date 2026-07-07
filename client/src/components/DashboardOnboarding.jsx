@@ -1,4 +1,10 @@
-function DashboardOnboarding({ hasAccounts, hasSynced, hasInsight }) {
+function DashboardOnboarding({
+  hasAccounts,
+  hasSynced,
+  hasInsight,
+  collapsed = false,
+  onCollapsedChange,
+}) {
   if (hasInsight) {
     return null
   }
@@ -26,6 +32,9 @@ function DashboardOnboarding({ hasAccounts, hasSynced, hasInsight }) {
     },
   ]
 
+  const completedCount = steps.filter((step) => step.done).length
+  const currentStepMeta = steps.find((step) => step.number === currentStep)
+
   const heading =
     currentStep === 1
       ? 'Connect your bank to get started'
@@ -40,10 +49,46 @@ function DashboardOnboarding({ hasAccounts, hasSynced, hasInsight }) {
         ? 'Your accounts are synced. Hit Generate Summary below to see what Soverm finds.'
         : 'Follow these steps to see your first personalized financial insight.'
 
+  if (collapsed) {
+    return (
+      <section className="rounded-xl border border-border-default bg-surface px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0 text-left">
+            <p className="text-sm font-semibold text-fg">Getting started</p>
+            <p className="mt-0.5 truncate text-xs text-fg-muted">
+              {completedCount} of 3 complete
+              {currentStepMeta && !currentStepMeta.done
+                ? ` · Next: ${currentStepMeta.title}`
+                : ''}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onCollapsedChange?.(false)}
+            className="shrink-0 rounded-lg border border-border-default bg-surface-elevated px-3 py-1.5 text-xs font-medium text-fg transition hover:border-border-hover"
+          >
+            Show steps
+          </button>
+        </div>
+      </section>
+    )
+  }
+
   return (
     <section className="rounded-xl border border-border-default border-l-4 border-l-brand bg-surface p-6">
-      <h2 className="text-sm font-semibold text-fg">{heading}</h2>
-      <p className="mt-1 text-sm text-fg-muted">{subheading}</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-fg">{heading}</h2>
+          <p className="mt-1 text-sm text-fg-muted">{subheading}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => onCollapsedChange?.(true)}
+          className="shrink-0 text-xs text-fg-muted transition hover:text-fg"
+        >
+          Minimize
+        </button>
+      </div>
       <ol className="mt-5 space-y-4">
         {steps.map((step) => {
           const isCurrent = step.number === currentStep && !step.done
@@ -51,7 +96,7 @@ function DashboardOnboarding({ hasAccounts, hasSynced, hasInsight }) {
           return (
             <li
               key={step.number}
-              className={`flex gap-3 rounded-lg p-2 -mx-2 ${
+              className={`-mx-2 flex gap-3 rounded-lg p-2 ${
                 isCurrent ? 'bg-surface-elevated ring-1 ring-brand/40' : ''
               }`}
             >

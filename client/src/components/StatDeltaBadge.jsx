@@ -11,10 +11,9 @@ function StatDeltaBadge({ delta, statType = 'spending', inline = false }) {
 
   const pillBase =
     'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold'
-  const positiveTone =
-    'border-emerald-500/30 bg-emerald-500/15 text-emerald-400'
-  const negativeTone = 'border-red-500/30 bg-red-500/15 text-red-400'
-  const neutralTone = 'border-[#374151] bg-[#1E2D45] text-[#9CA3AF]'
+  const positiveTone = 'border-brand/30 bg-brand/15 text-brand-soft'
+  const negativeTone = 'border-danger/30 bg-danger/15 text-danger'
+  const neutralTone = 'border-border-default bg-surface-elevated text-fg-muted'
 
   const toneClasses = {
     positive: positiveTone,

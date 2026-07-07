@@ -60,7 +60,7 @@ createRoot(document.getElementById('root')).render(
   <StrictMode>
     <Sentry.ErrorBoundary
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-[#0A0F1C] px-6 text-center text-sm text-[#9CA3AF]">
+        <div className="flex min-h-screen items-center justify-center bg-app px-6 text-center text-sm text-fg-muted">
           Something went wrong. Please refresh the page.
         </div>
       }

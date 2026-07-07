@@ -46,15 +46,15 @@ function SpendingSparkline({ series = [], className = '' }) {
       >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#8B5CF6" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="#8B5CF6" stopOpacity="0" />
+            <stop offset="0%" stopColor="var(--color-ai)" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="var(--color-ai)" stopOpacity="0" />
           </linearGradient>
         </defs>
         <polygon points={geometry.area} fill={`url(#${gradientId})`} />
         <polyline
           points={geometry.line}
           fill="none"
-          stroke="#A78BFA"
+          stroke="var(--color-ai-soft)"
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -64,8 +64,8 @@ function SpendingSparkline({ series = [], className = '' }) {
             cx={geometry.coords[geometry.coords.length - 1].x}
             cy={geometry.coords[geometry.coords.length - 1].y}
             r="3.5"
-            fill="#C4B5FD"
-            stroke="#0A0F1C"
+            fill="var(--color-ai-soft)"
+            stroke="var(--color-app)"
             strokeWidth="2"
           />
         )}

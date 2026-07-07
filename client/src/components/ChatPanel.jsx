@@ -20,7 +20,7 @@ const assistantMarkdownComponents = {
   li: ({ children }) => <li className="text-sm leading-relaxed">{children}</li>,
   strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
   code: ({ children }) => (
-    <code className="rounded bg-[#1A2236] px-1 text-xs">{children}</code>
+    <code className="rounded bg-surface-elevated px-1 text-xs">{children}</code>
   ),
 }
 
@@ -31,7 +31,7 @@ function ChatSuggestedPrompts({ prompts, disabled, onSelect }) {
 
   return (
     <div className="space-y-2">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-[#6B7280]">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-fg-subtle">
         Try asking
       </p>
       <div className="flex flex-wrap gap-2">
@@ -41,7 +41,7 @@ function ChatSuggestedPrompts({ prompts, disabled, onSelect }) {
             type="button"
             disabled={disabled}
             onClick={() => onSelect(prompt)}
-            className="max-w-full rounded-full border border-[#1E2D45] bg-[#0A0F1C] px-3 py-2 text-left text-xs leading-snug text-[#D1D5DB] transition hover:border-[#8B5CF6]/40 hover:bg-[#1A2236] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+            className="max-w-full rounded-full border border-border-default bg-app px-3 py-2 text-left text-xs leading-snug text-fg-muted transition hover:border-ai/40 hover:bg-surface-elevated hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
           >
             {prompt}
           </button>
@@ -178,10 +178,10 @@ function ChatPanel({
   const messageScrollClass =
     scrollMode === 'modal'
       ? 'chat-scroll min-h-0 flex-1 space-y-4 overflow-y-auto py-2 pr-1 max-sm:pb-4'
-      : 'chat-scroll mb-4 max-h-[min(24rem,50dvh)] space-y-4 overflow-y-auto overscroll-y-contain border-b border-[#1E2D45] pb-4 sm:max-h-96'
+      : 'chat-scroll mb-4 max-h-[min(24rem,50dvh)] space-y-4 overflow-y-auto overscroll-y-contain border-b border-border-default pb-4 sm:max-h-96'
 
   const inputControlClass =
-    'w-full min-h-[2.75rem] max-h-32 resize-y rounded-lg border border-[#1E2D45] bg-[#0A0F1C] py-2.5 text-base leading-relaxed text-[#F9FAFB] placeholder:text-[#6B7280] focus:border-[#8B5CF6] focus:outline-none disabled:opacity-60'
+    'w-full min-h-[2.75rem] max-h-32 resize-y rounded-lg border border-border-default bg-app py-2.5 text-base leading-relaxed text-fg placeholder:text-fg-subtle focus:border-ai focus:outline-none disabled:opacity-60'
 
   return (
     <section
@@ -189,18 +189,18 @@ function ChatPanel({
       className={
         isModalLayout
           ? 'flex min-h-0 flex-1 flex-col'
-          : 'mt-4 scroll-mt-28 rounded-xl border border-[#1E2D45] border-l-4 border-l-[#8B5CF6] bg-[#111827] p-4 sm:p-6'
+          : 'mt-4 scroll-mt-28 rounded-xl border border-border-default border-l-4 border-l-ai bg-surface p-4 sm:p-6'
       }
     >
       {!isModalLayout && (
         <div className="mb-3 flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
-            <ChatBubbleIcon className="h-4 w-4 flex-shrink-0 text-[#8B5CF6]" />
+            <ChatBubbleIcon className="h-4 w-4 flex-shrink-0 text-ai" />
             <div className="min-w-0">
-              <h3 className="truncate text-xs font-semibold uppercase tracking-wide text-[#8B5CF6]">
+              <h3 className="truncate text-xs font-semibold uppercase tracking-wide text-ai">
                 Ask Soverm
               </h3>
-              <p className="truncate text-[11px] text-[#6B7280]">
+              <p className="truncate text-[11px] text-fg-subtle">
                 Chat about your money — subscriptions, spending, and more
               </p>
             </div>
@@ -208,7 +208,7 @@ function ChatPanel({
           <button
             type="button"
             onClick={() => onExpandedChange(false)}
-            className="flex shrink-0 items-center gap-1 py-1 text-xs text-[#9CA3AF] transition hover:text-[#F9FAFB]"
+            className="flex shrink-0 items-center gap-1 py-1 text-xs text-fg-muted transition hover:text-fg"
           >
             Hide chat
             <svg
@@ -229,14 +229,14 @@ function ChatPanel({
 
       <div ref={messagesContainerRef} className={messageScrollClass}>
         {isPending && (
-          <p className="text-center text-xs text-[#9CA3AF]">Loading conversation…</p>
+          <p className="text-center text-xs text-fg-muted">Loading conversation…</p>
         )}
         {isError && (
-          <p className="text-center text-xs text-[#EF4444]">Couldn&apos;t load messages.</p>
+          <p className="text-center text-xs text-danger">Couldn&apos;t load messages.</p>
         )}
         {showSuggestedPrompts && (
-          <div className="rounded-lg border border-dashed border-[#1E2D45] bg-[#0A0F1C]/50 px-4 py-4">
-            <p className="text-sm leading-relaxed text-[#9CA3AF]">
+          <div className="rounded-lg border border-dashed border-border-default bg-app/50 px-4 py-4">
+            <p className="text-sm leading-relaxed text-fg-muted">
               Ask anything about your spending, subscriptions, categories, or general money
               questions — Soverm has your synced data.
             </p>
@@ -258,7 +258,7 @@ function ChatPanel({
               className={`max-w-[92%] break-words rounded-xl px-3.5 py-2.5 text-sm sm:max-w-[85%] ${
                 message.role === 'user'
                   ? 'bg-emerald-500 text-slate-950'
-                  : 'bg-[#1A2236] text-[#F9FAFB]'
+                  : 'bg-surface-elevated text-fg'
               }`}
             >
               {message.role === 'user' ? (
@@ -275,12 +275,12 @@ function ChatPanel({
         ))}
         {isSending && (
           <div className="flex justify-start">
-            <div className="rounded-xl bg-[#1A2236] px-3.5 py-2.5">
-              <p className="text-xs text-[#9CA3AF]">Soverm is thinking…</p>
+            <div className="rounded-xl bg-surface-elevated px-3.5 py-2.5">
+              <p className="text-xs text-fg-muted">Soverm is thinking…</p>
               <div className="mt-2 flex gap-1" aria-hidden="true">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#8B5CF6]" />
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#8B5CF6] [animation-delay:150ms]" />
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#8B5CF6] [animation-delay:300ms]" />
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-ai" />
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-ai [animation-delay:150ms]" />
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-ai [animation-delay:300ms]" />
               </div>
             </div>
           </div>
@@ -292,12 +292,12 @@ function ChatPanel({
         onSubmit={handleSend}
         className={
           isModalLayout
-            ? 'flex shrink-0 flex-col gap-2 border-t border-[#1E2D45] bg-[#0A0F1C] py-3 max-sm:fixed max-sm:bottom-0 max-sm:left-0 max-sm:right-0 max-sm:z-10 max-sm:px-4 max-sm:pb-[max(1rem,env(safe-area-inset-bottom))] max-sm:pt-3'
+            ? 'flex shrink-0 flex-col gap-2 border-t border-border-default bg-app py-3 max-sm:fixed max-sm:bottom-0 max-sm:left-0 max-sm:right-0 max-sm:z-10 max-sm:px-4 max-sm:pb-[max(1rem,env(safe-area-inset-bottom))] max-sm:pt-3'
             : 'flex flex-col gap-2'
         }
       >
         {isModalLayout ? (
-          <div className="flex w-full items-end gap-2 rounded-xl border border-[#1E2D45] bg-[#111827] p-1.5 transition focus-within:border-[#8B5CF6]/40 focus-within:ring-1 focus-within:ring-[#8B5CF6]/20">
+          <div className="flex w-full items-end gap-2 rounded-xl border border-border-default bg-surface p-1.5 transition focus-within:border-ai/40 focus-within:ring-1 focus-within:ring-ai/20">
             <textarea
               ref={inputRef}
               rows={1}
@@ -311,7 +311,7 @@ function ChatPanel({
             <button
               type="submit"
               disabled={isSending || !inputValue.trim()}
-              className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#8B5CF6] text-white transition hover:bg-[#7C3AED] disabled:cursor-not-allowed disabled:opacity-40"
+              className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ai text-white transition hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-40"
               aria-label="Send message"
             >
               <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -322,7 +322,7 @@ function ChatPanel({
         ) : (
           <>
             <div className="relative min-w-0">
-              <ChatBubbleIcon className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-[#6B7280]" />
+              <ChatBubbleIcon className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-fg-subtle" />
               <textarea
                 ref={inputRef}
                 rows={2}
@@ -335,11 +335,11 @@ function ChatPanel({
               />
             </div>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-[11px] leading-relaxed text-[#6B7280]">{contextLabel}</p>
+              <p className="text-[11px] leading-relaxed text-fg-subtle">{contextLabel}</p>
               <button
                 type="submit"
                 disabled={isSending || !inputValue.trim()}
-                className="min-h-10 shrink-0 rounded-lg bg-[#8B5CF6] px-5 py-2 text-sm font-medium text-white transition hover:bg-[#7C3AED] disabled:cursor-not-allowed disabled:opacity-60"
+                className="min-h-10 shrink-0 rounded-lg bg-ai px-5 py-2 text-sm font-medium text-white transition hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isSending ? 'Sending…' : 'Send'}
               </button>
@@ -347,7 +347,7 @@ function ChatPanel({
           </>
         )}
         {isModalLayout && (
-          <p className="text-center text-[11px] leading-relaxed text-[#6B7280]">{contextLabel}</p>
+          <p className="text-center text-[11px] leading-relaxed text-fg-subtle">{contextLabel}</p>
         )}
       </form>
     </section>

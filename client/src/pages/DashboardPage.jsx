@@ -5,21 +5,22 @@
  * action buttons, and AI-generated financial insight.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '@clerk/clerk-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import AppNavbar from '../components/AppNavbar.jsx'
 import DashboardHero from '../components/DashboardHero.jsx'
 import DashboardSectionHeader from '../components/DashboardSectionHeader.jsx'
 import DashboardAccountCard from '../components/DashboardAccountCard.jsx'
 import FirstInsightCelebration from '../components/FirstInsightCelebration.jsx'
-import ProactiveNoticeBanner from '../components/ProactiveNoticeBanner.jsx'
-import ConnectBankButton from '../components/ConnectBankButton.jsx'
-import SyncTransactionsButton from '../components/SyncTransactionsButton'
-import GenerateInsightButton from '../components/GenerateInsightButton'
+import DashboardNeedsAttention from '../components/DashboardNeedsAttention.jsx'
+import DashboardQuickTools from '../components/quickTools/DashboardQuickTools.jsx'
+import DashboardSpendingSnapshot from '../components/DashboardSpendingSnapshot.jsx'
+import ActionChecklist from '../components/ActionChecklist.jsx'
 import InsightGeneratingPanel from '../components/InsightGeneratingPanel.jsx'
 import InsightCard from '../components/InsightCard'
+import InsightFreshnessNudge from '../components/InsightFreshnessNudge.jsx'
 import SecurityNote from '../components/SecurityNote'
 import UsageBadge from '../components/UsageBadge.jsx'
 import PaywallCard from '../components/PaywallCard.jsx'
@@ -27,13 +28,24 @@ import { useToastContext } from '../context/ToastContext.jsx'
 import FirstConnectCelebration from '../components/FirstConnectCelebration.jsx'
 import ConfirmModal from '../components/ConfirmModal'
 import DashboardOnboarding from '../components/DashboardOnboarding.jsx'
+import DashboardActionsSection from '../components/DashboardActionsSection.jsx'
+import {
+  DASHBOARD_TABS,
+  DashboardTabBar,
+  DashboardTabPanel,
+} from '../components/DashboardTabs.jsx'
 import DashboardHeroSkeleton from '../components/DashboardHeroSkeleton.jsx'
-import AccountCardSkeleton from '../components/AccountCardSkeleton.jsx'
-import InsightCardSkeleton from '../components/InsightCardSkeleton.jsx'
 import Skeleton from '../components/Skeleton.jsx'
-import { dashboardQueryKey, expenseAnalyzerSummaryQueryKey, notificationsQueryKey, usageQueryKey } from '../lib/queryKeys.js'
-import { fetchExpenseAnalyzerSummary } from '../lib/fetchExpenseAnalyzer.js'
-import { isNotableTopMover } from '../lib/topMover.js'
+import { dashboardQueryKey, trackerQueryKey, expenseAnalyzerQueryKey, expenseAnalyzerSummaryQueryKey, notificationsQueryKey, usageQueryKey } from '../lib/queryKeys.js'
+import { fetchExpenseAnalyzer, fetchExpenseAnalyzerSummary } from '../lib/fetchExpenseAnalyzer.js'
+import { fetchTrackers } from '../lib/fetchTrackers.js'
+import { QUICK_TOOL_TABS } from '../lib/quickTools.js'
+import { fetchNotifications } from '../lib/fetchNotifications.js'
+import {
+  buildAttentionItems,
+  countIncompleteActions,
+  getInsightFreshnessNudge,
+} from '../lib/dashboardAttention.js'
 import { scrollToInsightChat } from '../lib/scrollToInsightChat.js'
 import { syncTransactions } from '../lib/syncTransactions.js'
 import { consumeFirstConnectCelebration } from '../lib/firstConnectCelebration.js'
@@ -41,16 +53,14 @@ import { disconnectAccount, getDisconnectConfirmMessage } from '../lib/disconnec
 import { fetchUsage } from '../lib/fetchUsage.js'
 import { trackUpgradeProClick } from '../lib/analytics.js'
 import {
+  getInitialOnboardingCollapsed,
+  markDashboardVisited,
+  setOnboardingCollapsedPreference,
+} from '../lib/dashboardUiPrefs.js'
+import {
   FloatingCfoChatButton,
   FloatingCfoChatModal,
 } from '../components/FloatingCfoChat.jsx'
-
-function formatCurrency(amount) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount)
-}
 
 const AUTO_SYNC_STALE_MINUTES = 5
 const AUTO_SYNC_RETRY_MS = AUTO_SYNC_STALE_MINUTES * 60 * 1000
@@ -78,6 +88,11 @@ function DashboardPage() {
   const [accountToDelete, setAccountToDelete] = useState(null)
   const [firstConnectCelebration, setFirstConnectCelebration] = useState(null)
   const [firstInsightCelebration, setFirstInsightCelebration] = useState(false)
+  const [onboardingCollapsed, setOnboardingCollapsed] = useState(() =>
+    getInitialOnboardingCollapsed()
+  )
+  const [activeTab, setActiveTab] = useState(DASHBOARD_TABS.OVERVIEW)
+  const [quickToolsTab, setQuickToolsTab] = useState(QUICK_TOOL_TABS.TRACKER)
   const syncInFlight = useRef(false)
   const lastAutoSyncAttempt = useRef(0)
   const prevAccountCount = useRef(null)
@@ -141,6 +156,8 @@ function DashboardPage() {
       } finally {
         syncInFlight.current = false
         await queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+        await queryClient.invalidateQueries({ queryKey: trackerQueryKey })
+        await queryClient.invalidateQueries({ queryKey: expenseAnalyzerQueryKey })
         await queryClient.invalidateQueries({ queryKey: expenseAnalyzerSummaryQueryKey })
         await queryClient.invalidateQueries({ queryKey: notificationsQueryKey })
       }
@@ -150,15 +167,39 @@ function DashboardPage() {
   }, [dashboardData?.lastSyncedAt, dataUpdatedAt, getToken, queryClient])
 
   useEffect(() => {
+    markDashboardVisited()
+  }, [])
+
+  useEffect(() => {
     if (searchParams.get('chat') !== 'open') {
       return
     }
 
     setChatExpanded(true)
     setPendingChatScroll(true)
+    setActiveTab(DASHBOARD_TABS.INSIGHT)
 
     const nextParams = new URLSearchParams(searchParams)
     nextParams.delete('chat')
+    setSearchParams(nextParams, { replace: true })
+  }, [searchParams, setSearchParams])
+
+  useEffect(() => {
+    if (searchParams.get('focus') !== 'balance') {
+      return
+    }
+
+    setActiveTab(DASHBOARD_TABS.OVERVIEW)
+
+    requestAnimationFrame(() => {
+      document.getElementById('dashboard-hero')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    })
+
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete('focus')
     setSearchParams(nextParams, { replace: true })
   }, [searchParams, setSearchParams])
 
@@ -177,18 +218,72 @@ function DashboardPage() {
   const hasInsight = !!dashboardData?.latestInsight
   const highlightGenerate = hasAccounts && hasSynced && !hasInsight
 
-  const { data: expenseTeaser } = useQuery({
+  const { data: expenseTeaser, isPending: expenseTeaserLoading } = useQuery({
     queryKey: expenseAnalyzerSummaryQueryKey,
     queryFn: () => fetchExpenseAnalyzerSummary(getToken),
     enabled: hasAccounts,
   })
 
-  const notableTopMover = isNotableTopMover(expenseTeaser?.topMover)
-    ? expenseTeaser.topMover
-    : null
+  const {
+    data: trackerData,
+    isPending: trackerQueryPending,
+    isError: trackerIsError,
+    error: trackerError,
+    refetch: refetchTrackers,
+  } = useQuery({
+    queryKey: trackerQueryKey,
+    queryFn: () => fetchTrackers(getToken),
+    enabled: hasAccounts,
+  })
 
-  const showExpenseTeaser =
-    (expenseTeaser?.recurringCount ?? 0) > 0 || notableTopMover != null
+  const trackerLoading = trackerQueryPending && trackerData === undefined
+
+  const { data: expenseAnalyzerData, isPending: expenseAnalyzerLoading } = useQuery({
+    queryKey: expenseAnalyzerQueryKey,
+    queryFn: () => fetchExpenseAnalyzer(getToken),
+    enabled: hasAccounts && activeTab === DASHBOARD_TABS.TOOLS,
+  })
+
+  const quickToolsLoading = expenseAnalyzerLoading && expenseAnalyzerData === undefined
+
+  const { data: notificationsData } = useQuery({
+    queryKey: notificationsQueryKey,
+    queryFn: () => fetchNotifications(getToken, { unreadOnly: true }),
+    enabled: hasAccounts,
+  })
+
+  const incompleteActionCount = countIncompleteActions(dashboardData?.latestInsight?.actions)
+
+  const insightFreshness = useMemo(
+    () =>
+      getInsightFreshnessNudge(dashboardData?.latestInsight?.created_at, {
+        hasInsight,
+      }),
+    [dashboardData?.latestInsight?.created_at, hasInsight]
+  )
+
+  const attentionItems = useMemo(
+    () =>
+      buildAttentionItems({
+        hasAccounts,
+        hasInsight,
+        highlightGenerate,
+        lastSyncedAt: dashboardData?.lastSyncedAt,
+        incompleteActionCount,
+        unreadNotifications: notificationsData?.notifications ?? [],
+        proactiveEnabled: notificationsData?.preferences?.proactiveEnabled ?? true,
+      }),
+    [
+      hasAccounts,
+      hasInsight,
+      highlightGenerate,
+      dashboardData?.lastSyncedAt,
+      incompleteActionCount,
+      notificationsData,
+    ]
+  )
+
+  const showAttentionAllClear = hasAccounts && hasInsight && attentionItems.length === 0
 
   useEffect(() => {
     if (accountCount === 0 || hasInsight) {
@@ -206,7 +301,8 @@ function DashboardPage() {
     if (celebrationMeta) {
       setFirstConnectCelebration(celebrationMeta)
     } else if (wasFirstAccountLink) {
-      document.getElementById('generate-insight-action')?.scrollIntoView({
+      setActiveTab(DASHBOARD_TABS.OVERVIEW)
+      document.getElementById('dashboard-actions')?.scrollIntoView({
         behavior: 'smooth',
         block: 'center',
       })
@@ -217,6 +313,10 @@ function DashboardPage() {
 
   function handleInsightLoadingChange(loading) {
     setInsightLoading(loading)
+
+    if (loading) {
+      setActiveTab(DASHBOARD_TABS.INSIGHT)
+    }
 
     if (loading && !hasInsight) {
       celebrateFirstInsightRef.current = true
@@ -234,8 +334,20 @@ function DashboardPage() {
     setFirstConnectCelebration(null)
   }
 
+  function handleFreshInsightGenerate() {
+    setActiveTab(DASHBOARD_TABS.OVERVIEW)
+    document.getElementById('generate-insight-action')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+    })
+    window.setTimeout(() => {
+      document.querySelector('#generate-insight-action button')?.click()
+    }, 450)
+  }
+
   function handleFirstConnectGenerate() {
     setFirstConnectCelebration(null)
+    setActiveTab(DASHBOARD_TABS.OVERVIEW)
     document.getElementById('generate-insight-action')?.scrollIntoView({
       behavior: 'smooth',
       block: 'center',
@@ -252,8 +364,99 @@ function DashboardPage() {
     }
 
     setChatExpanded(true)
+    setActiveTab(DASHBOARD_TABS.INSIGHT)
     scrollToInsightChat()
   }
+
+  function handleOnboardingCollapsedChange(collapsed) {
+    setOnboardingCollapsed(collapsed)
+    setOnboardingCollapsedPreference(collapsed)
+  }
+
+  function renderInsightSection() {
+    return (
+      <section>
+        <DashboardSectionHeader title="Soverm Insight" accent="ai" />
+
+        {insightError && (
+          <p className="mb-4 text-sm text-danger" role="alert">
+            {insightError}
+          </p>
+        )}
+
+        {insightLoading ? (
+          <InsightGeneratingPanel />
+        ) : (
+          <>
+            <FirstInsightCelebration
+              isOpen={firstInsightCelebration}
+              onDismiss={() => setFirstInsightCelebration(false)}
+            />
+            <InsightCard
+              insight={dashboardData?.latestInsight}
+              onChatError={(message) => showToast(message, 'error')}
+              chatExpanded={chatExpanded}
+              onChatExpandedChange={setChatExpanded}
+              showActions={false}
+            />
+            {(dashboardData?.latestInsight?.actions?.length ?? 0) > 0 && (
+              <ActionChecklist
+                actions={dashboardData.latestInsight.actions}
+                className="mt-4"
+              />
+            )}
+            {showPaywall && (
+              <div className="mt-6">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-[0.3em] text-fg-subtle">
+                  Want another insight today?
+                </p>
+                <PaywallCard
+                  spent={dashboardData?.spent}
+                  onUpgrade={() => {
+                    trackUpgradeProClick('dashboard_paywall')
+                    showToast(
+                      'Soverm Pro checkout is coming soon — stay tuned!',
+                      'success'
+                    )
+                  }}
+                />
+              </div>
+            )}
+          </>
+        )}
+      </section>
+    )
+  }
+
+  function renderAccountsSection() {
+    return (
+      <section className="mt-6">
+        <DashboardSectionHeader title="Connected accounts" />
+        {(dashboardData?.accounts ?? []).length === 0 ? (
+          <div className="mt-4 rounded-xl border border-dashed border-border-default bg-surface px-6 py-10 text-center">
+            <p className="text-sm font-medium text-fg">No bank connected yet</p>
+            <p className="mt-2 text-sm text-fg-muted">
+              Tap <span className="text-brand-soft">Connect Your Bank</span> above to link
+              your first account.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {(dashboardData?.accounts ?? []).map((account) => (
+              <DashboardAccountCard
+                key={account.id}
+                account={account}
+                onDisconnect={setAccountToDelete}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+    )
+  }
+
+  const overviewSetupPending = !hasAccounts || highlightGenerate
+  const insightAttentionPending = !hasInsight || incompleteActionCount > 0
 
   const showSkeleton = isPending && dashboardData === undefined
   const showFailedState = isError && dashboardData === undefined && !isPending
@@ -263,8 +466,6 @@ function DashboardPage() {
       <AppNavbar onChatClick={handleNavbarChat} />
 
       <main className="mx-auto max-w-6xl px-4 pb-16 pt-24 sm:px-6 sm:pt-28">
-        <ProactiveNoticeBanner />
-
         {isError && isFetching && dashboardData && (
           <p className="mb-4 text-center text-sm text-fg-muted" role="status">
             Couldn&apos;t refresh — retrying...
@@ -273,26 +474,15 @@ function DashboardPage() {
 
         {showSkeleton ? (
           <>
+            <Skeleton className="mt-6 h-[3.25rem] w-full rounded-2xl" />
             <DashboardHeroSkeleton />
-
-            <section className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Skeleton className="h-12 w-full max-w-[200px] rounded-lg sm:flex-1" />
-              <Skeleton className="h-12 w-full max-w-[200px] rounded-lg sm:flex-1" />
-              <Skeleton className="h-12 w-full max-w-[200px] rounded-lg sm:flex-1" />
-            </section>
-
-            <section className="mt-12">
-              <DashboardSectionHeader title="Your Accounts" />
-              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {[0, 1, 2, 3].map((index) => (
-                  <AccountCardSkeleton key={index} />
-                ))}
+            <Skeleton className="mt-8 h-12 w-full max-w-3xl rounded-lg" />
+            <section className="mt-6">
+              <DashboardSectionHeader title="Connected accounts" />
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <Skeleton className="h-32 rounded-xl" />
+                <Skeleton className="h-32 rounded-xl" />
               </div>
-            </section>
-
-            <section className="mt-12">
-              <DashboardSectionHeader title="Soverm Insight" accent="ai" />
-              <InsightCardSkeleton />
             </section>
           </>
         ) : showFailedState ? (
@@ -310,165 +500,147 @@ function DashboardPage() {
           </div>
         ) : dashboardData ? (
           <>
-            {/* Hero */}
-            <DashboardHero
-              hasAccounts={hasAccounts}
-              totalBalance={dashboardData?.totalBalance ?? 0}
-              lastSyncedAt={dashboardData?.lastSyncedAt}
-              selectedRange={selectedRange}
-              onRangeChange={setSelectedRange}
-              income={dashboardData?.income ?? 0}
-              spent={dashboardData?.spent ?? 0}
-              spendingSeries={dashboardData?.spendingSeries ?? []}
+            <DashboardTabBar
+              activeTab={activeTab}
+              onChange={setActiveTab}
+              overviewSetupPending={overviewSetupPending}
+              insightAttentionPending={insightAttentionPending}
             />
 
-            {hasAccounts && showExpenseTeaser && (
-              <div className="mt-4 text-center">
-                <p className="text-xs text-fg-muted">
-                  {[
-                    notableTopMover
-                      ? `${notableTopMover.category} ${notableTopMover.direction} ${notableTopMover.percent}% vs prior 30 days`
-                      : null,
-                    (expenseTeaser?.recurringCount ?? 0) > 0
-                      ? `${expenseTeaser.recurringCount} subscription${expenseTeaser.recurringCount === 1 ? '' : 's'} detected · ${formatCurrency(expenseTeaser.totalRecurringMonthly)}/mo`
-                      : null,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                  {' · '}
-                  <Link
-                    to="/expense-analyzer"
-                    className="text-ai-soft transition hover:text-ai hover:underline"
-                  >
-                    View Expense Analyzer →
-                  </Link>
-                </p>
-                {(expenseTeaser?.recurringPreview?.length ?? 0) > 0 && (
-                  <ul className="mx-auto mt-2 max-w-md space-y-1 text-xs text-fg-subtle">
-                    {expenseTeaser.recurringPreview.map((item) => (
-                      <li key={`${item.merchant}-${item.accountLabel ?? 'unknown'}`}>
-                        {item.merchant}
-                        {item.accountLabel ? ` · ${item.accountLabel}` : ''}
-                        {' · '}
-                        {formatCurrency(item.monthlyEquivalent)}/mo
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
-
-            <div className="mx-auto mt-8 max-w-xl space-y-4">
-              <DashboardOnboarding
+            <DashboardTabPanel
+              tabId={DASHBOARD_TABS.OVERVIEW}
+              activeTab={activeTab}
+              className="mt-8 space-y-6 outline-none"
+            >
+              <DashboardHero
                 hasAccounts={hasAccounts}
-                hasSynced={hasSynced}
-                hasInsight={hasInsight}
+                totalBalance={dashboardData?.totalBalance ?? 0}
+                lastSyncedAt={dashboardData?.lastSyncedAt}
+                selectedRange={selectedRange}
+                onRangeChange={setSelectedRange}
+                income={dashboardData?.income ?? 0}
+                spent={dashboardData?.spent ?? 0}
+                spendingSeries={dashboardData?.spendingSeries ?? []}
+                trackerSnapshot={trackerData}
               />
-              <SecurityNote />
-            </div>
 
-            <div className="mt-6 flex justify-center">
-              <UsageBadge usage={usage} />
-            </div>
+              <DashboardNeedsAttention
+                items={attentionItems}
+                getToken={getToken}
+                onSwitchTab={setActiveTab}
+                onAllClear={showAttentionAllClear}
+              />
 
-            {/* Action row */}
-            <section className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-stretch sm:justify-center">
-              <div className="w-full sm:max-w-[200px] sm:flex-1">
-                <ConnectBankButton
-                  className="w-full"
-                  highlighted={!hasAccounts}
-                  showSecurityNote={false}
+              {hasAccounts && (
+                <DashboardSpendingSnapshot
+                  summary={expenseTeaser}
+                  isLoading={expenseTeaserLoading}
                 />
-              </div>
-              <div className="w-full sm:max-w-[200px] sm:flex-1">
-                <SyncTransactionsButton className="w-full" showToast={showToast} />
-              </div>
-              <div id="generate-insight-action" className="w-full sm:max-w-[200px] sm:flex-1">
-                <GenerateInsightButton
-                  className="w-full"
-                  showCard={false}
-                  showToast={showToast}
-                  highlighted={highlightGenerate}
-                  onError={setInsightError}
-                  onLoadingChange={handleInsightLoadingChange}
-                  onLimitReached={setLimitReached}
-                  onUsageUpdated={(updatedUsage) =>
-                    queryClient.setQueryData(usageQueryKey, updatedUsage)
-                  }
-                />
-              </div>
-            </section>
+              )}
 
-            {/* Accounts */}
-            <section className="mt-12">
-              <DashboardSectionHeader title="Your Accounts" />
-              {(dashboardData?.accounts ?? []).length === 0 ? (
-                <div className="mt-4 rounded-xl border border-dashed border-border-default bg-surface px-6 py-10 text-center">
-                  <p className="text-sm font-medium text-fg">
-                    No bank connected yet
-                  </p>
-                  <p className="mt-2 text-sm text-fg-muted">
-                    Tap <span className="text-brand-soft">Connect Your Bank</span> above —
-                    that&apos;s your first step.
-                  </p>
+              <div className="flex justify-center">
+                <UsageBadge usage={usage} />
+              </div>
+
+              {!hasInsight && (
+                <div className="mx-auto max-w-xl space-y-4">
+                  <DashboardOnboarding
+                    hasAccounts={hasAccounts}
+                    hasSynced={hasSynced}
+                    hasInsight={hasInsight}
+                    collapsed={onboardingCollapsed}
+                    onCollapsedChange={handleOnboardingCollapsedChange}
+                  />
+                  <SecurityNote />
                 </div>
-              ) : (
-              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {(dashboardData?.accounts ?? []).map((account) => (
-                  <DashboardAccountCard
-                    key={account.id}
-                    account={account}
-                    onDisconnect={setAccountToDelete}
-                  />
-                ))}
-              </div>
-              )}
-            </section>
-
-            {/* AI Insight */}
-            <section className="mt-12">
-              <DashboardSectionHeader title="Soverm Insight" accent="ai" />
-
-              {insightError && (
-                <p className="mb-4 text-sm text-danger" role="alert">
-                  {insightError}
-                </p>
               )}
 
-              {insightLoading ? (
-                <InsightGeneratingPanel />
-              ) : (
-                <>
-                  <FirstInsightCelebration
-                    isOpen={firstInsightCelebration}
-                    onDismiss={() => setFirstInsightCelebration(false)}
-                  />
-                  <InsightCard
-                    insight={dashboardData?.latestInsight}
-                    onChatError={(message) => showToast(message, 'error')}
-                    chatExpanded={chatExpanded}
-                    onChatExpandedChange={setChatExpanded}
-                  />
-                  {showPaywall && (
-                    <div className="mt-6">
-                      <p className="mb-3 text-xs font-semibold uppercase tracking-[0.3em] text-fg-subtle">
-                        Want another insight today?
-                      </p>
-                      <PaywallCard
-                        spent={dashboardData?.spent}
-                        onUpgrade={() => {
-                          trackUpgradeProClick('dashboard_paywall')
-                          showToast(
-                            'Soverm Pro checkout is coming soon — stay tuned!',
-                            'success'
-                          )
-                        }}
-                      />
-                    </div>
-                  )}
-                </>
+              <DashboardActionsSection
+                showToast={showToast}
+                highlightedConnect={!hasAccounts}
+                highlightedGenerate={highlightGenerate}
+                onInsightError={setInsightError}
+                onInsightLoadingChange={handleInsightLoadingChange}
+                onLimitReached={setLimitReached}
+                onUsageUpdated={(updatedUsage) =>
+                  queryClient.setQueryData(usageQueryKey, updatedUsage)
+                }
+              />
+
+              {renderAccountsSection()}
+            </DashboardTabPanel>
+
+            <DashboardTabPanel
+              tabId={DASHBOARD_TABS.INSIGHT}
+              activeTab={activeTab}
+              className="mt-8 space-y-6 outline-none"
+            >
+              {!hasInsight && !insightLoading && (
+                <div className="rounded-xl border border-border-default bg-surface px-6 py-8 text-center">
+                  <p className="text-sm font-medium text-fg">No insight yet</p>
+                  <p className="mt-2 text-sm text-fg-muted">
+                    Head to Overview to connect your bank and tap{' '}
+                    <span className="text-brand-soft">Generate Summary</span>. You&apos;ll
+                    land back here when it&apos;s ready.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab(DASHBOARD_TABS.OVERVIEW)}
+                    className="mt-4 rounded-lg border border-border-default bg-surface-elevated px-4 py-2 text-sm font-medium text-fg transition hover:border-border-hover"
+                  >
+                    Go to Overview
+                  </button>
+                </div>
               )}
-            </section>
+
+              {insightFreshness && !insightLoading && (
+                <InsightFreshnessNudge
+                  dayCount={insightFreshness.dayCount}
+                  onGenerateClick={handleFreshInsightGenerate}
+                />
+              )}
+
+              {renderInsightSection()}
+            </DashboardTabPanel>
+
+            <DashboardTabPanel
+              tabId={DASHBOARD_TABS.TOOLS}
+              activeTab={activeTab}
+              className="mt-8 space-y-6 outline-none"
+            >
+              {!hasAccounts && (
+                <div className="rounded-xl border border-border-default bg-surface px-6 py-8 text-center">
+                  <p className="text-sm font-medium text-fg">Connect a bank to use tools</p>
+                  <p className="mt-2 text-sm text-fg-muted">
+                    Recent transactions, period comparisons, and account health appear here once
+                    your accounts are linked.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab(DASHBOARD_TABS.OVERVIEW)}
+                    className="mt-4 rounded-lg border border-border-default bg-surface-elevated px-4 py-2 text-sm font-medium text-fg transition hover:border-border-hover"
+                  >
+                    Go to Overview
+                  </button>
+                </div>
+              )}
+
+              {hasAccounts && (
+                <DashboardQuickTools
+                  accounts={dashboardData?.accounts ?? []}
+                  lastSyncedAt={dashboardData?.lastSyncedAt}
+                  expenseData={expenseAnalyzerData}
+                  trackerSnapshot={trackerData}
+                  trackerLoading={trackerLoading}
+                  trackerError={trackerIsError ? trackerError : null}
+                  onRetryTracker={() => refetchTrackers()}
+                  getToken={getToken}
+                  activeTab={quickToolsTab}
+                  onTabChange={setQuickToolsTab}
+                  isLoading={quickToolsLoading}
+                />
+              )}
+            </DashboardTabPanel>
           </>
         ) : null}
       </main>
@@ -499,6 +671,8 @@ function DashboardPage() {
             setAccountToDelete(null)
             showToast(`"${accountName}" disconnected`, 'success')
             await queryClient.invalidateQueries({ queryKey: dashboardQueryKey })
+            await queryClient.invalidateQueries({ queryKey: trackerQueryKey })
+            await queryClient.invalidateQueries({ queryKey: expenseAnalyzerSummaryQueryKey })
           } catch (err) {
             console.error('Failed to disconnect account:', err.message)
             showToast('Failed to disconnect account — please try again', 'error')

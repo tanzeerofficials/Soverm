@@ -47,21 +47,24 @@ const FAQ_ITEMS = [
 function SecurityFaq() {
   return (
     <section className="mx-auto mt-24 max-w-2xl" id="faq" aria-labelledby="faq-heading">
-      <h2 id="faq-heading" className="text-center text-2xl font-bold text-[#F9FAFB]">Security &amp; FAQ</h2>
-      <p className="mt-3 text-center text-sm text-[#9CA3AF]">
-        Straight answers — no fine print.
-      </p>
+      <div className="text-center">
+        <p className="text-sm font-medium uppercase tracking-wide text-brand">FAQ</p>
+        <h2 id="faq-heading" className="mt-2 text-2xl font-bold text-fg sm:text-3xl">
+          Security &amp; FAQ
+        </h2>
+        <p className="mt-3 text-sm text-fg-muted">Straight answers — no fine print.</p>
+      </div>
 
-      <div className="mt-8 rounded-xl border border-[#1E2D45] bg-[#111827] px-6">
+      <div className="mt-8 overflow-hidden rounded-xl border border-border-default bg-surface">
         {FAQ_ITEMS.map(({ question, answer }) => (
           <details
             key={question}
-            className="group border-b border-[#1E2D45] last:border-b-0"
+            className="group border-b border-border-default last:border-b-0"
           >
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-4 text-sm font-medium text-[#F9FAFB] [&::-webkit-details-marker]:hidden">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-4 text-sm font-medium text-fg transition hover:bg-surface-elevated/40 [&::-webkit-details-marker]:hidden group-open:text-brand-soft">
               {question}
               <svg
-                className="h-4 w-4 flex-shrink-0 text-[#9CA3AF] transition-transform group-open:rotate-180"
+                className="h-4 w-4 flex-shrink-0 text-fg-muted transition-transform group-open:rotate-180 group-open:text-brand-soft"
                 viewBox="0 0 20 20"
                 fill="currentColor"
                 aria-hidden="true"
@@ -73,7 +76,7 @@ function SecurityFaq() {
                 />
               </svg>
             </summary>
-            <p className="pb-4 text-sm leading-relaxed text-[#9CA3AF]">{answer}</p>
+            <p className="px-6 pb-4 text-sm leading-relaxed text-fg-muted">{answer}</p>
           </details>
         ))}
       </div>

@@ -15,6 +15,7 @@ import {
   markNotificationRead,
 } from '../lib/fetchNotifications.js'
 import { notificationsQueryKey } from '../lib/queryKeys.js'
+import { navigateToNotification } from '../lib/notificationNavigation.js'
 
 function BellIcon({ className = 'h-5 w-5' }) {
   return (
@@ -84,15 +85,15 @@ function NotificationBell() {
 
   async function handleNotificationClick(notification) {
     if (!notification.read) {
-      await markReadMutation.mutateAsync(notification.id)
+      try {
+        await markReadMutation.mutateAsync(notification.id)
+      } catch {
+        // Navigate even if marking read fails
+      }
     }
 
-    const link = notification.related_data?.link
     setOpen(false)
-
-    if (link) {
-      navigate(link)
-    }
+    navigateToNotification(navigate, notification)
   }
 
   return (
@@ -100,7 +101,7 @@ function NotificationBell() {
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="relative flex h-10 w-10 items-center justify-center rounded-lg border border-[#1E2D45] bg-[#111827] text-[#9CA3AF] transition hover:bg-[#1A2236] hover:text-white"
+        className="relative flex h-10 w-10 items-center justify-center rounded-lg border border-border-default bg-surface text-fg-muted transition hover:bg-surface-elevated hover:text-fg"
         aria-expanded={open}
         aria-controls={panelId}
         aria-label={
@@ -111,7 +112,7 @@ function NotificationBell() {
       >
         <BellIcon />
         {unreadCount > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#8B5CF6] px-1 text-[10px] font-bold text-white">
+          <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-ai px-1 text-[10px] font-bold text-white">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
@@ -120,17 +121,17 @@ function NotificationBell() {
       {open && (
         <div
           id={panelId}
-          className="absolute right-0 top-full z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-[#1E2D45] bg-[#111827] shadow-2xl"
+          className="absolute right-0 top-full z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border-default bg-surface shadow-2xl"
           role="dialog"
           aria-label="Notifications"
         >
-          <div className="flex items-center justify-between border-b border-[#1E2D45] px-4 py-3">
-            <p className="text-sm font-semibold text-[#F9FAFB]">Notifications</p>
+          <div className="flex items-center justify-between border-b border-border-default px-4 py-3">
+            <p className="text-sm font-semibold text-fg">Notifications</p>
             {unreadCount > 0 && (
               <button
                 type="button"
                 onClick={() => markAllReadMutation.mutate()}
-                className="text-xs text-[#8B5CF6] transition hover:text-[#C4B5FD]"
+                className="text-xs text-ai transition hover:text-ai-soft"
               >
                 Mark all read
               </button>
@@ -139,10 +140,10 @@ function NotificationBell() {
 
           <div className="max-h-80 overflow-y-auto">
             {isPending && (
-              <p className="px-4 py-6 text-center text-xs text-[#9CA3AF]">Loading…</p>
+              <p className="px-4 py-6 text-center text-xs text-fg-muted">Loading…</p>
             )}
             {!isPending && notifications.length === 0 && (
-              <p className="px-4 py-6 text-center text-xs text-[#9CA3AF]">
+              <p className="px-4 py-6 text-center text-xs text-fg-muted">
                 No notifications yet — Soverm will flag anything worth a look.
               </p>
             )}
@@ -151,27 +152,27 @@ function NotificationBell() {
                 key={notification.id}
                 type="button"
                 onClick={() => handleNotificationClick(notification)}
-                className={`flex w-full flex-col gap-1 border-b border-[#1E2D45] px-4 py-3 text-left transition hover:bg-[#1A2236] ${
+                className={`flex w-full flex-col gap-1 border-b border-border-default px-4 py-3 text-left transition hover:bg-surface-elevated ${
                   notification.read ? 'opacity-75' : ''
                 }`}
               >
                 <div className="flex items-start justify-between gap-2">
-                  <p className="text-sm font-medium text-[#F9FAFB]">{notification.title}</p>
+                  <p className="text-sm font-medium text-fg">{notification.title}</p>
                   {!notification.read && (
-                    <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#8B5CF6]" />
+                    <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-ai" />
                   )}
                 </div>
-                <p className="text-xs leading-relaxed text-[#9CA3AF]">{notification.body}</p>
-                <p className="text-[11px] text-[#6B7280]">
+                <p className="text-xs leading-relaxed text-fg-muted">{notification.body}</p>
+                <p className="text-[11px] text-fg-subtle">
                   {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
                 </p>
               </button>
             ))}
           </div>
           {!proactiveEnabled && (
-            <p className="border-t border-[#1E2D45] px-4 py-3 text-[11px] leading-relaxed text-[#6B7280]">
+            <p className="border-t border-border-default px-4 py-3 text-[11px] leading-relaxed text-fg-subtle">
               New alerts are paused. Turn them back on in{' '}
-              <Link to="/settings" className="text-[#8B5CF6] hover:underline">
+              <Link to="/settings" className="text-ai hover:underline">
                 Settings
               </Link>
               .

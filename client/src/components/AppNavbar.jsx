@@ -127,11 +127,11 @@ function NavPill({ to, label, icon, active, onNavigate }) {
       aria-current={active ? 'page' : undefined}
       className={`flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-medium transition-all duration-200 xl:px-4 ${
         active
-          ? 'bg-[#1A2236] text-[#F9FAFB] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-emerald-500/35'
-          : 'text-[#9CA3AF] hover:bg-[#1A2236]/55 hover:text-white'
+          ? 'bg-surface-elevated text-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-brand/35'
+          : 'text-fg-muted hover:bg-surface-elevated/55 hover:text-fg'
       }`}
     >
-      <NavIcon name={icon} className={`h-4 w-4 shrink-0 ${active ? 'text-emerald-400' : ''}`} />
+      <NavIcon name={icon} className={`h-4 w-4 shrink-0 ${active ? 'text-brand-soft' : ''}`} />
       <span className="hidden xl:inline">{label}</span>
       <span className="xl:hidden">{label.split(' ')[0]}</span>
     </Link>
@@ -183,8 +183,8 @@ function AppNavbar({ leftContent, onChatClick, backTo, backLabel, children }) {
   }
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 border-b border-[#1E2D45]/70 bg-[#0A0F1C]/88 shadow-[0_8px_32px_rgba(0,0,0,0.35)] backdrop-blur-xl">
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-emerald-500/35 to-transparent" />
+    <header className="fixed inset-x-0 top-0 z-50 border-b border-border-default/70 bg-app/88 shadow-[0_8px_32px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-brand/35 to-transparent" />
 
       <div className="relative mx-auto flex h-16 max-w-6xl items-center gap-3 px-3 sm:px-6 lg:gap-6">
         {/* Brand + optional page context */}
@@ -193,7 +193,7 @@ function AppNavbar({ leftContent, onChatClick, backTo, backLabel, children }) {
             {mobileBackNav ? (
               <Link
                 to={backTo}
-                className="flex min-w-0 items-center gap-1.5 rounded-lg px-1 py-1 text-sm text-[#9CA3AF] transition hover:text-white"
+                className="flex min-w-0 items-center gap-1.5 rounded-lg px-1 py-1 text-sm text-fg-muted transition hover:text-fg"
               >
                 <BackArrowIcon />
                 <span className="truncate">{backLabel}</span>
@@ -207,8 +207,8 @@ function AppNavbar({ leftContent, onChatClick, backTo, backLabel, children }) {
             <BrandMark />
             {leftContent && (
               <>
-                <span className="h-6 w-px bg-[#1E2D45]" aria-hidden="true" />
-                <div className="min-w-0 text-sm text-[#9CA3AF]">{leftContent}</div>
+                <span className="h-6 w-px bg-border-default" aria-hidden="true" />
+                <div className="min-w-0 text-sm text-fg-muted">{leftContent}</div>
               </>
             )}
           </div>
@@ -216,7 +216,7 @@ function AppNavbar({ leftContent, onChatClick, backTo, backLabel, children }) {
 
         {/* Desktop center navigation */}
         <nav
-          className="hidden items-center gap-1 rounded-full border border-[#1E2D45]/80 bg-[#111827]/70 p-1 lg:flex"
+          className="hidden items-center gap-1 rounded-full border border-border-default/80 bg-surface/70 p-1 lg:flex"
           aria-label="Primary"
         >
           {PRIMARY_NAV.map((item) => (
@@ -235,18 +235,18 @@ function AppNavbar({ leftContent, onChatClick, backTo, backLabel, children }) {
           {children}
           {onChatClick && <ChatWithCfoButton variant="compact" onClick={onChatClick} />}
 
-          <span className="mx-0.5 h-6 w-px bg-[#1E2D45]" aria-hidden="true" />
+          <span className="mx-0.5 h-6 w-px bg-border-default" aria-hidden="true" />
 
           <NotificationBell />
 
-          <div className="flex items-center gap-2.5 rounded-full border border-[#1E2D45] bg-[#111827]/80 py-1 pl-1 pr-2">
+          <div className="flex items-center gap-2.5 rounded-full border border-border-default bg-surface/80 py-1 pl-1 pr-2">
             <div
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#1A2236] to-[#111827] text-sm font-semibold text-emerald-400 ring-1 ring-[#2D3A52]"
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-surface-elevated to-surface text-sm font-semibold text-brand-soft ring-1 ring-border-default"
               aria-hidden="true"
             >
               {initials}
             </div>
-            <span className="hidden max-w-[7rem] truncate text-sm text-[#D1D5DB] xl:inline">
+            <span className="hidden max-w-[7rem] truncate text-sm text-fg-muted xl:inline">
               {firstName}
             </span>
           </div>
@@ -254,7 +254,7 @@ function AppNavbar({ leftContent, onChatClick, backTo, backLabel, children }) {
           <SignOutButton>
             <button
               type="button"
-              className="rounded-full border border-[#1E2D45] bg-[#111827]/80 px-4 py-2 text-sm font-medium text-[#9CA3AF] transition hover:border-[#374151] hover:bg-[#1A2236] hover:text-white"
+              className="rounded-full border border-border-default bg-surface/80 px-4 py-2 text-sm font-medium text-fg-muted transition hover:border-border-default hover:bg-surface-elevated hover:text-fg"
             >
               Sign out
             </button>
@@ -266,7 +266,7 @@ function AppNavbar({ leftContent, onChatClick, backTo, backLabel, children }) {
           <NotificationBell />
           <button
             type="button"
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#1E2D45] bg-[#111827] text-[#9CA3AF] transition hover:border-[#374151] hover:bg-[#1A2236] hover:text-white"
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-border-default bg-surface text-fg-muted transition hover:border-border-default hover:bg-surface-elevated hover:text-fg"
             aria-expanded={menuOpen}
             aria-controls={menuId}
             aria-label={menuOpen ? 'Close menu' : 'Open menu'}
@@ -288,26 +288,26 @@ function AppNavbar({ leftContent, onChatClick, backTo, backLabel, children }) {
 
           <nav
             id={menuId}
-            className="absolute inset-x-3 top-[calc(100%+0.5rem)] z-50 overflow-hidden rounded-2xl border border-[#1E2D45] bg-[#111827]/95 shadow-2xl backdrop-blur-xl sm:inset-x-auto sm:right-4 sm:w-80 lg:hidden"
+            className="absolute inset-x-3 top-[calc(100%+0.5rem)] z-50 overflow-hidden rounded-2xl border border-border-default bg-surface/95 shadow-2xl backdrop-blur-xl sm:inset-x-auto sm:right-4 sm:w-80 lg:hidden"
             aria-label="App navigation"
           >
-            <div className="border-b border-[#1E2D45] bg-gradient-to-r from-[#1A2236] to-[#111827] px-4 py-4">
+            <div className="border-b border-border-default bg-gradient-to-r from-surface-elevated to-surface px-4 py-4">
               <div className="flex items-center gap-3">
                 <div
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#1A2236] to-[#0A0F1C] text-sm font-semibold text-emerald-400 ring-1 ring-[#2D3A52]"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-surface-elevated to-app text-sm font-semibold text-brand-soft ring-1 ring-border-default"
                   aria-hidden="true"
                 >
                   {initials}
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-[#F9FAFB]">{firstName}</p>
-                  <p className="truncate text-xs text-[#9CA3AF]">Signed in to Soverm</p>
+                  <p className="truncate text-sm font-semibold text-fg">{firstName}</p>
+                  <p className="truncate text-xs text-fg-muted">Signed in to Soverm</p>
                 </div>
               </div>
             </div>
 
             <div className="p-2">
-              <p className="px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.25em] text-[#6B7280]">
+              <p className="px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.25em] text-fg-subtle">
                 Navigate
               </p>
               {PRIMARY_NAV.map((item) => {
@@ -321,13 +321,13 @@ function AppNavbar({ leftContent, onChatClick, backTo, backLabel, children }) {
                     aria-current={active ? 'page' : undefined}
                     className={`mb-1 flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition ${
                       active
-                        ? 'bg-[#1A2236] text-[#F9FAFB] ring-1 ring-emerald-500/30'
-                        : 'text-[#D1D5DB] hover:bg-[#1A2236]/70'
+                        ? 'bg-surface-elevated text-fg ring-1 ring-brand/30'
+                        : 'text-fg-muted hover:bg-surface-elevated/70'
                     }`}
                   >
                     <NavIcon
                       name={NAV_ICONS[item.to]}
-                      className={`h-5 w-5 shrink-0 ${active ? 'text-emerald-400' : 'text-[#6B7280]'}`}
+                      className={`h-5 w-5 shrink-0 ${active ? 'text-brand-soft' : 'text-fg-subtle'}`}
                     />
                     {item.label}
                   </Link>
@@ -335,30 +335,30 @@ function AppNavbar({ leftContent, onChatClick, backTo, backLabel, children }) {
               })}
 
               {children && (
-                <div className="mt-2 border-t border-[#1E2D45] pt-2 [&_a]:mb-1 [&_a]:flex [&_a]:items-center [&_a]:rounded-xl [&_a]:px-3 [&_a]:py-3 [&_a]:text-sm [&_a]:font-medium [&_a]:text-[#D1D5DB] [&_a]:transition hover:[&_a]:bg-[#1A2236]/70">
+                <div className="mt-2 border-t border-border-default pt-2 [&_a]:mb-1 [&_a]:flex [&_a]:items-center [&_a]:rounded-xl [&_a]:px-3 [&_a]:py-3 [&_a]:text-sm [&_a]:font-medium [&_a]:text-fg-muted [&_a]:transition hover:[&_a]:bg-surface-elevated/70">
                   {children}
                 </div>
               )}
             </div>
 
             {onChatClick && (
-              <div className="border-t border-[#1E2D45] p-3">
+              <div className="border-t border-border-default p-3">
                 <button
                   type="button"
                   onClick={handleChatClick}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#8B5CF6]/35 bg-[#8B5CF6]/10 px-4 py-3 text-sm font-medium text-[#C4B5FD] transition hover:bg-[#8B5CF6]/20"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-ai/35 bg-ai/10 px-4 py-3 text-sm font-medium text-ai-soft transition hover:bg-ai/20"
                 >
-                  <ChatBubbleIcon className="h-5 w-5 shrink-0 text-[#8B5CF6]" />
+                  <ChatBubbleIcon className="h-5 w-5 shrink-0 text-ai" />
                   Ask Soverm
                 </button>
               </div>
             )}
 
-            <div className="border-t border-[#1E2D45] p-2">
+            <div className="border-t border-border-default p-2">
               <SignOutButton>
                 <button
                   type="button"
-                  className="flex w-full items-center rounded-xl px-3 py-3 text-left text-sm font-medium text-red-400 transition hover:bg-red-500/10"
+                  className="flex w-full items-center rounded-xl px-3 py-3 text-left text-sm font-medium text-danger transition hover:bg-danger/10"
                 >
                   Sign out
                 </button>

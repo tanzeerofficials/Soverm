@@ -45,7 +45,7 @@ function LandingHowItWorks() {
         <ol className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:items-stretch sm:gap-6">
           {STEPS.map(({ step, title, description }) => (
             <li key={step} className="min-h-0">
-              <article className="flex h-full flex-col rounded-xl border border-border-default bg-surface p-6 text-left transition hover:border-[#2D3A52] hover:bg-surface-elevated/40">
+              <article className="flex h-full flex-col rounded-xl border border-border-default bg-surface p-6 text-left transition hover:border-border-hover hover:bg-surface-elevated/40">
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-brand/40 bg-brand/10 text-sm font-bold text-brand-soft">
                   {step}
                 </span>

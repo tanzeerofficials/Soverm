@@ -30,7 +30,7 @@ function InsightQuickQuestions({ insightId, insight, onError, onExpandChat }) {
 
   return (
     <section className="mt-4">
-      <p className="text-xs uppercase text-[#9CA3AF]">Quick questions</p>
+      <p className="text-xs uppercase text-fg-muted">Quick questions</p>
       <div className="mt-2 flex flex-wrap gap-2">
         {questions.map((question) => (
           <button
@@ -38,7 +38,7 @@ function InsightQuickQuestions({ insightId, insight, onError, onExpandChat }) {
             type="button"
             disabled={!!sendingQuestion}
             onClick={() => handleSend(question)}
-            className="max-w-full rounded-full bg-[#1A2236] px-3 py-2 text-left text-xs leading-snug text-[#9CA3AF] transition hover:bg-[#232d42] hover:text-white disabled:cursor-not-allowed disabled:opacity-60 sm:py-1.5"
+            className="max-w-full rounded-full bg-app px-3 py-2 text-left text-xs leading-snug text-fg-muted transition hover:bg-surface-elevated hover:text-fg disabled:cursor-not-allowed disabled:opacity-60 sm:py-1.5"
           >
             {sendingQuestion === question ? 'Asking…' : question}
           </button>

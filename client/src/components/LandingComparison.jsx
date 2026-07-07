@@ -28,13 +28,13 @@ function ComparisonColumn({ variant, title, items }) {
     <article
       className={`flex flex-col rounded-xl border p-6 sm:p-7 ${
         isPositive
-          ? 'border-emerald-500/40 bg-emerald-500/5 shadow-[0_0_32px_rgba(16,185,129,0.08)]'
-          : 'border-[#1E2D45] bg-[#111827]'
+          ? 'border-brand/40 bg-brand/5 shadow-[0_0_32px_rgba(16,185,129,0.08)]'
+          : 'border-border-default bg-surface'
       }`}
     >
       <p
         className={`text-xs font-semibold uppercase tracking-wider ${
-          isPositive ? 'text-emerald-400' : 'text-[#6B7280]'
+          isPositive ? 'text-brand-soft' : 'text-fg-subtle'
         }`}
       >
         {title}
@@ -44,7 +44,7 @@ function ComparisonColumn({ variant, title, items }) {
         {items.map((item) => (
           <li key={item} className="flex items-start gap-3 text-sm leading-relaxed">
             {isPositive ? (
-              <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400">
+              <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-brand/15 text-brand-soft">
                 <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                   <path
                     fillRule="evenodd"
@@ -54,7 +54,7 @@ function ComparisonColumn({ variant, title, items }) {
                 </svg>
               </span>
             ) : (
-              <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-[#1E2D45] text-[#6B7280]">
+              <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-border-default text-fg-subtle">
                 <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                   <path
                     fillRule="evenodd"
@@ -64,7 +64,7 @@ function ComparisonColumn({ variant, title, items }) {
                 </svg>
               </span>
             )}
-            <span className={isPositive ? 'text-[#F9FAFB]' : 'text-[#9CA3AF]'}>{item}</span>
+            <span className={isPositive ? 'text-fg' : 'text-fg-muted'}>{item}</span>
           </li>
         ))}
       </ul>
@@ -76,13 +76,13 @@ function LandingComparison() {
   return (
     <section className="mx-auto mt-24 max-w-4xl" aria-labelledby="comparison-heading">
       <div className="text-center">
-        <p className="text-sm font-medium uppercase tracking-wide text-emerald-500">
+        <p className="text-sm font-medium uppercase tracking-wide text-brand">
           Why Soverm
         </p>
-        <h2 id="comparison-heading" className="mt-2 text-2xl font-bold text-[#F9FAFB] sm:text-3xl">
+        <h2 id="comparison-heading" className="mt-2 text-2xl font-bold text-fg sm:text-3xl">
           Spreadsheets vs. Soverm
         </h2>
-        <p className="mx-auto mt-3 max-w-xl text-sm text-[#9CA3AF]">
+        <p className="mx-auto mt-3 max-w-xl text-sm text-fg-muted">
           You shouldn&apos;t need a finance degree to understand your own money.
         </p>
       </div>

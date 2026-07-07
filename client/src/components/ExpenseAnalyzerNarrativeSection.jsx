@@ -47,16 +47,16 @@ function ExpenseAnalyzerNarrativeSection({
 
   return (
     <section
-      className="rounded-xl border border-[#1E2D45] bg-[#111827]"
+      className="rounded-xl border border-border-default bg-surface"
       aria-label="Expense analysis and summary"
     >
       <div className="px-5 py-5 sm:px-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-[#6B7280]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-fg-subtle">
               Analyze &amp; Summary
             </p>
-            <p className="mt-1 text-sm text-[#9CA3AF]">
+            <p className="mt-1 text-sm text-fg-muted">
               {showPersonalized
                 ? 'Soverm’s summary of your spending, last 30 days'
                 : 'From your synced transactions — get a detailed expense summary below'}
@@ -64,7 +64,7 @@ function ExpenseAnalyzerNarrativeSection({
           </div>
 
           {showPersonalized ? (
-            <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-300">
+            <span className="rounded-full border border-brand/30 bg-brand/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-soft">
               Your summary
             </span>
           ) : null}
@@ -79,31 +79,31 @@ function ExpenseAnalyzerNarrativeSection({
             </div>
           ) : showPersonalized ? (
             <div className="space-y-3">
-              <p className="text-base font-semibold leading-snug text-[#F9FAFB]">
+              <p className="text-base font-semibold leading-snug text-fg">
                 {personalNarrative.lead}
               </p>
               {personalNarrative.paragraphs.map((paragraph) => (
-                <p key={paragraph.slice(0, 24)} className="text-sm leading-relaxed text-[#D1D5DB]">
+                <p key={paragraph.slice(0, 24)} className="text-sm leading-relaxed text-fg-muted">
                   {paragraph}
                 </p>
               ))}
             </div>
           ) : (
-            <p className="text-sm leading-relaxed text-[#D1D5DB]">{displayTemplate}</p>
+            <p className="text-sm leading-relaxed text-fg-muted">{displayTemplate}</p>
           )}
         </div>
 
         {confirmedRecurring > 0 && (
-          <p className="mt-4 text-sm text-[#9CA3AF]">
+          <p className="mt-4 text-sm text-fg-muted">
             Recurring{' '}
-            <span className="font-mono font-semibold tabular-nums text-[#C4B5FD]">
+            <span className="font-mono font-semibold tabular-nums text-ai-soft">
               {formatCurrency(confirmedRecurring)}/mo
             </span>
           </p>
         )}
 
-        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[#1E2D45] pt-4">
-          <p className="text-xs text-[#6B7280]">
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border-default pt-4">
+          <p className="text-xs text-fg-subtle">
             {showPersonalized && generatedLabel
               ? `Generated ${generatedLabel}`
               : 'Posted transactions only'}
@@ -115,14 +115,14 @@ function ExpenseAnalyzerNarrativeSection({
                 type="button"
                 onClick={generatePersonalized}
                 disabled={isGenerating || !fingerprint}
-                className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isGenerating ? 'Preparing your summary…' : 'Get expense summary'}
               </button>
             )}
 
             {generationError && (
-              <p className="max-w-xs text-right text-xs leading-relaxed text-amber-200/90">
+              <p className="max-w-xs text-right text-xs leading-relaxed text-warning/90">
                 {generationError.message ||
                   'Couldn’t generate your summary right now. The breakdown below is still accurate.'}
               </p>
@@ -130,10 +130,10 @@ function ExpenseAnalyzerNarrativeSection({
 
             {showPersonalized && displayTemplate && (
               <details className="text-sm">
-                <summary className="cursor-pointer list-none text-[#9CA3AF] transition hover:text-white">
+                <summary className="cursor-pointer list-none text-fg-muted transition hover:text-fg">
                   View standard summary
                 </summary>
-                <p className="mt-2 max-w-prose text-sm leading-relaxed text-[#9CA3AF]">
+                <p className="mt-2 max-w-prose text-sm leading-relaxed text-fg-muted">
                   {displayTemplate}
                 </p>
               </details>
@@ -141,10 +141,10 @@ function ExpenseAnalyzerNarrativeSection({
           </div>
         </div>
 
-        <div className="mt-6 border-t border-[#1E2D45] pt-5">
+        <div className="mt-6 border-t border-border-default pt-5">
           <div className="mb-3 flex items-center gap-2">
-            <ChatBubbleIcon className="h-4 w-4 text-[#8B5CF6]" />
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#8B5CF6]">
+            <ChatBubbleIcon className="h-4 w-4 text-ai" />
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-ai">
               Ask Soverm
             </h3>
           </div>
@@ -158,10 +158,10 @@ function ExpenseAnalyzerNarrativeSection({
               contextLabel="Grounded in your synced transactions, recurring charges, and category breakdown."
             />
           ) : (
-            <div className="rounded-lg border border-[#1E2D45] bg-[#0A0F1C]/40 px-4 py-4">
-              <p className="text-sm leading-relaxed text-[#9CA3AF]">
+            <div className="rounded-lg border border-border-default bg-app/40 px-4 py-4">
+              <p className="text-sm leading-relaxed text-fg-muted">
                 Generate your first insight on the{' '}
-                <Link to="/dashboard" className="text-[#8B5CF6] underline-offset-2 hover:underline">
+                <Link to="/dashboard" className="text-ai underline-offset-2 hover:underline">
                   dashboard
                 </Link>{' '}
                 to ask follow-up questions about your spending.

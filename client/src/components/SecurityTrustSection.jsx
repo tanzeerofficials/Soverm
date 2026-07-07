@@ -71,9 +71,9 @@ const WE_NEVER = [
 
 function IconBadge({ children }) {
   return (
-    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-emerald-500/30 bg-emerald-500/10">
+    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-brand/30 bg-brand/10">
       <svg
-        className="h-5 w-5 text-emerald-400"
+        className="h-5 w-5 text-brand-soft"
         viewBox="0 0 20 20"
         fill="currentColor"
         aria-hidden="true"
@@ -88,24 +88,24 @@ function SecurityTrustSection() {
   return (
     <section className="mx-auto mt-24 max-w-4xl" id="security" aria-labelledby="security-trust-heading">
       <div className="text-center">
-        <p className="text-sm font-medium uppercase tracking-wide text-emerald-500">
+        <p className="text-sm font-medium uppercase tracking-wide text-brand">
           Security
         </p>
         <h2
           id="security-trust-heading"
-          className="mt-2 text-2xl font-bold text-[#F9FAFB] sm:text-3xl"
+          className="mt-2 text-2xl font-bold text-fg sm:text-3xl"
         >
           Your money stays yours — we only read, never touch
         </h2>
-        <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-[#9CA3AF]">
+        <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-fg-muted">
           Connecting a bank can feel risky. Here is exactly how Soverm works: through
           Plaid, with read-only access, and with a clear off-switch whenever you want.
         </p>
       </div>
 
       {/* How data flows — visual strip */}
-      <div className="mt-10 rounded-xl border border-[#1E2D45] bg-[#111827] p-6 sm:p-8">
-        <p className="text-center text-xs font-medium uppercase tracking-wider text-[#6B7280]">
+      <div className="mt-10 rounded-xl border border-border-default bg-gradient-to-b from-surface-deep/60 to-surface p-6 sm:p-8">
+        <p className="text-center text-xs font-medium uppercase tracking-wider text-fg-subtle">
           How your bank connects
         </p>
         <ol className="mt-6 grid grid-cols-1 gap-8 sm:grid-cols-3 sm:gap-6">
@@ -115,7 +115,7 @@ function SecurityTrustSection() {
             { step: '3', label: 'Soverm receives data', detail: 'Balances & transactions only' },
           ].map((item) => (
             <li key={item.step} className="flex flex-col items-center text-center">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand/30 bg-brand/10 text-sm font-semibold text-brand-soft">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-brand/40 bg-brand/10 text-sm font-bold text-brand-soft">
                 {item.step}
               </span>
               <p className="mt-3 text-sm font-semibold text-fg">{item.label}</p>
@@ -132,12 +132,12 @@ function SecurityTrustSection() {
         {TRUST_PILLARS.map(({ title, description, icon }) => (
           <article
             key={title}
-            className="flex gap-4 rounded-xl border border-[#1E2D45] bg-[#111827] p-5 text-left transition hover:border-[#2D3F5C]"
+            className="flex gap-4 rounded-xl border border-border-default bg-surface p-5 text-left transition hover:border-border-hover hover:bg-surface-elevated/40"
           >
             <IconBadge>{icon}</IconBadge>
             <div>
-              <h3 className="text-sm font-semibold text-[#F9FAFB]">{title}</h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-[#9CA3AF]">{description}</p>
+              <h3 className="text-sm font-semibold text-fg">{title}</h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-fg-muted">{description}</p>
             </div>
           </article>
         ))}
@@ -145,8 +145,8 @@ function SecurityTrustSection() {
 
       {/* What we access vs never */}
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-5">
-          <h3 className="flex items-center gap-2 text-sm font-semibold text-emerald-400">
+        <div className="rounded-xl border border-brand/20 bg-brand/5 p-5">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-brand-soft">
             <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path
                 fillRule="evenodd"
@@ -158,17 +158,17 @@ function SecurityTrustSection() {
           </h3>
           <ul className="mt-3 space-y-2">
             {WE_ACCESS.map((item) => (
-              <li key={item} className="flex items-start gap-2 text-sm text-[#9CA3AF]">
-                <span className="mt-1.5 h-1 w-1 flex-shrink-0 rounded-full bg-emerald-400" />
+              <li key={item} className="flex items-start gap-2 text-sm text-fg-muted">
+                <span className="mt-1.5 h-1 w-1 flex-shrink-0 rounded-full bg-brand-soft" />
                 {item}
               </li>
             ))}
           </ul>
         </div>
 
-        <div className="rounded-xl border border-[#1E2D45] bg-[#111827] p-5">
-          <h3 className="flex items-center gap-2 text-sm font-semibold text-[#F9FAFB]">
-            <svg className="h-4 w-4 text-[#9CA3AF]" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        <div className="rounded-xl border border-border-default bg-surface p-5">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-fg">
+            <svg className="h-4 w-4 text-fg-muted" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path
                 fillRule="evenodd"
                 d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
@@ -179,8 +179,8 @@ function SecurityTrustSection() {
           </h3>
           <ul className="mt-3 space-y-2">
             {WE_NEVER.map((item) => (
-              <li key={item} className="flex items-start gap-2 text-sm text-[#9CA3AF]">
-                <span className="mt-1.5 h-1 w-1 flex-shrink-0 rounded-full bg-[#6B7280]" />
+              <li key={item} className="flex items-start gap-2 text-sm text-fg-muted">
+                <span className="mt-1.5 h-1 w-1 flex-shrink-0 rounded-full bg-fg-subtle" />
                 {item}
               </li>
             ))}
@@ -189,17 +189,17 @@ function SecurityTrustSection() {
       </div>
 
       {/* Plaid partnership */}
-      <div className="mt-8 flex flex-col items-center justify-center gap-3 rounded-xl border border-[#1E2D45] bg-[#0A0F1C] px-6 py-5 sm:flex-row sm:gap-4">
-        <p className="text-center text-sm text-[#9CA3AF] sm:text-left">
+      <div className="mt-8 flex flex-col items-center justify-center gap-3 rounded-xl border border-border-default bg-app px-6 py-5 sm:flex-row sm:gap-4">
+        <p className="text-center text-sm text-fg-muted sm:text-left">
           Bank connections are powered by{' '}
-          <span className="font-medium text-[#F9FAFB]">Plaid</span> — trusted by over 12,000
+          <span className="font-medium text-fg">Plaid</span> — trusted by over 12,000
           financial institutions worldwide.
         </p>
         <a
           href="https://plaid.com/safety/"
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex flex-shrink-0 items-center gap-2 rounded-lg border border-[#1E2D45] bg-white px-3 py-1.5 transition hover:bg-[#F9FAFB]"
+          className="inline-flex flex-shrink-0 items-center gap-2 rounded-lg border border-border-default bg-surface-elevated px-3 py-1.5 transition hover:border-border-hover hover:bg-surface"
           aria-label="Learn about Plaid security (opens in new tab)"
         >
           <img

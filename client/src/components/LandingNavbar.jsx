@@ -18,20 +18,20 @@ const NAV_LINKS = [
 
 function LandingNavbar() {
   return (
-    <header className="relative sticky top-0 z-50 border-b border-[#1E2D45]/70 bg-[#0A0F1C]/88 shadow-[0_4px_24px_rgba(0,0,0,0.2)] backdrop-blur-xl">
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-emerald-500/35 to-transparent" />
+    <header className="relative sticky top-0 z-50 border-b border-border-default/70 bg-app/88 shadow-[0_4px_24px_rgba(0,0,0,0.2)] backdrop-blur-xl">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-brand/35 to-transparent" />
       <div className="relative mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
         <BrandMark to="/" />
 
         <nav
-          className="hidden items-center gap-6 text-sm text-[#9CA3AF] md:flex"
+          className="hidden items-center gap-6 text-sm text-fg-muted md:flex"
           aria-label="Landing page sections"
         >
           {NAV_LINKS.map(({ href, label }) => (
             <a
               key={href}
               href={href}
-              className="transition hover:text-[#F9FAFB]"
+              className="transition hover:text-fg"
             >
               {label}
             </a>
@@ -42,7 +42,7 @@ function LandingNavbar() {
           <SignInButton mode="modal">
             <button
               type="button"
-              className="rounded-lg px-3 py-2 text-sm font-medium text-[#9CA3AF] transition hover:text-[#F9FAFB]"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-fg-muted transition hover:text-fg"
             >
               Sign In
             </button>
@@ -50,7 +50,7 @@ function LandingNavbar() {
           <SignUpButton mode="modal">
             <button
               type="button"
-              className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-emerald-400"
+              className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-brand-soft"
             >
               Sign Up
             </button>

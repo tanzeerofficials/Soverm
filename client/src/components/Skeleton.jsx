@@ -8,7 +8,7 @@
 function Skeleton({ className = '' }) {
   return (
     <div
-      className={`animate-pulse rounded bg-[#1A2236] ${className}`}
+      className={`animate-pulse rounded bg-surface-elevated ${className}`}
       aria-hidden="true"
     />
   )

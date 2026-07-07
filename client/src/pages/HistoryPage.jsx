@@ -30,20 +30,20 @@ function HistoryMetaChip({ children }) {
 
 function HistoryLockedBanner({ lockedCount, onUpgrade }) {
   return (
-    <div className="relative mt-6 overflow-hidden rounded-xl border border-[#F59E0B]/30 bg-[#111827] p-4 sm:p-5">
+    <div className="relative mt-6 overflow-hidden rounded-xl border border-warning/30 bg-surface p-4 sm:p-5">
       <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-[#F9FAFB]">
+          <p className="text-sm font-semibold text-fg">
             {lockedCount} earlier insight{lockedCount === 1 ? '' : 's'} locked
           </p>
-          <p className="mt-1 max-w-lg text-xs leading-relaxed text-[#9CA3AF]">
+          <p className="mt-1 max-w-lg text-xs leading-relaxed text-fg-muted">
             Free keeps 7 days. Soverm Pro unlocks your full archive.
           </p>
         </div>
         <button
           type="button"
           onClick={onUpgrade}
-          className="shrink-0 rounded-lg bg-[#F59E0B] px-4 py-2 text-sm font-semibold text-[#0A0F1C] transition hover:bg-[#FBBF24]"
+          className="shrink-0 rounded-lg bg-warning px-4 py-2 text-sm font-semibold text-app transition hover:brightness-110"
         >
           Upgrade to Pro
         </button>
@@ -54,21 +54,21 @@ function HistoryLockedBanner({ lockedCount, onUpgrade }) {
 
 function HistoryEmptyState() {
   return (
-    <div className="mx-auto max-w-lg rounded-2xl border border-dashed border-[#1E2D45] bg-[#111827]/50 px-6 py-14 text-center">
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-[#1E2D45] bg-[#0A0F1C] text-[#8B5CF6]">
+    <div className="mx-auto max-w-lg rounded-2xl border border-dashed border-border-default bg-surface/50 px-6 py-14 text-center">
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-border-default bg-app text-ai">
         <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
           <circle cx="12" cy="12" r="9" />
           <path d="M12 7v5l3 2" />
         </svg>
       </div>
-      <p className="mt-5 text-base font-semibold text-[#F9FAFB]">No insights yet</p>
-      <p className="mt-2 text-sm leading-relaxed text-[#9CA3AF]">
+      <p className="mt-5 text-base font-semibold text-fg">No insights yet</p>
+      <p className="mt-2 text-sm leading-relaxed text-fg-muted">
         Generate your first insight from the dashboard — it will appear here as part of your
         financial archive.
       </p>
       <Link
         to="/dashboard"
-        className="mt-6 inline-flex rounded-xl bg-emerald-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600"
+        className="mt-6 inline-flex rounded-xl bg-brand px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-soft"
       >
         Go to Dashboard
       </Link>
@@ -178,7 +178,7 @@ function HistoryPage() {
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div className="relative min-w-0 flex-1">
                     <svg
-                      className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6B7280]"
+                      className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle"
                       viewBox="0 0 20 20"
                       fill="currentColor"
                       aria-hidden="true"
@@ -194,14 +194,14 @@ function HistoryPage() {
                       value={searchQuery}
                       onChange={(event) => setSearchQuery(event.target.value)}
                       placeholder="Search by date or headline…"
-                      className={`w-full rounded-lg border border-[#1E2D45] bg-[#111827] py-2.5 pl-10 text-sm text-[#F9FAFB] placeholder:text-[#6B7280] focus:border-emerald-500/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${searchQuery ? 'pr-10' : 'pr-4'}`}
+                      className={`w-full rounded-lg border border-border-default bg-surface py-2.5 pl-10 text-sm text-fg placeholder:text-fg-subtle focus:border-brand/40 focus:outline-none focus:ring-2 focus:ring-brand/20 ${searchQuery ? 'pr-10' : 'pr-4'}`}
                       aria-label="Search insights"
                     />
                     {searchQuery && (
                       <button
                         type="button"
                         onClick={() => setSearchQuery('')}
-                        className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-[#9CA3AF] transition hover:bg-[#1A2236] hover:text-white"
+                        className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-fg-muted transition hover:bg-surface-elevated hover:text-fg"
                         aria-label="Clear search"
                       >
                         <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -210,7 +210,7 @@ function HistoryPage() {
                       </button>
                     )}
                   </div>
-                  <p className="shrink-0 text-xs text-[#6B7280]">
+                  <p className="shrink-0 text-xs text-fg-subtle">
                     {filteredInsights.length} of {insights.length}
                   </p>
                 </div>
@@ -218,15 +218,15 @@ function HistoryPage() {
             )}
 
             {filteredInsights.length === 0 ? (
-              <div className="rounded-xl border border-[#1E2D45] bg-[#111827] px-6 py-12 text-center">
-                <p className="text-sm font-medium text-[#F9FAFB]">No matching insights</p>
-                <p className="mt-2 text-sm text-[#9CA3AF]">
+              <div className="rounded-xl border border-border-default bg-surface px-6 py-12 text-center">
+                <p className="text-sm font-medium text-fg">No matching insights</p>
+                <p className="mt-2 text-sm text-fg-muted">
                   Try a different month, date, or headline keyword.
                 </p>
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  className="mt-4 text-sm font-medium text-[#8B5CF6] transition hover:text-[#C4B5FD]"
+                  className="mt-4 text-sm font-medium text-ai transition hover:text-ai-soft"
                 >
                   Clear search
                 </button>

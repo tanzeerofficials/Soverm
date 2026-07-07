@@ -13,15 +13,15 @@ function UsageBadge({ usage }) {
   return (
     <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
       {isPro ? (
-        <span className="inline-flex items-center gap-1 rounded-full border border-[#F59E0B]/30 bg-[#F59E0B]/10 px-3 py-1 font-medium text-[#F59E0B]">
+        <span className="inline-flex items-center gap-1 rounded-full border border-warning/30 bg-warning/10 px-3 py-1 font-medium text-warning">
           ✦ Soverm Pro — unlimited insights
         </span>
       ) : (
         <span
           className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 font-medium ${
             remainingToday > 0
-              ? 'border-[#1E2D45] bg-[#1A2236] text-[#9CA3AF]'
-              : 'border-[#1E2D45] bg-[#1A2236] text-[#6B7280]'
+              ? 'border-border-default bg-surface-elevated text-fg-muted'
+              : 'border-border-default bg-surface-elevated text-fg-subtle'
           }`}
         >
           {remainingToday > 0

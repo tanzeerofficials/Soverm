@@ -24,16 +24,16 @@ function tabCountLabel(count) {
 }
 
 function TabIcon({ id, active }) {
-  const stroke = active ? '#34D399' : '#6B7280'
+  const iconClass = active ? 'text-brand-soft' : 'text-fg-subtle'
 
   if (id === EXPENSE_ANALYZER_TABS.SUMMARY) {
     return (
       <svg
         aria-hidden="true"
-        className="h-4 w-4 shrink-0 sm:h-[18px] sm:w-[18px]"
+        className={`h-4 w-4 shrink-0 sm:h-[18px] sm:w-[18px] ${iconClass}`}
         viewBox="0 0 24 24"
         fill="none"
-        stroke={stroke}
+        stroke="currentColor"
         strokeWidth="1.75"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -48,10 +48,10 @@ function TabIcon({ id, active }) {
     return (
       <svg
         aria-hidden="true"
-        className="h-4 w-4 shrink-0 sm:h-[18px] sm:w-[18px]"
+        className={`h-4 w-4 shrink-0 sm:h-[18px] sm:w-[18px] ${iconClass}`}
         viewBox="0 0 24 24"
         fill="none"
-        stroke={stroke}
+        stroke="currentColor"
         strokeWidth="1.75"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -66,10 +66,10 @@ function TabIcon({ id, active }) {
     return (
       <svg
         aria-hidden="true"
-        className="h-4 w-4 shrink-0 sm:h-[18px] sm:w-[18px]"
+        className={`h-4 w-4 shrink-0 sm:h-[18px] sm:w-[18px] ${iconClass}`}
         viewBox="0 0 24 24"
         fill="none"
-        stroke={stroke}
+        stroke="currentColor"
         strokeWidth="1.75"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -85,10 +85,10 @@ function TabIcon({ id, active }) {
   return (
     <svg
       aria-hidden="true"
-      className="h-4 w-4 shrink-0 sm:h-[18px] sm:w-[18px]"
+      className={`h-4 w-4 shrink-0 sm:h-[18px] sm:w-[18px] ${iconClass}`}
       viewBox="0 0 24 24"
       fill="none"
-      stroke={stroke}
+      stroke="currentColor"
       strokeWidth="1.75"
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -136,7 +136,7 @@ function ExpenseAnalyzerTabBar({
   return (
     <div className="relative">
       <div
-        className="overflow-hidden rounded-2xl border border-[#1E2D45] bg-gradient-to-b from-[#131B2E] to-[#0D1320] shadow-[0_8px_32px_rgba(0,0,0,0.35)]"
+        className="overflow-hidden rounded-2xl border border-border-default bg-gradient-to-b from-surface-deep to-app shadow-[0_8px_32px_rgba(0,0,0,0.35)]"
         role="tablist"
         aria-label="Expense analyzer sections"
       >
@@ -160,15 +160,15 @@ function ExpenseAnalyzerTabBar({
                 onClick={() => onChange(tab.id)}
                 className={`group relative flex min-h-11 min-w-[5.75rem] flex-1 snap-center flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-2.5 transition-all duration-200 sm:min-w-0 sm:flex-row sm:gap-2 sm:px-3 sm:py-3 ${
                   isActive
-                    ? 'bg-[#1A2236] text-[#F9FAFB] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-emerald-500/35'
-                    : 'text-[#9CA3AF] hover:bg-[#1A2236]/50 hover:text-[#E5E7EB] active:scale-[0.98]'
+                    ? 'bg-surface-elevated text-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-brand/35'
+                    : 'text-fg-muted hover:bg-surface-elevated/50 hover:text-fg active:scale-[0.98]'
                 }`}
               >
                 <span className="flex items-center gap-1.5">
                   <TabIcon id={tab.id} active={isActive} />
                   {showSummaryDot && (
                     <span
-                      className="absolute left-1/2 top-2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-emerald-400 sm:left-auto sm:right-2 sm:top-2 sm:translate-x-0"
+                      className="absolute left-1/2 top-2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-brand-soft sm:left-auto sm:right-2 sm:top-2 sm:translate-x-0"
                       aria-hidden="true"
                     />
                   )}
@@ -183,8 +183,8 @@ function ExpenseAnalyzerTabBar({
                     <span
                       className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums leading-none ${
                         isActive
-                          ? 'bg-emerald-500/15 text-emerald-300'
-                          : 'bg-[#0A0F1C] text-[#6B7280] group-hover:text-[#9CA3AF]'
+                          ? 'bg-brand/15 text-brand-soft'
+                          : 'bg-app text-fg-subtle group-hover:text-fg-muted'
                       }`}
                     >
                       {countLabel}
@@ -194,7 +194,7 @@ function ExpenseAnalyzerTabBar({
 
                 {isActive && (
                   <span
-                    className="absolute inset-x-3 bottom-1 hidden h-0.5 rounded-full bg-gradient-to-r from-emerald-400/0 via-emerald-400 to-emerald-400/0 sm:block"
+                    className="absolute inset-x-3 bottom-1 hidden h-0.5 rounded-full bg-gradient-to-r from-brand-soft/0 via-brand-soft to-brand-soft/0 sm:block"
                     aria-hidden="true"
                   />
                 )}
@@ -204,7 +204,7 @@ function ExpenseAnalyzerTabBar({
         </div>
       </div>
 
-      <p className="mt-2 text-center text-[11px] text-[#6B7280] sm:hidden">
+      <p className="mt-2 text-center text-[11px] text-fg-subtle sm:hidden">
         Swipe to see all sections
       </p>
     </div>

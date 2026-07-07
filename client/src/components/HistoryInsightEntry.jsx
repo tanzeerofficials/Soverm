@@ -107,7 +107,7 @@ function HistoryInsightEntry({ insight, onSelect, showTimeline = true }) {
       <button
         type="button"
         onClick={() => onSelect(insight)}
-        className="group flex w-full flex-col overflow-hidden rounded-xl border border-border-default border-l-4 border-l-ai bg-surface text-left shadow-sm transition hover:border-[#2D3A52] hover:bg-surface-elevated/40 hover:shadow-md"
+        className="group flex w-full flex-col overflow-hidden rounded-xl border border-border-default border-l-4 border-l-ai bg-surface text-left shadow-sm transition hover:border-border-hover hover:bg-surface-elevated/40 hover:shadow-md"
       >
         <div className="flex items-center justify-between gap-3 border-b border-border-default bg-app/50 px-4 py-3 sm:px-5">
           <span className="text-xs font-semibold uppercase tracking-wide text-ai">

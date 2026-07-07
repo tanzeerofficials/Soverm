@@ -32,7 +32,7 @@ function FooterLink({ to, children }) {
     return (
       <a
         href={to.replace('/', '')}
-        className="text-sm text-[#9CA3AF] transition hover:text-[#F9FAFB]"
+        className="text-sm text-fg-muted transition hover:text-fg"
       >
         {children}
       </a>
@@ -42,7 +42,7 @@ function FooterLink({ to, children }) {
   return (
     <Link
       to={to}
-      className="text-sm text-[#9CA3AF] transition hover:text-[#F9FAFB]"
+      className="text-sm text-fg-muted transition hover:text-fg"
     >
       {children}
     </Link>
@@ -52,7 +52,7 @@ function FooterLink({ to, children }) {
 function FooterColumn({ title, children }) {
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
+      <p className="text-xs font-semibold uppercase tracking-wider text-fg-subtle">
         {title}
       </p>
       <ul className="mt-4 space-y-3">{children}</ul>
@@ -62,7 +62,7 @@ function FooterColumn({ title, children }) {
 
 function PlaidBadge() {
   return (
-    <div className="rounded-xl border border-[#1E2D45] bg-[#111827] p-4">
+    <div className="rounded-xl border border-border-default bg-surface p-4">
       <div className="flex items-start gap-3">
         <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-emerald-500/30 bg-emerald-500/10">
           <svg
@@ -79,15 +79,15 @@ function PlaidBadge() {
           </svg>
         </div>
         <div>
-          <p className="text-sm font-medium text-[#F9FAFB]">Bank-level security</p>
-          <p className="mt-1 text-xs leading-relaxed text-[#9CA3AF]">
+          <p className="text-sm font-medium text-fg">Bank-level security</p>
+          <p className="mt-1 text-xs leading-relaxed text-fg-muted">
             Read-only connections via Plaid. We never see your bank login.
           </p>
           <a
             href="https://plaid.com"
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-3 inline-flex items-center gap-2 rounded-md bg-white px-2.5 py-1 transition hover:bg-[#F9FAFB]"
+            className="mt-3 inline-flex items-center gap-2 rounded-md bg-white px-2.5 py-1 transition hover:bg-fg"
             aria-label="Plaid (opens in new tab)"
           >
             <img
@@ -108,7 +108,7 @@ function Footer() {
   const year = new Date().getFullYear()
 
   return (
-    <footer className="mt-auto border-t border-[#1E2D45] bg-[#0A0F1C]">
+    <footer className="mt-auto border-t border-border-default bg-app">
       <div className="mx-auto max-w-6xl px-6 py-12 sm:px-8 sm:py-14">
         <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-12 lg:gap-8">
           {/* Brand */}
@@ -166,7 +166,7 @@ function Footer() {
 
           {/* Security */}
           <div className="sm:col-span-2 lg:col-span-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
+            <p className="text-xs font-semibold uppercase tracking-wider text-fg-subtle">
               Security
             </p>
             <div className="mt-4">
@@ -176,11 +176,11 @@ function Footer() {
         </div>
 
         {/* Bottom bar */}
-        <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-[#1E2D45] pt-8 text-center sm:flex-row sm:text-left">
-          <p className="text-xs text-[#6B7280]">
+        <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-border-default pt-8 text-center sm:flex-row sm:text-left">
+          <p className="text-xs text-fg-subtle">
             © {year} Soverm. All rights reserved.
           </p>
-          <p className="text-xs text-[#6B7280]">
+          <p className="text-xs text-fg-subtle">
             Read-only access · Encrypted in transit · Disconnect anytime
           </p>
         </div>

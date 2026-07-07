@@ -22,7 +22,7 @@ function ConnectBankButton({ className = '', highlighted = false, showSecurityNo
     <div
       className={`flex w-full max-w-full flex-col items-center ${
         highlighted
-          ? 'rounded-lg ring-2 ring-[#10B981] ring-offset-1 ring-offset-[#0A0F1C]'
+          ? 'rounded-lg ring-2 ring-brand ring-offset-1 ring-offset-app'
           : ''
       }`}
     >
@@ -30,14 +30,14 @@ function ConnectBankButton({ className = '', highlighted = false, showSecurityNo
         type="button"
         onClick={handleClick}
         disabled={!ready || isExchanging}
-        className={`min-h-11 w-full rounded-lg bg-emerald-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 ${
+        className={`min-h-11 w-full rounded-lg bg-brand px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-60 ${
           highlighted && !isExchanging ? 'animate-pulse' : ''
         } ${className}`}
       >
         {label}
       </button>
       {showSecurityNote && (
-      <p className="mt-2 flex max-w-[280px] items-center justify-center gap-1.5 px-1 text-center text-[11px] leading-snug text-[#9CA3AF] sm:text-xs">
+      <p className="mt-2 flex max-w-[280px] items-center justify-center gap-1.5 px-1 text-center text-[11px] leading-snug text-fg-muted sm:text-xs">
         <svg
           className="h-3.5 w-3.5 flex-shrink-0"
           viewBox="0 0 20 20"

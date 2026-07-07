@@ -64,7 +64,7 @@ function LandingHero() {
             <SignInButton mode="modal">
               <button
                 type="button"
-                className="w-full rounded-lg border border-border-default bg-surface/80 px-8 py-3.5 text-sm font-medium text-fg backdrop-blur-sm transition hover:border-[#2D3F5C] hover:bg-surface-elevated sm:w-auto"
+                className="w-full rounded-lg border border-border-default bg-surface/80 px-8 py-3.5 text-sm font-medium text-fg backdrop-blur-sm transition hover:border-border-hover hover:bg-surface-elevated sm:w-auto"
               >
                 Sign In
               </button>

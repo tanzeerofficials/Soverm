@@ -1,13 +1,14 @@
 /*
  * ACTION CHECKLIST
  *
- * Displays actionable todos from an AI insight with
- * optimistic checkbox toggling synced to the server.
+ * Insight action items with progress bar and optimistic checkbox toggling
+ * synced to the server.
  */
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@clerk/clerk-react'
 import { useQueryClient } from '@tanstack/react-query'
+import { summarizeInsightActions } from '../lib/dashboardAttention.js'
 import { dashboardQueryKey } from '../lib/queryKeys.js'
 
 function normalizeActions(actions) {
@@ -28,7 +29,7 @@ function normalizeActions(actions) {
   })
 }
 
-function ActionChecklist({ actions, onUpdate }) {
+function ActionChecklist({ actions, onUpdate, id = 'dashboard-insight-actions', className = '' }) {
   const { getToken } = useAuth()
   const queryClient = useQueryClient()
   const [localActions, setLocalActions] = useState(() => normalizeActions(actions))
@@ -36,6 +37,9 @@ function ActionChecklist({ actions, onUpdate }) {
   useEffect(() => {
     setLocalActions(normalizeActions(actions))
   }, [actions])
+
+  const { total, completed } = summarizeInsightActions(localActions)
+  const progressPercent = total > 0 ? Math.round((completed / total) * 100) : 0
 
   async function handleToggle(actionId, currentCompleted) {
     if (String(actionId).startsWith('pending-')) {
@@ -85,13 +89,49 @@ function ActionChecklist({ actions, onUpdate }) {
   }
 
   return (
-    <section className="mt-4 rounded-xl border border-[#1E2D45] border-l-4 border-l-[#10B981] bg-[#111827] p-6 transition hover:bg-[#1A2236]">
-      <h3 className="mb-4 text-xs font-semibold uppercase tracking-wide text-[#10B981]">
-        THIS WEEK&apos;S ACTIONS
-      </h3>
-      <ul className="space-y-1">
+    <section
+      id={id}
+      className={`rounded-xl border border-border-default border-l-4 border-l-brand bg-surface p-4 sm:p-5 ${className}`}
+      aria-label="Insight action checklist"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-brand">
+            This week&apos;s actions
+          </p>
+          <p className="mt-1 text-sm font-semibold text-fg">
+            {completed === total ? (
+              <span className="text-brand-soft">All {total} actions complete</span>
+            ) : (
+              <>
+                {completed} of {total} complete
+              </>
+            )}
+          </p>
+        </div>
+        <span className="font-mono text-xs tabular-nums text-fg-muted">{progressPercent}%</span>
+      </div>
+
+      <div
+        className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-elevated"
+        role="progressbar"
+        aria-valuenow={progressPercent}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={`${completed} of ${total} insight actions complete`}
+      >
+        <div
+          className="h-full rounded-full bg-brand transition-all duration-300"
+          style={{ width: `${progressPercent}%` }}
+        />
+      </div>
+
+      <ul className="mt-4 space-y-1">
         {localActions.map((action) => (
-          <li key={action.id} className="flex items-center gap-3 rounded-lg px-2 py-2 transition hover:bg-[#1A2236]/60">
+          <li
+            key={action.id}
+            className="flex items-center gap-3 rounded-lg px-2 py-2 transition hover:bg-surface-elevated/60"
+          >
             <button
               type="button"
               onClick={() => handleToggle(action.id, action.completed)}
@@ -99,13 +139,13 @@ function ActionChecklist({ actions, onUpdate }) {
               aria-pressed={action.completed}
               className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border-2 transition ${
                 action.completed
-                  ? 'border-[#10B981] bg-[#10B981]'
-                  : 'border-[#1E2D45] bg-transparent'
+                  ? 'border-brand bg-brand'
+                  : 'border-border-default bg-transparent'
               }`}
             >
               {action.completed && (
                 <svg
-                  className="h-3 w-3 text-white"
+                  className="h-3 w-3 text-fg"
                   viewBox="0 0 20 20"
                   fill="currentColor"
                   aria-hidden="true"
@@ -120,9 +160,7 @@ function ActionChecklist({ actions, onUpdate }) {
             </button>
             <span
               className={`text-sm transition ${
-                action.completed
-                  ? 'text-[#6B7280] line-through'
-                  : 'text-[#F9FAFB]'
+                action.completed ? 'text-fg-subtle line-through' : 'text-fg'
               }`}
             >
               {action.description}

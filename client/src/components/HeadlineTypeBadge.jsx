@@ -1,23 +1,23 @@
 const BADGE_VARIANTS = {
   warning: {
     label: 'Needs attention',
-    className: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
+    className: 'border-warning/30 bg-warning/10 text-warning',
   },
   positive: {
     label: 'Good news',
-    className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+    className: 'border-brand/30 bg-brand/10 text-brand-soft',
   },
   improvement: {
     label: 'Improvement',
-    className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+    className: 'border-brand/30 bg-brand/10 text-brand-soft',
   },
   spike: {
     label: 'Spending spike',
-    className: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
+    className: 'border-warning/30 bg-warning/10 text-warning',
   },
   insight: {
     label: 'Insight',
-    className: 'border-[#374151] bg-[#1A2236] text-[#9CA3AF]',
+    className: 'border-border-default bg-surface-elevated text-fg-muted',
   },
 }
 

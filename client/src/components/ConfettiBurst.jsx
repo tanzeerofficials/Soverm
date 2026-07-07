@@ -7,6 +7,7 @@
 
 import { useEffect, useMemo } from 'react'
 
+// Palette mirrors @theme tokens in index.css (inline styles need hex).
 const CONFETTI_COLORS = ['#10b981', '#8b5cf6', '#34d399', '#c4b5fd', '#f59e0b']
 
 function ConfettiBurst({ active, durationMs = 2600, onComplete }) {

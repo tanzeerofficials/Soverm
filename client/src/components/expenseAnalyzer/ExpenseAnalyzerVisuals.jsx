@@ -26,7 +26,7 @@ function VisualLegend({ slices, activeKey, onHover, formatAmount, variant = 'spl
             <button
               type="button"
               className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition ${
-                isActive ? 'bg-[#1A2236]' : 'hover:bg-[#1A2236]/60'
+                isActive ? 'bg-surface-elevated' : 'hover:bg-surface-elevated/60'
               } ${isDimmed ? 'opacity-50' : ''}`}
               onMouseEnter={() => onHover(slice.key)}
               onMouseLeave={() => onHover(null)}
@@ -42,24 +42,24 @@ function VisualLegend({ slices, activeKey, onHover, formatAmount, variant = 'spl
               {variant === 'combined' ? (
                 <>
                   <div className="min-w-0 flex-1">
-                    <span className="text-sm font-semibold text-[#F9FAFB]">{label}</span>
-                    <span className="ml-2 font-mono text-sm font-semibold tabular-nums text-[#F9FAFB]">
+                    <span className="text-sm font-semibold text-fg">{label}</span>
+                    <span className="ml-2 font-mono text-sm font-semibold tabular-nums text-fg">
                       {formatAmount(slice.amount)}
                     </span>
                   </div>
-                  <span className="shrink-0 text-xs tabular-nums text-[#9CA3AF]">
+                  <span className="shrink-0 text-xs tabular-nums text-fg-muted">
                     {formatPercent(slice.percent)}
                   </span>
                 </>
               ) : (
                 <>
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-[#F9FAFB]">
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-fg">
                     {label}
                   </span>
-                  <span className="shrink-0 font-mono text-sm font-semibold tabular-nums text-[#F9FAFB]">
+                  <span className="shrink-0 font-mono text-sm font-semibold tabular-nums text-fg">
                     {formatAmount(slice.amount)}
                   </span>
-                  <span className="w-12 shrink-0 text-right text-xs tabular-nums text-[#9CA3AF]">
+                  <span className="w-12 shrink-0 text-right text-xs tabular-nums text-fg-muted">
                     {formatPercent(slice.percent)}
                   </span>
                 </>
@@ -96,11 +96,11 @@ function VisualBlock({
       {showHeader && (title || subtitle) && (
         <div className="mb-4">
           {title && (
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#9CA3AF]">
+            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-fg-muted">
               {title}
             </p>
           )}
-          {subtitle && <p className="mt-1 text-sm text-[#6B7280]">{subtitle}</p>}
+          {subtitle && <p className="mt-1 text-sm text-fg-subtle">{subtitle}</p>}
         </div>
       )}
 
@@ -150,22 +150,22 @@ function ExpenseAnalyzerVisuals({
   return (
     <section
       aria-label="Spending visuals"
-      className="relative overflow-hidden rounded-2xl border border-[#1E2D45] bg-[#111827]"
+      className="relative overflow-hidden rounded-2xl border border-border-default bg-surface"
     >
       <div
-        className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-[#8B5CF6]/10 blur-3xl"
+        className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-ai/10 blur-3xl"
         aria-hidden="true"
       />
       <div
-        className="pointer-events-none absolute -bottom-20 -left-12 h-48 w-48 rounded-full bg-[#10B981]/5 blur-3xl"
+        className="pointer-events-none absolute -bottom-20 -left-12 h-48 w-48 rounded-full bg-brand/5 blur-3xl"
         aria-hidden="true"
       />
 
       <div className="relative p-5 sm:p-7">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold text-[#F9FAFB]">Your spending at a glance</h2>
-            <p className="mt-1 text-sm text-[#9CA3AF]">Last 30 days · by category</p>
+            <h2 className="text-lg font-semibold text-fg">Your spending at a glance</h2>
+            <p className="mt-1 text-sm text-fg-muted">Last 30 days · by category</p>
           </div>
 
           {overallSpending?.delta && (
@@ -185,7 +185,7 @@ function ExpenseAnalyzerVisuals({
         </div>
 
         {showRecurring && (
-          <div className="mt-8 border-t border-[#1E2D45] pt-7">
+          <div className="mt-8 border-t border-border-default pt-7">
             <VisualBlock
               title="Recurring footprint"
               subtitle={`${formatCurrency(totalRecurringMonthly || recurring.total)}/mo across subscriptions`}

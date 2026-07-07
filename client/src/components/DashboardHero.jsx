@@ -4,6 +4,7 @@ import { useAnimatedNumber } from '../hooks/useAnimatedNumber.js'
 import { fillSpendingSeries } from '../lib/spendingSparkline.js'
 import CashFlowSummary from './CashFlowSummary.jsx'
 import SpendingSparkline from './SpendingSparkline.jsx'
+import HowCalculatedDisclosure from './HowCalculatedDisclosure.jsx'
 
 const RANGE_OPTIONS = [
   { value: '7d', label: '7D' },
@@ -35,16 +36,25 @@ function DashboardHero({
   income = 0,
   spent = 0,
   spendingSeries = [],
+  trackerSnapshot = null,
 }) {
   const animatedBalance = useAnimatedNumber(totalBalance)
+  const animatedSafeToSpend = useAnimatedNumber(trackerSnapshot?.safeToSpend ?? 0)
   const filledSpendingSeries = useMemo(
     () => fillSpendingSeries(spendingSeries, selectedRange),
     [spendingSeries, selectedRange]
   )
+  const hasSpendingTracker =
+    trackerSnapshot?.spendingTracker != null || trackerSnapshot?.configured === true
+  const spendingProgress = trackerSnapshot?.spendingTracker?.progress ?? null
+  const primarySaving = trackerSnapshot?.savingTrackers?.[0]
 
   if (!hasAccounts) {
     return (
-      <section className="relative overflow-hidden rounded-2xl border border-border-default bg-gradient-to-b from-[#131B2E]/90 via-surface to-app px-6 py-10 text-center sm:px-10 sm:py-12">
+      <section
+        id="dashboard-hero"
+        className="relative overflow-hidden rounded-2xl border border-border-default bg-gradient-to-b from-surface-deep/90 via-surface to-app px-6 py-10 text-center sm:px-10 sm:py-12"
+      >
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(16,185,129,0.1),transparent_65%)]" />
         <div className="relative">
           <p className="text-xs font-medium uppercase tracking-[0.28em] text-emerald-400">Step 1</p>
@@ -61,18 +71,79 @@ function DashboardHero({
   }
 
   return (
-    <section className="relative overflow-hidden rounded-2xl border border-border-default bg-gradient-to-b from-[#131B2E]/90 via-surface to-app px-6 py-10 text-center shadow-[0_12px_40px_rgba(0,0,0,0.25)] sm:px-10 sm:py-12">
+    <section
+      id="dashboard-hero"
+      className="relative overflow-hidden rounded-2xl border border-border-default bg-gradient-to-b from-surface-deep/90 via-surface to-app px-6 py-10 text-center shadow-[0_12px_40px_rgba(0,0,0,0.25)] sm:px-10 sm:py-12"
+    >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(16,185,129,0.14),transparent_60%)]" />
       <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-ai/10 blur-3xl" />
 
       <div className="relative">
-        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-fg-muted">
-          Total balance
-        </p>
-
-        <p className="mt-4 font-mono text-4xl font-light tabular-nums tracking-tight text-fg sm:text-6xl md:text-7xl">
-          {formatCurrency(animatedBalance)}
-        </p>
+        {hasSpendingTracker ? (
+          <>
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-fg-muted">
+              Safe to spend
+            </p>
+            <p
+              className={`mt-4 font-mono text-4xl font-light tabular-nums tracking-tight sm:text-6xl md:text-7xl ${
+                trackerSnapshot?.isOverBudget || spendingProgress?.isOver ? 'text-danger' : 'text-brand-soft'
+              }`}
+            >
+              {formatCurrency(animatedSafeToSpend)}
+            </p>
+            <p className="mt-3 text-sm text-fg-muted">
+              {trackerSnapshot?.isOverBudget || spendingProgress?.isOver
+                ? `Over spending cap by ${formatCurrency(trackerSnapshot?.overBudgetBy ?? spendingProgress?.overBy)} · ${trackerSnapshot?.periodLabel}`
+                : `${formatCurrency(trackerSnapshot?.spentThisMonth)} of ${formatCurrency(trackerSnapshot?.monthlyBudget)} spent · ${trackerSnapshot?.periodLabel}`}
+            </p>
+            {primarySaving && (
+              <p className="mt-1 text-xs text-fg-subtle">
+                Saving tracker: {formatCurrency(primarySaving.progress?.saved ?? 0)} of{' '}
+                {formatCurrency(primarySaving.monthlyAmount)} this month
+              </p>
+            )}
+            <div className="mx-auto mt-4 max-w-md">
+              <div className="h-1.5 overflow-hidden rounded-full bg-surface-elevated">
+                <div
+                  className={`h-full rounded-full ${
+                    trackerSnapshot?.isOverBudget || spendingProgress?.isOver
+                      ? 'bg-danger'
+                      : (trackerSnapshot?.percentUsed ?? spendingProgress?.percentUsed ?? 0) >= 80
+                        ? 'bg-warning'
+                        : 'bg-brand'
+                  }`}
+                  style={{
+                    width: `${Math.min(trackerSnapshot?.percentUsed ?? spendingProgress?.percentUsed ?? 0, 100)}%`,
+                  }}
+                />
+              </div>
+            </div>
+            <p className="mt-4 text-xs text-fg-subtle">
+              Total balance {formatCurrency(totalBalance)}
+              {trackerSnapshot?.accountCount > 0
+                ? ` · ${trackerSnapshot.accountCount} connected account${trackerSnapshot.accountCount === 1 ? '' : 's'}`
+                : ''}
+            </p>
+            <HowCalculatedDisclosure
+              title="How spending tracking works"
+              items={[
+                'Compares outflows from connected accounts this calendar month against your spending cap.',
+                'Safe to spend is what is left of that cap, capped by your net account balance.',
+                'Saving trackers are tracked separately in Quick tools → Tracker.',
+                'Pending transactions are excluded until they post.',
+              ]}
+            />
+          </>
+        ) : (
+          <>
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-fg-muted">
+              Total balance
+            </p>
+            <p className="mt-4 font-mono text-4xl font-light tabular-nums tracking-tight text-fg sm:text-6xl md:text-7xl">
+              {formatCurrency(animatedBalance)}
+            </p>
+          </>
+        )}
 
         {lastSyncedAt && (
           <>

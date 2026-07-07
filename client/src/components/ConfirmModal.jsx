@@ -47,7 +47,7 @@ function ConfirmModal({
       role="presentation"
     >
       <div
-        className="w-full max-w-sm rounded-xl border border-[#1E2D45] bg-[#111827] p-6"
+        className="w-full max-w-sm rounded-xl border border-border-default bg-surface p-6"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -56,14 +56,14 @@ function ConfirmModal({
       >
         <h2
           id="confirm-modal-title"
-          className="mb-2 text-lg font-semibold text-[#F9FAFB]"
+          className="mb-2 text-lg font-semibold text-fg"
         >
           {title}
         </h2>
 
         <p
           id="confirm-modal-message"
-          className="mb-4 text-sm leading-relaxed text-[#9CA3AF]"
+          className="mb-4 text-sm leading-relaxed text-fg-muted"
         >
           {message}
         </p>
@@ -72,9 +72,9 @@ function ConfirmModal({
           <div className="mb-6">
             <label
               htmlFor="confirm-modal-phrase"
-              className="mb-2 block text-xs text-[#9CA3AF]"
+              className="mb-2 block text-xs text-fg-muted"
             >
-              Type <span className="font-mono text-[#F9FAFB]">{confirmationPhrase}</span>{' '}
+              Type <span className="font-mono text-fg">{confirmationPhrase}</span>{' '}
               to confirm
             </label>
             <input
@@ -83,7 +83,7 @@ function ConfirmModal({
               value={typedPhrase}
               onChange={(event) => setTypedPhrase(event.target.value)}
               autoComplete="off"
-              className="w-full min-h-11 rounded-lg border border-[#1E2D45] bg-[#0A0F1C] px-3 py-2 text-base text-[#F9FAFB] focus:border-red-500 focus:outline-none"
+              className="w-full min-h-11 rounded-lg border border-border-default bg-app px-3 py-2 text-base text-fg focus:border-danger focus:outline-none"
             />
           </div>
         )}
@@ -92,7 +92,7 @@ function ConfirmModal({
           <button
             type="button"
             onClick={onCancel}
-            className="min-h-11 px-4 py-2 text-sm text-[#9CA3AF] transition hover:text-white"
+            className="min-h-11 px-4 py-2 text-sm text-fg-muted transition hover:text-fg"
           >
             Cancel
           </button>
@@ -100,7 +100,7 @@ function ConfirmModal({
             type="button"
             onClick={onConfirm}
             disabled={!phraseMatches || isConfirming}
-            className="min-h-11 rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+            className="min-h-11 rounded-lg bg-danger px-4 py-2 text-sm font-medium text-fg transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isConfirming ? 'Deleting…' : confirmLabel}
           </button>

@@ -7,17 +7,23 @@
  */
 
 import { useState } from 'react'
+import { dismissSecurityNote, isSecurityNoteDismissed } from '../lib/dashboardUiPrefs.js'
 
 function SecurityNote() {
-  const [dismissed, setDismissed] = useState(false)
+  const [dismissed, setDismissed] = useState(() => isSecurityNoteDismissed())
 
   if (dismissed) return null
+
+  function handleDismiss() {
+    dismissSecurityNote()
+    setDismissed(true)
+  }
 
   return (
     <div className="relative rounded-xl border border-border-default border-l-4 border-l-brand bg-surface p-4 text-sm">
       <button
         type="button"
-        onClick={() => setDismissed(true)}
+        onClick={handleDismiss}
         className="absolute right-3 top-3 text-xs text-fg-muted transition hover:text-fg"
       >
         Got it

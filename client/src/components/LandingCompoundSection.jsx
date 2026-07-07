@@ -48,13 +48,13 @@ function LandingCompoundSection() {
   return (
     <section className="mx-auto mt-24 max-w-4xl" aria-labelledby="compound-heading">
       <div className="text-center">
-        <p className="text-sm font-medium uppercase tracking-wide text-emerald-500">
+        <p className="text-sm font-medium uppercase tracking-wide text-brand">
           Built to compound
         </p>
-        <h2 id="compound-heading" className="mt-2 text-2xl font-bold text-[#F9FAFB] sm:text-3xl">
+        <h2 id="compound-heading" className="mt-2 text-2xl font-bold text-fg sm:text-3xl">
           Most apps show you data. Soverm builds your financial story.
         </h2>
-        <p className="mx-auto mt-3 max-w-xl text-sm text-[#9CA3AF]">
+        <p className="mx-auto mt-3 max-w-xl text-sm text-fg-muted">
           The longer you use it, the more it knows — and the sharper the advice gets.
         </p>
       </div>
@@ -63,20 +63,20 @@ function LandingCompoundSection() {
         {TIMELINE.map(({ phase, title, body, icon }) => (
           <article
             key={phase}
-            className="flex flex-col rounded-xl border border-[#1E2D45] bg-[#111827] p-6 text-left"
+            className="flex flex-col rounded-xl border border-border-default bg-surface p-6 text-left transition hover:border-border-hover hover:bg-surface-elevated/40"
           >
             <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-emerald-500/40 bg-emerald-500/10 text-emerald-400">
+              <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-brand/40 bg-brand/10 text-brand-soft">
                 <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                   {icon}
                 </svg>
               </span>
-              <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400">
+              <span className="text-xs font-semibold uppercase tracking-wider text-brand-soft">
                 {phase}
               </span>
             </div>
-            <h3 className="mt-4 font-semibold text-[#F9FAFB]">{title}</h3>
-            <p className="mt-2 text-sm leading-relaxed text-[#9CA3AF]">{body}</p>
+            <h3 className="mt-4 font-semibold text-fg">{title}</h3>
+            <p className="mt-2 text-sm leading-relaxed text-fg-muted">{body}</p>
           </article>
         ))}
       </div>

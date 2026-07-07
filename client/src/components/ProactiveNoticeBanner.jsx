@@ -12,6 +12,7 @@ import {
   markNotificationRead,
 } from '../lib/fetchNotifications.js'
 import { notificationsQueryKey } from '../lib/queryKeys.js'
+import { navigateToNotification } from '../lib/notificationNavigation.js'
 
 function ProactiveNoticeBanner() {
   const { getToken } = useAuth()
@@ -39,33 +40,38 @@ function ProactiveNoticeBanner() {
   }
 
   async function handleOpen() {
-    await markReadMutation.mutateAsync(latest.id)
-    navigate(latest.related_data?.link || '/expense-analyzer')
+    try {
+      await markReadMutation.mutateAsync(latest.id)
+    } catch {
+      // Navigate even if marking read fails
+    }
+
+    navigateToNotification(navigate, latest)
   }
 
   return (
     <section
-      className="mb-6 rounded-xl border border-[#8B5CF6]/30 bg-[#8B5CF6]/10 px-4 py-4 sm:px-5"
+      className="mb-6 rounded-xl border border-ai/30 bg-ai/10 px-4 py-4 sm:px-5"
       aria-label="Soverm noticed something"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-[#C4B5FD]">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-ai-soft">
             Soverm noticed something
           </p>
-          <p className="mt-1 text-sm font-semibold text-[#F9FAFB]">{latest.title}</p>
-          <p className="mt-1 text-sm leading-relaxed text-[#D1D5DB]">{latest.body}</p>
+          <p className="mt-1 text-sm font-semibold text-fg">{latest.title}</p>
+          <p className="mt-1 text-sm leading-relaxed text-fg-muted">{latest.body}</p>
         </div>
         <button
           type="button"
           onClick={handleOpen}
-          className="shrink-0 rounded-lg bg-[#8B5CF6] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#7C3AED]"
+          className="shrink-0 rounded-lg bg-ai px-4 py-2 text-sm font-medium text-white transition hover:brightness-110"
         >
           View details
         </button>
       </div>
       {unread.length > 1 && (
-        <p className="mt-3 text-xs text-[#9CA3AF]">
+        <p className="mt-3 text-xs text-fg-muted">
           +{unread.length - 1} more unread — open the bell icon in the header
         </p>
       )}
