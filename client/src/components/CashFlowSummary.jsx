@@ -29,18 +29,27 @@ function CashFlowSummary({ income = 0, spent = 0, rangeLabel }) {
         <p className="text-[11px] text-fg-subtle">{rangeLabel}</p>
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-3 sm:gap-4">
-        <div className="rounded-lg border border-brand/20 bg-brand/5 px-3 py-3 text-left sm:px-4">
+      <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-4">
+        <div className="min-w-0 rounded-lg border border-brand/20 bg-brand/5 px-2 py-2.5 text-center sm:px-4 sm:py-3">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-brand-soft">
             Income
           </p>
-          <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-brand-soft sm:text-xl">
+          <p className="mt-1 font-mono text-sm font-semibold tabular-nums leading-tight text-brand-soft sm:text-xl">
             {formatCurrency(income)}
           </p>
         </div>
 
+        <div className="min-w-0 rounded-lg border border-danger/20 bg-danger/5 px-2 py-2.5 text-center sm:px-4 sm:py-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-danger/90">
+            Spend
+          </p>
+          <p className="mt-1 font-mono text-sm font-semibold tabular-nums leading-tight text-danger sm:text-xl">
+            {formatCurrency(spent)}
+          </p>
+        </div>
+
         <div
-          className={`rounded-lg border px-3 py-3 text-center sm:px-4 ${
+          className={`min-w-0 rounded-lg border px-2 py-2.5 text-center sm:px-4 sm:py-3 ${
             netIsPositive
               ? 'border-brand/25 bg-brand/5'
               : 'border-danger/25 bg-danger/5'
@@ -50,21 +59,12 @@ function CashFlowSummary({ income = 0, spent = 0, rangeLabel }) {
             Net
           </p>
           <p
-            className={`mt-1 font-mono text-lg font-semibold tabular-nums sm:text-xl ${
+            className={`mt-1 font-mono text-sm font-semibold tabular-nums leading-tight sm:text-xl ${
               netIsPositive ? 'text-brand-soft' : 'text-danger'
             }`}
           >
             {netIsPositive ? '+' : '−'}
             {formatCurrency(Math.abs(net))}
-          </p>
-        </div>
-
-        <div className="rounded-lg border border-danger/20 bg-danger/5 px-3 py-3 text-right sm:px-4">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-danger/90">
-            Spent
-          </p>
-          <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-danger sm:text-xl">
-            {formatCurrency(spent)}
           </p>
         </div>
       </div>
