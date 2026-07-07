@@ -79,7 +79,7 @@ export function detectLargeTransactionTriggers({ recentTransactions = [] }) {
         date: row.date,
         accountLabel: row.account_name || row.bank_name || null,
         averageTransactionAmount: roundCurrency(averageAmount),
-        link: '/expense-analyzer',
+        link: '/expense-analyzer?tab=overview',
       },
       facts: {
         merchant: row.name,
@@ -117,7 +117,7 @@ export function detectLowBalanceTrigger({ accounts = [], monthOverMonth = null }
         runwayDays,
         dailyBurn: roundCurrency(dailyBurn),
         monthlySpend: roundCurrency(monthlySpend),
-        link: '/dashboard',
+        link: '/dashboard?focus=balance',
       },
       facts: {
         netBalance,
@@ -164,7 +164,7 @@ export function detectNewRecurringChargeTriggers({
         category: charge.category,
         source: charge.source,
         confidence: charge.confidence,
-        link: '/expense-analyzer',
+        link: '/expense-analyzer?tab=recurring',
       },
       facts: {
         merchant: charge.merchant,
@@ -202,7 +202,7 @@ export function detectSpendingSpikeTriggers({ categoryBreakdown = [] }) {
         currentTotal: entry.currentTotal,
         priorTotal: entry.priorTotal,
         percent: delta.percent,
-        link: '/expense-analyzer',
+        link: '/expense-analyzer?tab=categories',
       },
       facts: {
         category: categoryKey,

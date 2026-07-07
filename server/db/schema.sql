@@ -6,6 +6,7 @@ CREATE TABLE users (
   name TEXT NOT NULL,
   subscription_tier TEXT NOT NULL DEFAULT 'free' CHECK (subscription_tier IN ('free', 'pro')),
   proactive_notifications_enabled BOOLEAN NOT NULL DEFAULT true,
+  monthly_budget NUMERIC(12, 2),
   created_at TIMESTAMP DEFAULT NOW()
 );
 
