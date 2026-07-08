@@ -46,7 +46,7 @@ function DashboardOnboarding({
     currentStep === 1
       ? 'This is the only step you need right now — Soverm can’t read your finances until a bank is linked.'
       : currentStep === 3
-        ? 'Your accounts are synced. Hit Generate Summary below to see what Soverm finds.'
+        ? 'Your accounts are synced. Hit Generate Insights to see what Soverm finds.'
         : 'Follow these steps to see your first personalized financial insight.'
 
   if (collapsed) {

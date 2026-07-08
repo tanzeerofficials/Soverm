@@ -8,7 +8,13 @@
 import { useState } from 'react'
 import { useAuth } from '@clerk/clerk-react'
 import { useQueryClient } from '@tanstack/react-query'
-import { dashboardQueryKey } from '../lib/queryKeys.js'
+import {
+  dashboardQueryKey,
+  expenseAnalyzerQueryKey,
+  expenseAnalyzerSummaryQueryKey,
+  notificationsQueryKey,
+  trackerQueryKey,
+} from '../lib/queryKeys.js'
 import { syncTransactions } from '../lib/syncTransactions.js'
 
 function SyncTransactionsButton({ className = '', showToast }) {
@@ -26,7 +32,13 @@ function SyncTransactionsButton({ className = '', showToast }) {
         `Synced ${data.added} new, ${data.modified} updated, ${data.removed} removed`,
         'success'
       )
-      await queryClient.invalidateQueries({ queryKey: dashboardQueryKey })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: dashboardQueryKey }),
+        queryClient.invalidateQueries({ queryKey: trackerQueryKey }),
+        queryClient.invalidateQueries({ queryKey: expenseAnalyzerQueryKey }),
+        queryClient.invalidateQueries({ queryKey: expenseAnalyzerSummaryQueryKey }),
+        queryClient.invalidateQueries({ queryKey: notificationsQueryKey }),
+      ])
     } catch (err) {
       console.error('Sync failed:', err.message)
       showToast?.('Sync failed — please try again', 'error')

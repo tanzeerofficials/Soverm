@@ -55,6 +55,17 @@ const setupItems = buildAttentionItems({
 })
 assert(setupItems.some((item) => item.id === 'connect-bank'), 'prompts bank connect')
 
+const firstInsightItems = buildAttentionItems({
+  hasAccounts: true,
+  hasInsight: false,
+  highlightGenerate: true,
+  lastSyncedAt: hoursAgo(1),
+  incompleteActionCount: 0,
+})
+const firstInsight = firstInsightItems.find((item) => item.id === 'first-insight')
+assert(firstInsight?.tab === 'insight', 'first insight points to insight tab')
+assert(firstInsight?.scrollTo === 'generate-insight-action-insight', 'first insight scroll target')
+
 assert(hoursSinceSync(hoursAgo(2)) >= 2, 'hours since sync')
 assert(daysSince(daysAgo(3)) >= 3, 'days since insight')
 

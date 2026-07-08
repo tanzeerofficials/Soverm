@@ -12,6 +12,7 @@ import { loadChatFinancialContext, loadInsightActionsForChat } from '../utils/ch
 import { chatRateLimitMiddleware } from '../utils/rateLimit.js'
 import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
 import { reportServerError } from '../utils/sentry.js'
+import { validateChatMessage, validateUuidParam } from '../utils/validation.js'
 
 const router = Router()
 
@@ -20,8 +21,22 @@ router.use(requireAuth())
 router.get('/:insightId', async (req, res) => {
   const { userId } = getAuth(req)
 
+  const idCheck = validateUuidParam(req.params.insightId, 'insightId')
+  if (idCheck.error) {
+    return res.status(400).json({ error: idCheck.error })
+  }
+
   try {
     const { insightId } = req.params
+
+    const insightResult = await db.query(
+      `SELECT id FROM insights WHERE id = $1 AND user_id = $2`,
+      [insightId, userId]
+    )
+
+    if (insightResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Insight not found' })
+    }
 
     const messagesResult = await db.query(
       `SELECT role, content, created_at
@@ -41,15 +56,19 @@ router.get('/:insightId', async (req, res) => {
 router.post('/:insightId', chatRateLimitMiddleware(), async (req, res) => {
   const { userId } = getAuth(req)
 
+  const idCheck = validateUuidParam(req.params.insightId, 'insightId')
+  if (idCheck.error) {
+    return res.status(400).json({ error: idCheck.error })
+  }
+
+  const messageCheck = validateChatMessage(req.body?.message)
+  if (messageCheck.error) {
+    return res.status(400).json({ error: messageCheck.error })
+  }
+
   try {
     const { insightId } = req.params
-    const { message } = req.body
-
-    if (!message || typeof message !== 'string' || !message.trim()) {
-      return res.status(400).json({ error: 'Message is required' })
-    }
-
-    const trimmedMessage = message.trim()
+    const trimmedMessage = messageCheck.value
 
     const [insightResult, historyResult, chatFinancialContext, insightActionsResult] =
       await Promise.all([

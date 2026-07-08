@@ -104,10 +104,10 @@ export function buildAttentionItems({
       id: 'first-insight',
       tone: 'brand',
       title: 'Ready for your first insight',
-      detail: 'Your accounts are synced — tap Generate Summary below to see what Soverm finds.',
-      actionLabel: 'Generate insight',
-      tab: 'overview',
-      scrollTo: 'generate-insight-action',
+      detail: 'Your accounts are synced — tap Generate Insights on the Insight tab to see what Soverm finds.',
+      actionLabel: 'Generate Insights',
+      tab: 'insight',
+      scrollTo: 'generate-insight-action-insight',
     })
   }
 

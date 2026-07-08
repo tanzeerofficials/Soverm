@@ -1,7 +1,8 @@
 /*
  * DASHBOARD ACTIONS SECTION
  *
- * Connect, sync, and generate — sits above connected account cards on Overview.
+ * Connect, sync, and optionally generate — Overview shows connect + sync;
+ * Insight tab adds generate.
  */
 
 import ConnectBankButton from './ConnectBankButton.jsx'
@@ -16,32 +17,42 @@ function DashboardActionsSection({
   onInsightLoadingChange,
   onLimitReached,
   onUsageUpdated,
+  showConnectBank = true,
+  showGenerateInsight = true,
+  sectionId = 'dashboard-actions',
+  generateActionId = 'generate-insight-action',
+  insightLoading = false,
 }) {
   return (
-    <section id="dashboard-actions" aria-label="Dashboard actions">
+    <section id={sectionId} aria-label="Dashboard actions">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
-        <div className="w-full sm:flex-1">
-          <ConnectBankButton
-            className="w-full"
-            highlighted={highlightedConnect}
-            showSecurityNote={false}
-          />
-        </div>
+        {showConnectBank && (
+          <div className="w-full sm:flex-1">
+            <ConnectBankButton
+              className="w-full"
+              highlighted={highlightedConnect}
+              showSecurityNote={false}
+            />
+          </div>
+        )}
         <div className="w-full sm:flex-1">
           <SyncTransactionsButton className="w-full" showToast={showToast} />
         </div>
-        <div id="generate-insight-action" className="w-full sm:flex-1">
-          <GenerateInsightButton
-            className="w-full"
-            showCard={false}
-            showToast={showToast}
-            highlighted={highlightedGenerate}
-            onError={onInsightError}
-            onLoadingChange={onInsightLoadingChange}
-            onLimitReached={onLimitReached}
-            onUsageUpdated={onUsageUpdated}
-          />
-        </div>
+        {showGenerateInsight && (
+          <div id={generateActionId} className="w-full sm:flex-1">
+            <GenerateInsightButton
+              className="w-full"
+              showCard={false}
+              showToast={showToast}
+              highlighted={highlightedGenerate}
+              isLoading={insightLoading}
+              onError={onInsightError}
+              onLoadingChange={onInsightLoadingChange}
+              onLimitReached={onLimitReached}
+              onUsageUpdated={onUsageUpdated}
+            />
+          </div>
+        )}
       </div>
     </section>
   )

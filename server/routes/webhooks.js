@@ -57,7 +57,7 @@ router.post('/clerk', async (req, res) => {
   const svixSignature = req.headers['svix-signature']
 
   if (!svixId || !svixTimestamp || !svixSignature) {
-    return res.status(400).send('Webhook verification failed')
+    return res.status(401).send('Webhook verification failed')
   }
 
   let event
@@ -70,7 +70,7 @@ router.post('/clerk', async (req, res) => {
     })
   } catch (err) {
     reportServerError('to verify Clerk webhook', err, { req })
-    return res.status(400).send('Webhook verification failed')
+    return res.status(401).send('Webhook verification failed')
   }
 
   if (event.type === 'user.created') {

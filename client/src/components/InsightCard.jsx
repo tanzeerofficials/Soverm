@@ -67,8 +67,8 @@ function InsightCard({
     return (
       <div className="rounded-xl border border-border-default bg-surface px-6 py-10 text-center">
         <p className="text-sm leading-relaxed text-fg-muted">
-          No insight generated yet. Go to Overview, connect your bank if needed, then tap
-          Generate Summary.
+          No insight generated yet. Go to the Insight tab, sync your accounts if needed, then tap
+          Generate Insights.
         </p>
       </div>
     )

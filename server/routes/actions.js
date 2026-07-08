@@ -5,12 +5,15 @@
  */
 
 import { Router } from 'express'
-import { getAuth } from '@clerk/express'
+import { getAuth, requireAuth } from '@clerk/express'
 import db from '../db/index.js'
 import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
 import { reportServerError } from '../utils/sentry.js'
+import { validateBooleanField, validateUuidParam } from '../utils/validation.js'
 
 const router = Router()
+
+router.use(requireAuth())
 
 /*
  * GET /api/actions
@@ -23,9 +26,6 @@ const router = Router()
  */
 router.get('/', async (req, res) => {
   const { userId } = getAuth(req)
-  if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized' })
-  }
 
   try {
     const result = await db.query(
@@ -55,18 +55,28 @@ router.get('/', async (req, res) => {
  */
 router.patch('/:id', async (req, res) => {
   const { userId } = getAuth(req)
-  if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized' })
+
+  const idCheck = validateUuidParam(req.params.id, 'action id')
+  if (idCheck.error) {
+    return res.status(400).json({ error: idCheck.error })
+  }
+
+  const completedCheck = validateBooleanField(req.body?.completed, 'completed')
+  if (completedCheck.error) {
+    return res.status(400).json({ error: completedCheck.error })
   }
 
   try {
-    const { completed } = req.body
-
-    await db.query(
+    const result = await db.query(
       `UPDATE actions SET completed = $1
-       WHERE id = $2 AND user_id = $3`,
-      [completed, req.params.id, userId]
+       WHERE id = $2 AND user_id = $3
+       RETURNING id`,
+      [completedCheck.value, req.params.id, userId]
     )
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Action not found' })
+    }
 
     res.json({ success: true })
   } catch (err) {

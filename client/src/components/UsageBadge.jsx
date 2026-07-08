@@ -24,9 +24,10 @@ function UsageBadge({ usage }) {
               : 'border-border-default bg-surface-elevated text-fg-subtle'
           }`}
         >
+          Soverm Free Tier
           {remainingToday > 0
-            ? `${remainingToday} of ${limit} free insight${limit === 1 ? '' : 's'} left today`
-            : "Today's free insight used"}
+            ? ` · ${remainingToday} of ${limit} insight${limit === 1 ? '' : 's'} left today`
+            : " · Today's free insight used"}
         </span>
       )}
     </div>

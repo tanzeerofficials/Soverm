@@ -17,6 +17,7 @@ import {
   loadOrGeneratePersonalNarrative,
 } from '../services/expenseAnalyzerNarrative.js'
 import { reportServerError } from '../utils/sentry.js'
+import { narrativeRateLimiter } from '../middleware/security.js'
 
 const router = Router()
 
@@ -89,7 +90,7 @@ router.get('/narrative', async (req, res) => {
  * Returns cached narrative or generates a new personalized summary via Claude.
  * Validates all dollar amounts against the structured brief before responding.
  */
-router.post('/narrative', async (req, res) => {
+router.post('/narrative', narrativeRateLimiter, async (req, res) => {
   const { userId } = getAuth(req)
 
   try {

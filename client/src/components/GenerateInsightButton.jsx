@@ -25,16 +25,18 @@ function GenerateInsightButton({
   onLimitReached,
   onUsageUpdated,
   highlighted = false,
+  isLoading: isLoadingProp = false,
 }) {
   const { getToken } = useAuth()
   const queryClient = useQueryClient()
-  const [loading, setLoading] = useState(false)
+  const [internalLoading, setInternalLoading] = useState(false)
   const [insight, setInsight] = useState(null)
   const [error, setError] = useState(null)
+  const loading = isLoadingProp || internalLoading
 
   async function handleGenerate() {
     trackGenerateInsightClick()
-    setLoading(true)
+    setInternalLoading(true)
     onLoadingChange?.(true)
     setError(null)
     onLimitReached?.(false)
@@ -83,7 +85,7 @@ function GenerateInsightButton({
       onError?.(null)
       onUsageUpdated?.(data.usage)
       trackGenerateInsightResult('success')
-      showToast?.('Financial summary generated', 'success')
+      showToast?.('Insight generated', 'success')
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: dashboardQueryKey }),
         queryClient.invalidateQueries({ queryKey: historyQueryKey }),
@@ -97,7 +99,7 @@ function GenerateInsightButton({
       setInsight(null)
       showToast?.('Insight generation failed — please try again', 'error')
     } finally {
-      setLoading(false)
+      setInternalLoading(false)
       onLoadingChange?.(false)
     }
   }
@@ -111,7 +113,7 @@ function GenerateInsightButton({
         highlighted && !loading ? 'animate-pulse ring-2 ring-ai/50 ring-offset-2 ring-offset-app' : ''
       } ${className}`}
     >
-      {loading ? 'Generating summary…' : 'Generate Summary'}
+      {loading ? 'Generating insights…' : 'Generate Insights'}
     </button>
   )
 

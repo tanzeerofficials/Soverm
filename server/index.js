@@ -67,9 +67,16 @@ const { default: goalsRouter } = await import('./routes/goals.js')
 const { default: trackersRouter } = await import('./routes/trackers.js')
 const { startSyncJob } = await import('./jobs/syncAllUsers.js')
 const { GENERIC_ERROR_MESSAGE } = await import('./utils/apiErrors.js')
+const { globalRateLimiter, securityHeaders } = await import('./middleware/security.js')
 
 const app = express()
 const port = Number(process.env.PORT) || 5000
+
+// Railway sits behind a reverse proxy — needed for rate limiting by client IP.
+app.set('trust proxy', 1)
+
+app.use(securityHeaders)
+app.use(globalRateLimiter)
 
 // CORS: comma-separated browser origins in ALLOWED_ORIGINS (no wildcards).
 // Include production Vercel URL, preview deployment URLs, and http://localhost:5173 for local dev.
@@ -135,7 +142,7 @@ app.use(
 app.use('/webhooks', express.raw({ type: 'application/json' }), webhooksRouter)
 
 // express.json() turns incoming JSON text into req.body objects we can use.
-app.use(express.json())
+app.use(express.json({ limit: '100kb' }))
 
 // clerkMiddleware checks "is this person logged in?"
 // It can read login info from cookies OR from Authorization: Bearer headers.
@@ -208,6 +215,10 @@ if (process.env.NODE_ENV !== 'production') {
 // Express error middleware (after Sentry.setupExpressErrorHandler).
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err.message)
+  captureServerError(err, {
+    label: 'express_error_handler',
+    path: req?.originalUrl || req?.path,
+  })
   if (res.headersSent) {
     return next(err)
   }

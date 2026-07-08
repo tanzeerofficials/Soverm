@@ -23,7 +23,7 @@ function formatCurrency(amount) {
 function DashboardSpendingSnapshot({ summary, isLoading }) {
   if (isLoading) {
     return (
-      <section className="mt-6 rounded-xl border border-border-default bg-surface p-4 sm:p-5">
+      <section className="rounded-xl border border-border-default bg-surface p-4 sm:p-5">
         <Skeleton className="h-4 w-40" />
         <Skeleton className="mt-4 h-16 w-full" />
         <Skeleton className="mt-3 h-10 w-full" />
@@ -40,8 +40,8 @@ function DashboardSpendingSnapshot({ summary, isLoading }) {
 
   if (!hasContent) {
     return (
-      <section className="mt-6 rounded-xl border border-border-default bg-surface p-4 sm:p-5">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-fg-subtle">
+      <section className="rounded-xl border border-border-default bg-surface p-4 sm:p-5">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-ai-soft">
           Spending snapshot
         </p>
         <p className="mt-3 text-sm text-fg-muted">
@@ -64,10 +64,10 @@ function DashboardSpendingSnapshot({ summary, isLoading }) {
     : null
 
   return (
-    <section className="mt-6 rounded-xl border border-border-default bg-surface p-4 sm:p-5">
+    <section className="rounded-xl border border-border-default bg-surface p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-fg-subtle">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-ai-soft">
             Spending snapshot
           </p>
           <p className="mt-1 text-xs text-fg-muted">Last 30 days vs the prior 30 days</p>

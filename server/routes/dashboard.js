@@ -6,7 +6,7 @@
  */
 
 import { Router } from 'express'
-import { getAuth } from '@clerk/express'
+import { getAuth, requireAuth } from '@clerk/express'
 import db from '../db/index.js'
 import { calculateTotalBalance, getDisplayBalance } from '../utils/balanceHelpers.js'
 import { CONNECTED_ACCOUNT_TRANSACTION_JOINS } from '../utils/connectedAccountTransactions.js'
@@ -16,6 +16,8 @@ import { reportServerError } from '../utils/sentry.js'
 const NON_PENDING_FILTER = 'AND (t.pending IS NOT TRUE)'
 
 const router = Router()
+
+router.use(requireAuth())
 
 function parseLatestInsight(row) {
   let parsedContent
@@ -63,9 +65,6 @@ function resolveRange(rangeParam) {
  */
 router.get('/summary', async (req, res) => {
   const { userId } = getAuth(req)
-  if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized' })
-  }
 
   try {
     const appliedRange = resolveRange(req.query.range)
@@ -151,9 +150,9 @@ router.get('/summary', async (req, res) => {
       const actionsResult = await db.query(
         `SELECT id, description, completed
          FROM actions
-         WHERE insight_id = $1
+         WHERE insight_id = $1 AND user_id = $2
          ORDER BY created_at ASC`,
-        [insightRow.id]
+        [insightRow.id, userId]
       )
 
       latestInsight = {

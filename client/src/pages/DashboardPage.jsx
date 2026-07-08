@@ -334,27 +334,34 @@ function DashboardPage() {
     setFirstConnectCelebration(null)
   }
 
+  function triggerGenerateInsight() {
+    setActiveTab(DASHBOARD_TABS.INSIGHT)
+
+    function tryClick(attempt = 0) {
+      const generateSection = document.getElementById('generate-insight-action-insight')
+      const button = generateSection?.querySelector('button')
+
+      if (button && !button.disabled) {
+        generateSection.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        button.click()
+        return
+      }
+
+      if (attempt < 40) {
+        window.setTimeout(() => tryClick(attempt + 1), 50)
+      }
+    }
+
+    tryClick()
+  }
+
   function handleFreshInsightGenerate() {
-    setActiveTab(DASHBOARD_TABS.OVERVIEW)
-    document.getElementById('generate-insight-action')?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center',
-    })
-    window.setTimeout(() => {
-      document.querySelector('#generate-insight-action button')?.click()
-    }, 450)
+    triggerGenerateInsight()
   }
 
   function handleFirstConnectGenerate() {
     setFirstConnectCelebration(null)
-    setActiveTab(DASHBOARD_TABS.OVERVIEW)
-    document.getElementById('generate-insight-action')?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center',
-    })
-    window.setTimeout(() => {
-      document.querySelector('#generate-insight-action button')?.click()
-    }, 450)
+    triggerGenerateInsight()
   }
 
   function handleNavbarChat() {
@@ -524,6 +531,14 @@ function DashboardPage() {
                 trackerSnapshot={trackerData}
               />
 
+              <DashboardActionsSection
+                showToast={showToast}
+                highlightedConnect={!hasAccounts}
+                showGenerateInsight={false}
+              />
+
+              {renderAccountsSection()}
+
               <DashboardNeedsAttention
                 items={attentionItems}
                 getToken={getToken}
@@ -538,10 +553,6 @@ function DashboardPage() {
                 />
               )}
 
-              <div className="flex justify-center">
-                <UsageBadge usage={usage} />
-              </div>
-
               {!hasInsight && (
                 <div className="mx-auto max-w-xl space-y-4">
                   <DashboardOnboarding
@@ -554,11 +565,24 @@ function DashboardPage() {
                   <SecurityNote />
                 </div>
               )}
+            </DashboardTabPanel>
+
+            <DashboardTabPanel
+              tabId={DASHBOARD_TABS.INSIGHT}
+              activeTab={activeTab}
+              className="mt-8 space-y-6 outline-none"
+            >
+              <div className="flex justify-center sm:justify-start">
+                <UsageBadge usage={usage} />
+              </div>
 
               <DashboardActionsSection
+                showConnectBank={false}
+                sectionId="dashboard-insight-actions"
+                generateActionId="generate-insight-action-insight"
                 showToast={showToast}
-                highlightedConnect={!hasAccounts}
                 highlightedGenerate={highlightGenerate}
+                insightLoading={insightLoading}
                 onInsightError={setInsightError}
                 onInsightLoadingChange={handleInsightLoadingChange}
                 onLimitReached={setLimitReached}
@@ -567,21 +591,13 @@ function DashboardPage() {
                 }
               />
 
-              {renderAccountsSection()}
-            </DashboardTabPanel>
-
-            <DashboardTabPanel
-              tabId={DASHBOARD_TABS.INSIGHT}
-              activeTab={activeTab}
-              className="mt-8 space-y-6 outline-none"
-            >
               {!hasInsight && !insightLoading && (
                 <div className="rounded-xl border border-border-default bg-surface px-6 py-8 text-center">
                   <p className="text-sm font-medium text-fg">No insight yet</p>
                   <p className="mt-2 text-sm text-fg-muted">
-                    Head to Overview to connect your bank and tap{' '}
-                    <span className="text-brand-soft">Generate Summary</span>. You&apos;ll
-                    land back here when it&apos;s ready.
+                    Sync your accounts, then tap{' '}
+                    <span className="text-brand-soft">Generate Insights</span> above to see what
+                    Soverm finds.
                   </p>
                   <button
                     type="button"

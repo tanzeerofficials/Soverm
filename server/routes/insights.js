@@ -6,7 +6,7 @@
  */
 
 import { Router } from 'express'
-import { getAuth } from '@clerk/express'
+import { getAuth, requireAuth } from '@clerk/express'
 import db from '../db/index.js'
 import { generateFinancialSummary, buildPersistedInsightContent } from '../services/claude.js'
 import { loadFinancialContextForUser, loadMonthOverMonthComparison } from '../utils/financialContext.js'
@@ -15,12 +15,13 @@ import { getUsageSummary } from '../utils/usage.js'
 import {
   getGenerateRateLimitMessage,
   isGenerateRateLimited,
-  PRO_DAILY_INSIGHT_CEILING,
 } from '../utils/rateLimit.js'
 import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
 import { reportServerError } from '../utils/sentry.js'
 
 const router = Router()
+
+router.use(requireAuth())
 
 /*
  * GET /api/insights/usage
@@ -34,9 +35,6 @@ const router = Router()
  */
 router.get('/usage', async (req, res) => {
   const { userId } = getAuth(req)
-  if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized' })
-  }
 
   try {
     const usage = await getUsageSummary(userId)
@@ -65,9 +63,6 @@ router.get('/usage', async (req, res) => {
  */
 router.post('/generate', async (req, res) => {
   const { userId } = getAuth(req)
-  if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized' })
-  }
 
   try {
     const usage = await getUsageSummary(userId)
@@ -85,8 +80,6 @@ router.post('/generate', async (req, res) => {
       return res.status(429).json({
         error: 'rate_limit_exceeded',
         message: getGenerateRateLimitMessage(),
-        limit: PRO_DAILY_INSIGHT_CEILING,
-        usage,
       })
     }
 

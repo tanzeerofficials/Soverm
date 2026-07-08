@@ -5,13 +5,15 @@
  */
 
 import { Router } from 'express'
-import { getAuth } from '@clerk/express'
+import { getAuth, requireAuth } from '@clerk/express'
 import db from '../db/index.js'
 import { getUsageSummary } from '../utils/usage.js'
 import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
 import { reportServerError } from '../utils/sentry.js'
 
 const router = Router()
+
+router.use(requireAuth())
 
 function parseInsightContent(row) {
   let parsedContent
@@ -44,9 +46,6 @@ function parseInsightContent(row) {
  */
 router.get('/', async (req, res) => {
   const { userId } = getAuth(req)
-  if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized' })
-  }
 
   try {
     const usage = await getUsageSummary(userId)

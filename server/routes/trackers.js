@@ -18,6 +18,7 @@ import {
 import { ensureUserExists } from '../utils/ensureUser.js'
 import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
 import { reportServerError } from '../utils/sentry.js'
+import { validateUuidParam } from '../utils/validation.js'
 
 const router = Router()
 
@@ -65,6 +66,11 @@ router.patch('/:id', async (req, res) => {
   const { userId } = getAuth(req)
   const { id } = req.params
 
+  const idCheck = validateUuidParam(id, 'tracker id')
+  if (idCheck.error) {
+    return res.status(400).json({ error: idCheck.error })
+  }
+
   try {
     const tracker = await updateTracker(userId, id, req.body)
     await respondWithSnapshot(res, userId, { tracker })
@@ -89,6 +95,11 @@ router.patch('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   const { userId } = getAuth(req)
   const { id } = req.params
+
+  const idCheck = validateUuidParam(id, 'tracker id')
+  if (idCheck.error) {
+    return res.status(400).json({ error: idCheck.error })
+  }
 
   try {
     await deleteTracker(userId, id)

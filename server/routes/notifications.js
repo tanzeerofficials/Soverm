@@ -18,6 +18,7 @@ import {
 } from '../utils/notificationPreferences.js'
 import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
 import { reportServerError } from '../utils/sentry.js'
+import { validateUuidParam } from '../utils/validation.js'
 
 const router = Router()
 
@@ -95,6 +96,11 @@ router.patch('/read-all', async (req, res) => {
 
 router.patch('/:notificationId/read', async (req, res) => {
   const { userId } = getAuth(req)
+
+  const idCheck = validateUuidParam(req.params.notificationId, 'notificationId')
+  if (idCheck.error) {
+    return res.status(400).json({ error: idCheck.error })
+  }
 
   try {
     const updated = await markNotificationRead(userId, req.params.notificationId)

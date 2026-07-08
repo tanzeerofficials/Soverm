@@ -43,8 +43,11 @@ function DashboardNeedsAttention({
     }
 
     return (
-      <section className="mt-6 rounded-xl border border-brand/25 bg-brand/5 px-4 py-4 sm:px-5">
-        <p className="text-sm font-semibold text-brand-soft">You&apos;re all caught up</p>
+      <section className="rounded-xl border border-brand/25 bg-brand/5 px-4 py-4 sm:px-5">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-warning">
+          Needs your attention
+        </p>
+        <p className="mt-2 text-sm font-semibold text-brand-soft">You&apos;re all caught up</p>
         <p className="mt-1 text-xs text-fg-muted">
           No pending items right now — check back after your next sync or insight.
         </p>
@@ -93,11 +96,11 @@ function DashboardNeedsAttention({
 
   return (
     <section
-      className="mt-6 rounded-xl border border-border-default bg-surface p-4 sm:p-5"
+      className="rounded-xl border border-border-default bg-surface p-4 sm:p-5"
       aria-label="Needs your attention"
     >
       <div className="mb-4">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-fg-subtle">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-warning">
           Needs your attention
         </p>
         <p className="mt-1 text-xs text-fg-muted">

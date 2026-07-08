@@ -15,12 +15,10 @@ import { reportServerError } from './sentry.js'
 
 export { CHAT_HOURLY_LIMIT, PRO_DAILY_INSIGHT_CEILING }
 
-function rateLimitResponse(res, { message, limit, retryAfterSeconds }) {
+function rateLimitResponse(res, { message }) {
   return res.status(429).json({
     error: 'rate_limit_exceeded',
     message,
-    limit,
-    retryAfterSeconds: retryAfterSeconds ?? null,
   })
 }
 
@@ -64,7 +62,7 @@ export async function getChatRateLimitStatus(userId) {
     retryAfterSeconds,
     message: allowed
       ? null
-      : `You've sent ${CHAT_HOURLY_LIMIT} messages this hour. Try again in a few minutes.`,
+      : 'Message limit reached for this hour. Try again in a few minutes.',
   }
 }
 
@@ -73,7 +71,7 @@ export function isGenerateRateLimited(usage) {
 }
 
 export function getGenerateRateLimitMessage() {
-  return `Daily insight limit reached (${PRO_DAILY_INSIGHT_CEILING} per day). Try again tomorrow.`
+  return 'Daily insight limit reached. Try again tomorrow.'
 }
 
 /*
@@ -91,8 +89,6 @@ export function chatRateLimitMiddleware() {
       if (!status.allowed) {
         return rateLimitResponse(res, {
           message: status.message,
-          limit: status.limit,
-          retryAfterSeconds: status.retryAfterSeconds,
         })
       }
       next()

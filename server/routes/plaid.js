@@ -7,21 +7,22 @@
  */
 
 import { Router } from 'express'
-import { getAuth } from '@clerk/express'
+import { getAuth, requireAuth } from '@clerk/express'
 import { plaidClient, syncAllAccountsForUser } from '../services/plaid.js'
 import { evaluateAndCreateProactiveNotifications } from '../services/proactiveNotifications.js'
 import db from '../db/index.js'
 import { ensureUserExists } from '../utils/ensureUser.js'
 import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
 import { reportServerError } from '../utils/sentry.js'
+import { plaidRateLimiter, syncRateLimiter } from '../middleware/security.js'
+import { validatePublicToken, validateUuidParam } from '../utils/validation.js'
 
 const router = Router()
 
-router.post('/create-link-token', async (req, res) => {
+router.use(requireAuth())
+
+router.post('/create-link-token', plaidRateLimiter, async (req, res) => {
   const { userId } = getAuth(req)
-  if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized' })
-  }
 
   try {
     const response = await plaidClient.linkTokenCreate({
@@ -39,17 +40,20 @@ router.post('/create-link-token', async (req, res) => {
   }
 })
 
-router.post('/exchange-public-token', async (req, res) => {
+router.post('/exchange-public-token', plaidRateLimiter, async (req, res) => {
   const { userId } = getAuth(req)
-  if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized' })
-  }
 
   try {
     await ensureUserExists(userId)
 
-    const { public_token } = req.body
-    const exchangeResponse = await plaidClient.itemPublicTokenExchange({ public_token })
+    const tokenCheck = validatePublicToken(req.body?.public_token)
+    if (tokenCheck.error) {
+      return res.status(400).json({ error: tokenCheck.error })
+    }
+
+    const exchangeResponse = await plaidClient.itemPublicTokenExchange({
+      public_token: tokenCheck.value,
+    })
     const { access_token } = exchangeResponse.data
 
     const accountsResponse = await plaidClient.accountsBalanceGet({ access_token })
@@ -61,15 +65,22 @@ router.post('/exchange-public-token', async (req, res) => {
        VALUES ($1, $2, $3, NOW())
        ON CONFLICT (plaid_access_token) DO UPDATE
          SET institution_name = EXCLUDED.institution_name,
-             user_id = EXCLUDED.user_id,
              last_synced_at = NOW()
+         WHERE plaid_items.user_id = EXCLUDED.user_id
        RETURNING id`,
       [userId, access_token, bankName]
     )
+
+    if (itemResult.rows.length === 0) {
+      return res.status(403).json({
+        error: 'This bank connection is already linked to another account.',
+      })
+    }
+
     const plaidItemId = itemResult.rows[0].id
 
     for (const account of accounts) {
-      await db.query(
+      const accountResult = await db.query(
         `INSERT INTO accounts (
           id, user_id, plaid_item_id, plaid_account_id, plaid_access_token,
           bank_name, account_name, account_type,
@@ -78,7 +89,6 @@ router.post('/exchange-public-token', async (req, res) => {
           gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
         )
         ON CONFLICT (plaid_account_id) DO UPDATE SET
-          user_id = EXCLUDED.user_id,
           plaid_item_id = EXCLUDED.plaid_item_id,
           plaid_access_token = EXCLUDED.plaid_access_token,
           bank_name = EXCLUDED.bank_name,
@@ -91,7 +101,9 @@ router.post('/exchange-public-token', async (req, res) => {
             WHEN accounts.plaid_access_token IS DISTINCT FROM EXCLUDED.plaid_access_token
               THEN NULL
             ELSE accounts.plaid_cursor
-          END`,
+          END
+        WHERE accounts.user_id = EXCLUDED.user_id
+        RETURNING id`,
         [
           userId,
           plaidItemId,
@@ -105,6 +117,12 @@ router.post('/exchange-public-token', async (req, res) => {
           account.balances.iso_currency_code,
         ]
       )
+
+      if (accountResult.rows.length === 0) {
+        return res.status(403).json({
+          error: 'One or more accounts are already linked to another user.',
+        })
+      }
     }
 
     const { added, modified, removed } = await syncAllAccountsForUser(userId)
@@ -124,11 +142,8 @@ router.post('/exchange-public-token', async (req, res) => {
   }
 })
 
-router.post('/sync-transactions', async (req, res) => {
+router.post('/sync-transactions', syncRateLimiter, async (req, res) => {
   const { userId } = getAuth(req)
-  if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized' })
-  }
 
   try {
     const { added, modified, removed } = await syncAllAccountsForUser(userId)
@@ -142,8 +157,10 @@ router.post('/sync-transactions', async (req, res) => {
 
 router.delete('/accounts/:accountId', async (req, res) => {
   const { userId } = getAuth(req)
-  if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized' })
+
+  const idCheck = validateUuidParam(req.params.accountId, 'accountId')
+  if (idCheck.error) {
+    return res.status(400).json({ error: idCheck.error })
   }
 
   const client = await db.connect()
