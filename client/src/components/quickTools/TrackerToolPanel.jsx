@@ -197,9 +197,139 @@ function TrackerCreateForm({ mode, snapshot, onCreated, isSaving, errorMessage }
   )
 }
 
-function SpendingTrackerCard({ tracker, periodLabel, onRemove, isRemoving }) {
+function TrackerEditForm({ mode, tracker, onSave, onCancel, isSaving, errorMessage }) {
+  const [name, setName] = useState(tracker.name ?? '')
+  const [monthlyAmount, setMonthlyAmount] = useState(String(tracker.monthlyAmount ?? ''))
+  const [purposeType, setPurposeType] = useState(tracker.purposeType ?? 'future')
+  const [targetTotal, setTargetTotal] = useState(
+    tracker.targetTotal != null ? String(tracker.targetTotal) : ''
+  )
+
+  function handleSubmit(event) {
+    event.preventDefault()
+    const parsedMonthly = Number(monthlyAmount)
+    if (!Number.isFinite(parsedMonthly) || parsedMonthly <= 0) {
+      return
+    }
+
+    const payload = {
+      name: name.trim() || undefined,
+      monthlyAmount: parsedMonthly,
+    }
+
+    if (mode === TRACK_MODES.SAVING) {
+      payload.purposeType = purposeType
+      payload.targetTotal = targetTotal ? Number(targetTotal) : null
+    }
+
+    onSave(payload)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="mt-3 space-y-3 rounded-lg border border-border-default bg-app/40 p-3">
+      {mode === TRACK_MODES.SAVING && (
+        <>
+          <label className="block">
+            <span className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">Goal name</span>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="mt-1.5 w-full rounded-lg border border-border-default bg-app px-3 py-2 text-sm text-fg outline-none focus:border-brand/50"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">Purpose</span>
+            <select
+              value={purposeType}
+              onChange={(e) => setPurposeType(e.target.value)}
+              className="mt-1.5 w-full rounded-lg border border-border-default bg-app px-3 py-2 text-sm text-fg outline-none focus:border-brand/50"
+            >
+              {GOAL_PURPOSE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </>
+      )}
+
+      <label className="block">
+        <span className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+          {mode === TRACK_MODES.SPENDING ? 'Monthly spending limit' : 'Save this month'}
+        </span>
+        <div className="relative mt-1.5">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-fg-muted">$</span>
+          <input
+            type="number"
+            min="1"
+            step="1"
+            value={monthlyAmount}
+            onChange={(e) => setMonthlyAmount(e.target.value)}
+            className="w-full rounded-lg border border-border-default bg-app py-2 pl-7 pr-3 font-mono text-sm tabular-nums text-fg outline-none focus:border-brand/50"
+          />
+        </div>
+      </label>
+
+      {mode === TRACK_MODES.SAVING && (
+        <label className="block">
+          <span className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+            Total target (optional)
+          </span>
+          <div className="relative mt-1.5">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-fg-muted">$</span>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={targetTotal}
+              onChange={(e) => setTargetTotal(e.target.value)}
+              placeholder="Leave blank for none"
+              className="w-full rounded-lg border border-border-default bg-app py-2 pl-7 pr-3 font-mono text-sm tabular-nums text-fg outline-none focus:border-brand/50"
+            />
+          </div>
+        </label>
+      )}
+
+      {errorMessage && (
+        <p className="text-sm text-danger" role="alert">
+          {errorMessage}
+        </p>
+      )}
+
+      <div className="flex items-center gap-3">
+        <button
+          type="submit"
+          disabled={isSaving || !monthlyAmount}
+          className="text-xs font-semibold text-brand-soft hover:underline disabled:opacity-60"
+        >
+          {isSaving ? 'Saving…' : 'Save changes'}
+        </button>
+        <button type="button" onClick={onCancel} className="text-xs text-fg-muted hover:text-fg">
+          Cancel
+        </button>
+      </div>
+    </form>
+  )
+}
+
+function SpendingTrackerCard({ tracker, periodLabel, getToken, onRemove, isRemoving }) {
   const { progress, monthlyAmount, name } = tracker
   const badge = statusLabel(progress.status, 'spending')
+  const [isEditing, setIsEditing] = useState(false)
+  const [editError, setEditError] = useState(null)
+  const queryClient = useQueryClient()
+
+  const editMutation = useMutation({
+    mutationFn: (payload) => updateTracker(getToken, tracker.id, payload),
+    onSuccess: (response) => {
+      queryClient.setQueryData(trackerQueryKey, response)
+      setIsEditing(false)
+      setEditError(null)
+    },
+    onError: (error) => setEditError(error.message),
+  })
 
   return (
     <article className="rounded-lg border border-border-default bg-app/50 px-4 py-4">
@@ -241,6 +371,28 @@ function SpendingTrackerCard({ tracker, periodLabel, onRemove, isRemoving }) {
           : `${formatCurrency(progress.remaining)} left to spend · ${progress.percentUsed}% used`}
       </p>
 
+      {isEditing ? (
+        <TrackerEditForm
+          mode={TRACK_MODES.SPENDING}
+          tracker={tracker}
+          onSave={(payload) => editMutation.mutate(payload)}
+          onCancel={() => {
+            setIsEditing(false)
+            setEditError(null)
+          }}
+          isSaving={editMutation.isPending}
+          errorMessage={editError}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setIsEditing(true)}
+          className="mt-3 text-xs font-medium text-ai-soft transition hover:text-ai hover:underline"
+        >
+          Edit spending cap
+        </button>
+      )}
+
       <button
         type="button"
         onClick={onRemove}
@@ -253,19 +405,30 @@ function SpendingTrackerCard({ tracker, periodLabel, onRemove, isRemoving }) {
   )
 }
 
-function SavingTrackerCard({ tracker, periodLabel, getToken, onUpdated, onRemove, isRemoving }) {
+function SavingTrackerCard({ tracker, periodLabel, getToken, onRemove, isRemoving }) {
   const { progress, monthlyAmount, name, purposeType, targetTotal } = tracker
   const badge = statusLabel(progress.status, 'saving')
   const [isLogging, setIsLogging] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editError, setEditError] = useState(null)
   const queryClient = useQueryClient()
 
   const logMutation = useMutation({
     mutationFn: (progressAmount) => updateTracker(getToken, tracker.id, { progressAmount }),
     onSuccess: (response) => {
       queryClient.setQueryData(trackerQueryKey, response)
-      onUpdated?.()
       setIsLogging(false)
     },
+  })
+
+  const editMutation = useMutation({
+    mutationFn: (payload) => updateTracker(getToken, tracker.id, payload),
+    onSuccess: (response) => {
+      queryClient.setQueryData(trackerQueryKey, response)
+      setIsEditing(false)
+      setEditError(null)
+    },
+    onError: (error) => setEditError(error.message),
   })
 
   return (
@@ -305,15 +468,24 @@ function SavingTrackerCard({ tracker, periodLabel, getToken, onUpdated, onRemove
         </p>
       )}
 
-      {!isLogging ? (
-        <button
-          type="button"
-          onClick={() => setIsLogging(true)}
-          className="mt-3 text-xs font-medium text-ai-soft transition hover:text-ai hover:underline"
-        >
-          Update saved this month
-        </button>
-      ) : (
+      {!isLogging && !isEditing ? (
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1">
+          <button
+            type="button"
+            onClick={() => setIsLogging(true)}
+            className="text-xs font-medium text-ai-soft transition hover:text-ai hover:underline"
+          >
+            Update saved this month
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsEditing(true)}
+            className="text-xs font-medium text-fg-muted transition hover:text-fg hover:underline"
+          >
+            Edit goal
+          </button>
+        </div>
+      ) : isLogging ? (
         <form
           className="mt-3 flex items-center gap-2"
           onSubmit={(e) => {
@@ -339,6 +511,18 @@ function SavingTrackerCard({ tracker, periodLabel, getToken, onUpdated, onRemove
             Cancel
           </button>
         </form>
+      ) : (
+        <TrackerEditForm
+          mode={TRACK_MODES.SAVING}
+          tracker={tracker}
+          onSave={(payload) => editMutation.mutate(payload)}
+          onCancel={() => {
+            setIsEditing(false)
+            setEditError(null)
+          }}
+          isSaving={editMutation.isPending}
+          errorMessage={editError}
+        />
       )}
 
       <button
@@ -416,6 +600,7 @@ function TrackerToolPanel({ snapshot, isLoading, loadError, onRetryLoad, getToke
         <SpendingTrackerCard
           tracker={spendingTracker}
           periodLabel={periodLabel}
+          getToken={getToken}
           onRemove={() => deleteMutation.mutate(spendingTracker.id)}
           isRemoving={deleteMutation.isPending}
         />

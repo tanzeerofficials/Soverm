@@ -13,6 +13,11 @@ import {
 } from '../utils/proactiveNotificationRules.js'
 import { generateProactiveNotificationCopy } from './proactiveNotificationCopy.js'
 import { loadProactiveNotificationsEnabled } from '../utils/notificationPreferences.js'
+import { listActiveTrackers } from './monthlyTrackersService.js'
+import { enrichTracker } from '../utils/monthlyTrackers.js'
+import { getCalendarMonthWindow } from '../utils/safeToSpend.js'
+import { hasMonthlyTrackersTable } from '../utils/monthlyTrackersSchema.js'
+import { loadSpentThisCalendarMonth } from './trackerSnapshot.js'
 
 async function loadRecentTransactionsForTriggers(userId) {
   const result = await db.query(
@@ -97,6 +102,28 @@ async function loadNotificationLimits(userId) {
   return { createdToday, triggerTypeCountsToday, recentDedupKeys }
 }
 
+async function loadSpendingTrackerForTriggers(userId) {
+  if (!(await hasMonthlyTrackersTable())) {
+    return { spendingTracker: null, periodStart: null }
+  }
+
+  const [spentThisMonth, trackers] = await Promise.all([
+    loadSpentThisCalendarMonth(userId),
+    listActiveTrackers(userId),
+  ])
+
+  const spending = trackers.find((tracker) => tracker.trackType === 'spending')
+
+  if (!spending) {
+    return { spendingTracker: null, periodStart: null }
+  }
+
+  return {
+    spendingTracker: enrichTracker(spending, { spentThisMonth }),
+    periodStart: getCalendarMonthWindow().periodStart,
+  }
+}
+
 async function buildEvaluationContext(userId) {
   const [
     accounts,
@@ -104,12 +131,14 @@ async function buildEvaluationContext(userId) {
     expensePayload,
     recentTransactions,
     previouslyNotifiedMerchants,
+    spendingTrackerContext,
   ] = await Promise.all([
     loadAccountsForUser(userId),
     loadMonthOverMonthComparison(userId),
     loadExpenseAnalyzerData(userId),
     loadRecentTransactionsForTriggers(userId),
     loadPreviouslyNotifiedRecurringMerchants(userId),
+    loadSpendingTrackerForTriggers(userId),
   ])
 
   return {
@@ -120,6 +149,8 @@ async function buildEvaluationContext(userId) {
     recentTransactions,
     previouslyNotifiedMerchants,
     netBalance: calculateTotalBalance(accounts),
+    spendingTracker: spendingTrackerContext.spendingTracker,
+    periodStart: spendingTrackerContext.periodStart,
   }
 }
 

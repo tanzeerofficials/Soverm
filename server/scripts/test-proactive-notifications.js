@@ -10,6 +10,7 @@ import {
   detectLargeTransactionTriggers,
   detectLowBalanceTrigger,
   detectNewRecurringChargeTriggers,
+  detectSpendingCapTriggers,
   detectSpendingSpikeTriggers,
   evaluateProactiveTriggers,
   LARGE_TRANSACTION_MIN_ABSOLUTE,
@@ -107,6 +108,34 @@ try {
   assert(spike.length === 1, 'Should detect dining spike only')
   assert(spike[0].facts.percent >= SPENDING_SPIKE_PERCENT, 'Spike should meet threshold')
   console.log('  pass: spending spike detection')
+  passed++
+
+  const capOver = detectSpendingCapTriggers({
+    spendingTracker: {
+      id: 'tracker-1',
+      name: 'Monthly spending',
+      monthlyAmount: 1500,
+      progress: { spent: 1600, isOver: true, overBy: 100, percentUsed: 107 },
+    },
+    periodStart: '2026-07-01',
+  })
+  assert(capOver.length === 1, 'Should detect spending cap over')
+  assert(capOver[0].triggerType === 'spending_cap_over', 'Over cap trigger type')
+  console.log('  pass: spending cap over detection')
+  passed++
+
+  const capWarning = detectSpendingCapTriggers({
+    spendingTracker: {
+      id: 'tracker-1',
+      name: 'Monthly spending',
+      monthlyAmount: 1500,
+      progress: { spent: 1250, isOver: false, remaining: 250, percentUsed: 83 },
+    },
+    periodStart: '2026-07-01',
+  })
+  assert(capWarning.length === 1, 'Should detect spending cap warning')
+  assert(capWarning[0].triggerType === 'spending_cap_warning', 'Warning cap trigger type')
+  console.log('  pass: spending cap warning detection')
   passed++
 
   const evaluated = evaluateProactiveTriggers({

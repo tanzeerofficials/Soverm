@@ -204,6 +204,35 @@ function DashboardPage() {
   }, [searchParams, setSearchParams])
 
   useEffect(() => {
+    const tab = searchParams.get('tab')
+    const quickTool = searchParams.get('quickTool')
+
+    if (tab !== DASHBOARD_TABS.TOOLS && quickTool !== QUICK_TOOL_TABS.TRACKER) {
+      return
+    }
+
+    if (tab === DASHBOARD_TABS.TOOLS || quickTool === QUICK_TOOL_TABS.TRACKER) {
+      setActiveTab(DASHBOARD_TABS.TOOLS)
+    }
+
+    if (quickTool === QUICK_TOOL_TABS.TRACKER) {
+      setQuickToolsTab(QUICK_TOOL_TABS.TRACKER)
+    }
+
+    requestAnimationFrame(() => {
+      document.getElementById('dashboard-quick-tools')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    })
+
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete('tab')
+    nextParams.delete('quickTool')
+    setSearchParams(nextParams, { replace: true })
+  }, [searchParams, setSearchParams])
+
+  useEffect(() => {
     if (!pendingChatScroll || !dashboardData?.latestInsight?.id) {
       return
     }
@@ -272,6 +301,7 @@ function DashboardPage() {
         incompleteActionCount,
         unreadNotifications: notificationsData?.notifications ?? [],
         proactiveEnabled: notificationsData?.preferences?.proactiveEnabled ?? true,
+        trackerSnapshot: trackerData,
       }),
     [
       hasAccounts,
@@ -280,6 +310,7 @@ function DashboardPage() {
       dashboardData?.lastSyncedAt,
       incompleteActionCount,
       notificationsData,
+      trackerData,
     ]
   )
 
@@ -543,6 +574,7 @@ function DashboardPage() {
                 items={attentionItems}
                 getToken={getToken}
                 onSwitchTab={setActiveTab}
+                onQuickToolTabChange={setQuickToolsTab}
                 onAllClear={showAttentionAllClear}
               />
 

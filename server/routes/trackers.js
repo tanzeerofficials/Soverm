@@ -20,102 +20,115 @@ import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
 import { reportServerError } from '../utils/sentry.js'
 import { validateUuidParam } from '../utils/validation.js'
 
-const router = Router()
-
-router.use(requireAuth())
-
 async function respondWithSnapshot(res, userId, extra = {}) {
   const snapshot = await buildTrackerSnapshotWithFallback(userId)
   res.json({ ...extra, ...snapshot })
 }
 
-router.get('/', async (req, res) => {
-  const { userId } = getAuth(req)
+export function createTrackersRouter({
+  authenticate = requireAuth(),
+  resolveUserId = (req) => getAuth(req).userId,
+} = {}) {
+  const router = Router()
 
-  try {
-    const snapshot = await buildTrackerSnapshotWithFallback(userId)
-    res.json(snapshot)
-  } catch (err) {
-    reportServerError('to load tracker snapshot', err, { userId, req })
-    res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
-  }
-})
+  router.use(authenticate)
 
-router.post('/', async (req, res) => {
-  const { userId } = getAuth(req)
+  router.get('/', async (req, res) => {
+    const userId = resolveUserId(req)
 
-  try {
-    await ensureUserExists(userId)
-    const tracker = await createTracker(userId, req.body)
-    await respondWithSnapshot(res, userId, { tracker })
-  } catch (err) {
-    if (err.statusCode === 400) {
-      return res.status(400).json({ error: err.message })
+    try {
+      const snapshot = await buildTrackerSnapshotWithFallback(userId)
+      res.json(snapshot)
+    } catch (err) {
+      if (err.statusCode === 503) {
+        return res.status(503).json({ error: err.message })
+      }
+
+      reportServerError('to load tracker snapshot', err, { userId, req })
+      res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
+    }
+  })
+
+  router.post('/', async (req, res) => {
+    const userId = resolveUserId(req)
+
+    try {
+      await ensureUserExists(userId)
+      const tracker = await createTracker(userId, req.body)
+      await respondWithSnapshot(res, userId, { tracker })
+    } catch (err) {
+      if (err.statusCode === 400) {
+        return res.status(400).json({ error: err.message })
+      }
+
+      if (err.statusCode === 503 || err.message.includes('migration 013') || err.message.includes('migration 014')) {
+        return res.status(503).json({ error: err.message })
+      }
+
+      reportServerError('to create tracker', err, { userId, req })
+      res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
+    }
+  })
+
+  router.patch('/:id', async (req, res) => {
+    const userId = resolveUserId(req)
+    const { id } = req.params
+
+    const idCheck = validateUuidParam(id, 'tracker id')
+    if (idCheck.error) {
+      return res.status(400).json({ error: idCheck.error })
     }
 
-    if (err.message.includes('migration 013')) {
-      return res.status(503).json({ error: err.message })
+    try {
+      const tracker = await updateTracker(userId, id, req.body)
+      await respondWithSnapshot(res, userId, { tracker })
+    } catch (err) {
+      if (err.statusCode === 400) {
+        return res.status(400).json({ error: err.message })
+      }
+
+      if (err.statusCode === 404) {
+        return res.status(404).json({ error: err.message })
+      }
+
+      if (err.statusCode === 503 || err.message.includes('migration 013') || err.message.includes('migration 014')) {
+        return res.status(503).json({ error: err.message })
+      }
+
+      reportServerError('to update tracker', err, { userId, req })
+      res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
+    }
+  })
+
+  router.delete('/:id', async (req, res) => {
+    const userId = resolveUserId(req)
+    const { id } = req.params
+
+    const idCheck = validateUuidParam(id, 'tracker id')
+    if (idCheck.error) {
+      return res.status(400).json({ error: idCheck.error })
     }
 
-    reportServerError('to create tracker', err, { userId, req })
-    res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
-  }
-})
+    try {
+      await deleteTracker(userId, id)
+      await respondWithSnapshot(res, userId, { id })
+    } catch (err) {
+      if (err.statusCode === 404) {
+        return res.status(404).json({ error: err.message })
+      }
 
-router.patch('/:id', async (req, res) => {
-  const { userId } = getAuth(req)
-  const { id } = req.params
+      if (err.statusCode === 503 || err.message.includes('migration 013') || err.message.includes('migration 014')) {
+        return res.status(503).json({ error: err.message })
+      }
 
-  const idCheck = validateUuidParam(id, 'tracker id')
-  if (idCheck.error) {
-    return res.status(400).json({ error: idCheck.error })
-  }
-
-  try {
-    const tracker = await updateTracker(userId, id, req.body)
-    await respondWithSnapshot(res, userId, { tracker })
-  } catch (err) {
-    if (err.statusCode === 400) {
-      return res.status(400).json({ error: err.message })
+      reportServerError('to delete tracker', err, { userId, req })
+      res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
     }
+  })
 
-    if (err.statusCode === 404) {
-      return res.status(404).json({ error: err.message })
-    }
+  return router
+}
 
-    if (err.message.includes('migration 013')) {
-      return res.status(503).json({ error: err.message })
-    }
-
-    reportServerError('to update tracker', err, { userId, req })
-    res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
-  }
-})
-
-router.delete('/:id', async (req, res) => {
-  const { userId } = getAuth(req)
-  const { id } = req.params
-
-  const idCheck = validateUuidParam(id, 'tracker id')
-  if (idCheck.error) {
-    return res.status(400).json({ error: idCheck.error })
-  }
-
-  try {
-    await deleteTracker(userId, id)
-    await respondWithSnapshot(res, userId, { id })
-  } catch (err) {
-    if (err.statusCode === 404) {
-      return res.status(404).json({ error: err.message })
-    }
-
-    if (err.message.includes('migration 013')) {
-      return res.status(503).json({ error: err.message })
-    }
-
-    reportServerError('to delete tracker', err, { userId, req })
-    res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
-  }
-})
+const router = createTrackersRouter()
 
 export default router

@@ -178,7 +178,7 @@ function DashboardQuickTools({
   const recentTransactions = collectRecentTransactions(expenseData?.categoryBreakdown)
 
   return (
-    <section className="rounded-xl border border-border-default bg-surface p-4 sm:p-5">
+    <section id="dashboard-quick-tools" className="rounded-xl border border-border-default bg-surface p-4 sm:p-5">
       <p className="text-sm text-fg-muted">Recent activity, account health, and monthly trackers</p>
       <div className="mt-4">
         <QuickToolsTabBar activeTab={activeTab} onChange={handleTabChange} />

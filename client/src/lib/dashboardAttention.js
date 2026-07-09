@@ -6,10 +6,69 @@
 import {
   notificationActionLabel,
 } from './notificationNavigation.js'
+import { QUICK_TOOL_TABS } from './quickTools.js'
 
 export const INSIGHT_STALE_DAYS = 5
 export const SYNC_STALE_HOURS = 24
 export const MAX_NOTIFICATION_ITEMS = 2
+export const SPENDING_CAP_WARNING_PERCENT = 80
+
+function formatAttentionCurrency(amount) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(amount ?? 0)
+}
+
+/**
+ * Surfaces spending-cap warnings for the Overview "Needs attention" card.
+ * Uses tracker snapshot fields already loaded for the dashboard hero.
+ */
+export function buildTrackerAttentionItems(trackerSnapshot) {
+  const spendingTracker = trackerSnapshot?.spendingTracker
+  const progress = spendingTracker?.progress
+
+  if (!progress) {
+    return []
+  }
+
+  const periodLabel = trackerSnapshot?.periodLabel ?? 'this month'
+  const capName = spendingTracker.name || 'Spending cap'
+  const limit = spendingTracker.monthlyAmount ?? trackerSnapshot?.monthlyBudget
+  const navigation = {
+    tab: 'tools',
+    quickToolTab: QUICK_TOOL_TABS.TRACKER,
+    scrollTo: 'dashboard-quick-tools',
+  }
+
+  if (progress.isOver) {
+    return [
+      {
+        id: 'spending-cap-over',
+        tone: 'danger',
+        title: `${capName} exceeded`,
+        detail: `${formatAttentionCurrency(progress.spent)} of ${formatAttentionCurrency(limit)} spent ${periodLabel} — over by ${formatAttentionCurrency(progress.overBy)}.`,
+        actionLabel: 'View tracker',
+        ...navigation,
+      },
+    ]
+  }
+
+  if (progress.percentUsed >= SPENDING_CAP_WARNING_PERCENT) {
+    return [
+      {
+        id: 'spending-cap-warning',
+        tone: 'warning',
+        title: `Approaching ${capName.toLowerCase()}`,
+        detail: `${formatAttentionCurrency(progress.spent)} of ${formatAttentionCurrency(limit)} spent ${periodLabel} (${progress.percentUsed}% used).`,
+        actionLabel: 'View tracker',
+        ...navigation,
+      },
+    ]
+  }
+
+  return []
+}
 
 export function daysSince(isoDate) {
   if (!isoDate) {
@@ -70,6 +129,7 @@ export function buildAttentionItems({
   incompleteActionCount,
   unreadNotifications = [],
   proactiveEnabled = true,
+  trackerSnapshot = null,
 }) {
   const items = []
 
@@ -85,6 +145,10 @@ export function buildAttentionItems({
         notification,
       })
     }
+  }
+
+  if (hasAccounts) {
+    items.push(...buildTrackerAttentionItems(trackerSnapshot))
   }
 
   if (!hasAccounts) {

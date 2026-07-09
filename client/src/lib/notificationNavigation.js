@@ -8,6 +8,8 @@ const TRIGGER_TYPES = {
   LOW_BALANCE: 'low_balance',
   NEW_RECURRING_CHARGE: 'new_recurring_charge',
   SPENDING_SPIKE: 'spending_spike',
+  SPENDING_CAP_OVER: 'spending_cap_over',
+  SPENDING_CAP_WARNING: 'spending_cap_warning',
 }
 
 export function parseNotificationRelatedData(relatedData) {
@@ -58,6 +60,12 @@ export function resolveNotificationTarget(notification) {
       }
     case TRIGGER_TYPES.LARGE_TRANSACTION:
       return { pathname: '/expense-analyzer', search: buildSearch({ tab: 'overview' }) }
+    case TRIGGER_TYPES.SPENDING_CAP_OVER:
+    case TRIGGER_TYPES.SPENDING_CAP_WARNING:
+      return {
+        pathname: '/dashboard',
+        search: buildSearch({ tab: 'tools', quickTool: 'tracker' }),
+      }
     default:
       break
   }
@@ -92,6 +100,9 @@ export function notificationActionLabel(notification) {
       return 'View category'
     case TRIGGER_TYPES.LARGE_TRANSACTION:
       return 'View spending'
+    case TRIGGER_TYPES.SPENDING_CAP_OVER:
+    case TRIGGER_TYPES.SPENDING_CAP_WARNING:
+      return 'View tracker'
     default:
       return 'View details'
   }

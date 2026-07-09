@@ -6,12 +6,15 @@ export const TRIGGER_TYPES = {
   LOW_BALANCE: 'low_balance',
   NEW_RECURRING_CHARGE: 'new_recurring_charge',
   SPENDING_SPIKE: 'spending_spike',
+  SPENDING_CAP_OVER: 'spending_cap_over',
+  SPENDING_CAP_WARNING: 'spending_cap_warning',
 }
 
 export const LARGE_TRANSACTION_MIN_ABSOLUTE = 500
 export const LARGE_TRANSACTION_MULTIPLIER = 3
 export const LOW_BALANCE_RUNWAY_DAYS = 4
 export const SPENDING_SPIKE_PERCENT = 40
+export const SPENDING_CAP_WARNING_PERCENT = 80
 export const DEDUP_LOOKBACK_DAYS = 7
 export const MAX_NOTIFICATIONS_PER_SYNC = 2
 export const MAX_NOTIFICATIONS_PER_DAY = 2
@@ -19,6 +22,8 @@ export const MAX_PER_TRIGGER_TYPE_PER_DAY = 1
 
 const TRIGGER_PRIORITY = [
   TRIGGER_TYPES.LOW_BALANCE,
+  TRIGGER_TYPES.SPENDING_CAP_OVER,
+  TRIGGER_TYPES.SPENDING_CAP_WARNING,
   TRIGGER_TYPES.LARGE_TRANSACTION,
   TRIGGER_TYPES.NEW_RECURRING_CHARGE,
   TRIGGER_TYPES.SPENDING_SPIKE,
@@ -216,9 +221,70 @@ export function detectSpendingSpikeTriggers({ categoryBreakdown = [] }) {
   return triggers.sort((left, right) => right.facts.percent - left.facts.percent)
 }
 
+export function detectSpendingCapTriggers({ spendingTracker = null, periodStart = null } = {}) {
+  const progress = spendingTracker?.progress
+
+  if (!progress || !spendingTracker?.monthlyAmount) {
+    return []
+  }
+
+  const periodKey = periodStart ?? 'current-month'
+  const capName = spendingTracker.name || 'Spending cap'
+  const limit = roundCurrency(spendingTracker.monthlyAmount)
+  const spent = roundCurrency(progress.spent)
+  const triggers = []
+
+  if (progress.isOver) {
+    triggers.push({
+      triggerType: TRIGGER_TYPES.SPENDING_CAP_OVER,
+      dedupKey: `spending_cap:over:${periodKey}`,
+      relatedData: {
+        trackerId: spendingTracker.id ?? null,
+        capName,
+        monthlyLimit: limit,
+        spent,
+        overBy: roundCurrency(progress.overBy),
+        percentUsed: progress.percentUsed,
+        link: '/dashboard?tab=tools&quickTool=tracker',
+      },
+      facts: {
+        capName,
+        monthlyLimit: limit,
+        spent,
+        overBy: roundCurrency(progress.overBy),
+        percentUsed: progress.percentUsed,
+      },
+    })
+  } else if (progress.percentUsed >= SPENDING_CAP_WARNING_PERCENT) {
+    triggers.push({
+      triggerType: TRIGGER_TYPES.SPENDING_CAP_WARNING,
+      dedupKey: `spending_cap:warning:${periodKey}`,
+      relatedData: {
+        trackerId: spendingTracker.id ?? null,
+        capName,
+        monthlyLimit: limit,
+        spent,
+        remaining: roundCurrency(progress.remaining),
+        percentUsed: progress.percentUsed,
+        link: '/dashboard?tab=tools&quickTool=tracker',
+      },
+      facts: {
+        capName,
+        monthlyLimit: limit,
+        spent,
+        remaining: roundCurrency(progress.remaining),
+        percentUsed: progress.percentUsed,
+      },
+    })
+  }
+
+  return triggers
+}
+
 export function evaluateProactiveTriggers(context) {
   const candidates = [
     ...detectLowBalanceTrigger(context),
+    ...detectSpendingCapTriggers(context),
     ...detectLargeTransactionTriggers(context),
     ...detectNewRecurringChargeTriggers(context),
     ...detectSpendingSpikeTriggers(context),
@@ -258,6 +324,16 @@ export function buildTemplateNotificationCopy(trigger) {
       return {
         title: 'Spending spike in a category',
         body: `${trigger.facts.category} is up ${trigger.facts.percent}% vs the prior 30 days ($${trigger.facts.currentTotal} vs $${trigger.facts.priorTotal}).`,
+      }
+    case TRIGGER_TYPES.SPENDING_CAP_OVER:
+      return {
+        title: 'Spending cap exceeded',
+        body: `${trigger.facts.capName} is over for this month — $${trigger.facts.spent} spent vs $${trigger.facts.monthlyLimit} limit.`,
+      }
+    case TRIGGER_TYPES.SPENDING_CAP_WARNING:
+      return {
+        title: 'Approaching your spending cap',
+        body: `${trigger.facts.capName} is at ${trigger.facts.percentUsed}% ($${trigger.facts.spent} of $${trigger.facts.monthlyLimit}) with $${trigger.facts.remaining} left.`,
       }
     default:
       return {
