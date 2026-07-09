@@ -19,12 +19,14 @@ const TONE_STYLES = {
   ai: 'border-ai/30 bg-ai/10',
   brand: 'border-brand/30 bg-brand/5',
   warning: 'border-warning/30 bg-warning/5',
+  danger: 'border-danger/30 bg-danger/5',
 }
 
 function DashboardNeedsAttention({
   items,
   getToken,
   onSwitchTab,
+  onQuickToolTabChange,
   onAllClear,
 }) {
   const navigate = useNavigate()
@@ -82,6 +84,9 @@ function DashboardNeedsAttention({
 
     if (item.tab === DASHBOARD_TABS.TOOLS) {
       onSwitchTab?.(DASHBOARD_TABS.TOOLS)
+      if (item.quickToolTab) {
+        onQuickToolTabChange?.(item.quickToolTab)
+      }
     }
 
     if (item.scrollTo) {
@@ -90,7 +95,7 @@ function DashboardNeedsAttention({
           behavior: 'smooth',
           block: 'center',
         })
-      }, item.tab ? 150 : 0)
+      }, item.tab ? 200 : 0)
     }
   }
 

@@ -7,6 +7,7 @@
 import db from '../db/index.js'
 import { calculateTotalBalance, getDisplayBalance } from '../utils/balanceHelpers.js'
 import { CONNECTED_ACCOUNT_TRANSACTION_JOINS } from '../utils/connectedAccountTransactions.js'
+import { hasMonthlyTrackersTable } from '../utils/monthlyTrackersSchema.js'
 import { listActiveTrackers } from './monthlyTrackersService.js'
 import {
   enrichTracker,
@@ -17,37 +18,31 @@ import {
 } from '../utils/safeToSpend.js'
 
 const NON_PENDING_FILTER = 'AND (t.pending IS NOT TRUE)'
+const CALENDAR_MONTH_FILTER = `AND t.date >= date_trunc('month', CURRENT_DATE)::date
+       AND t.date < (date_trunc('month', CURRENT_DATE) + INTERVAL '1 month')::date`
 
-async function loadIncomeThisCalendarMonth(userId) {
+export async function loadCalendarMonthCashFlow(userId) {
   const result = await db.query(
-    `SELECT COALESCE(SUM(ABS(t.amount)), 0) AS total
+    `SELECT
+       COALESCE(SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END), 0) AS spent,
+       COALESCE(SUM(CASE WHEN t.amount < 0 THEN ABS(t.amount) ELSE 0 END), 0) AS income
      FROM transactions t
      ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
      WHERE t.user_id = $1
-       AND t.amount < 0
        ${NON_PENDING_FILTER}
-       AND t.date >= date_trunc('month', CURRENT_DATE)::date
-       AND t.date < (date_trunc('month', CURRENT_DATE) + INTERVAL '1 month')::date`,
+       ${CALENDAR_MONTH_FILTER}`,
     [userId]
   )
 
-  return roundCurrency(result.rows[0].total)
+  return {
+    spentThisMonth: roundCurrency(result.rows[0].spent),
+    incomeThisMonth: roundCurrency(result.rows[0].income),
+  }
 }
 
 export async function loadSpentThisCalendarMonth(userId) {
-  const result = await db.query(
-    `SELECT COALESCE(SUM(t.amount), 0) AS total
-     FROM transactions t
-     ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
-     WHERE t.user_id = $1
-       AND t.amount > 0
-       ${NON_PENDING_FILTER}
-       AND t.date >= date_trunc('month', CURRENT_DATE)::date
-       AND t.date < (date_trunc('month', CURRENT_DATE) + INTERVAL '1 month')::date`,
-    [userId]
-  )
-
-  return roundCurrency(result.rows[0].total)
+  const { spentThisMonth } = await loadCalendarMonthCashFlow(userId)
+  return spentThisMonth
 }
 
 export async function loadSuggestedSpendingLimit(userId) {
@@ -66,8 +61,7 @@ export async function loadSuggestedSpendingLimit(userId) {
 }
 
 export async function buildTrackerSnapshot(userId) {
-  const [accountsResult, lastSyncedResult, spentThisMonth, incomeThisMonth, suggestedSpendingLimit, trackers] =
-    await Promise.all([
+  const [accountsResult, lastSyncedResult, cashFlow, trackers] = await Promise.all([
       db.query(
         `SELECT id, bank_name, account_name, account_type,
                 balance_current, balance_available, currency
@@ -85,11 +79,15 @@ export async function buildTrackerSnapshot(userId) {
          WHERE last_synced_at IS NOT NULL`,
         [userId]
       ),
-      loadSpentThisCalendarMonth(userId),
-      loadIncomeThisCalendarMonth(userId),
-      loadSuggestedSpendingLimit(userId),
+      loadCalendarMonthCashFlow(userId),
       listActiveTrackers(userId),
     ])
+
+  const { spentThisMonth, incomeThisMonth } = cashFlow
+  const hasSpendingTracker = trackers.some((tracker) => tracker.trackType === 'spending')
+  const suggestedSpendingLimit = hasSpendingTracker
+    ? 0
+    : await loadSuggestedSpendingLimit(userId)
 
   const accounts = accountsResult.rows.map((account) => ({
     ...account,
@@ -144,88 +142,12 @@ export async function buildTrackerSnapshot(userId) {
   }
 }
 
-async function monthlyTrackersTableExists() {
-  const result = await db.query(
-    `SELECT 1
-     FROM information_schema.tables
-     WHERE table_schema = 'public'
-       AND table_name = 'monthly_trackers'`
-  )
-
-  return result.rows.length > 0
-}
-
-function mapLegacyGoalToTracker(goal) {
-  return {
-    id: goal.id,
-    trackType: 'saving',
-    name: goal.name,
-    purposeType: goal.purposeType,
-    monthlyAmount: goal.monthlyAmount,
-    targetTotal: goal.targetTotal,
-    progressAmount: goal.savedSoFar ?? 0,
-    active: goal.active !== false,
-  }
-}
-
-/**
- * Converts pre-013 budget/goals snapshot into the unified tracker shape
- * so the client always receives a consistent API response.
- */
-export function normalizeLegacyBudgetSnapshot(legacy) {
-  const spentThisMonth = legacy.spentThisMonth ?? 0
-  const incomeThisMonth = legacy.incomeThisMonth ?? 0
-  const trackers = []
-
-  let spendingTracker = null
-  if (legacy.configured && legacy.monthlyBudget) {
-    spendingTracker = enrichTracker(
-      {
-        id: 'legacy-spending',
-        trackType: 'spending',
-        name: 'Monthly spending',
-        purposeType: null,
-        monthlyAmount: legacy.monthlyBudget,
-        targetTotal: null,
-        progressAmount: 0,
-        active: true,
-      },
-      { spentThisMonth, income: incomeThisMonth }
-    )
-    trackers.push(spendingTracker)
-  }
-
-  const savingTrackers = (legacy.goals ?? []).map((goal) => {
-    const enriched = enrichTracker(mapLegacyGoalToTracker(goal), {
-      spentThisMonth,
-      income: incomeThisMonth,
-    })
-    trackers.push(enriched)
-    return enriched
-  })
-
-  const spendingProgress = spendingTracker?.progress ?? null
-
-  return {
-    ...legacy,
-    trackers,
-    spendingTracker,
-    savingTrackers,
-    incomeThisMonth,
-    suggestedSpendingLimit: legacy.suggestedBudget ?? null,
-    isOverBudget: legacy.isOverBudget ?? spendingProgress?.isOver ?? false,
-    overBudgetBy: legacy.overBudgetBy ?? spendingProgress?.overBy ?? null,
-    percentUsed: legacy.percentUsed ?? spendingProgress?.percentUsed ?? null,
-    remainingBudget: legacy.remainingBudget ?? spendingProgress?.remaining ?? null,
-  }
-}
-
 export async function buildTrackerSnapshotWithFallback(userId) {
-  if (await monthlyTrackersTableExists()) {
-    return buildTrackerSnapshot(userId)
+  if (!(await hasMonthlyTrackersTable())) {
+    const error = new Error('Monthly trackers are not available yet — run migration 013')
+    error.statusCode = 503
+    throw error
   }
 
-  const { buildBudgetSnapshot } = await import('./budgetSnapshot.js')
-  const legacy = await buildBudgetSnapshot(userId)
-  return normalizeLegacyBudgetSnapshot(legacy)
+  return buildTrackerSnapshot(userId)
 }

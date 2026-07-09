@@ -6,6 +6,10 @@
 
 import db from '../db/index.js'
 import {
+  hasMonthlyProgressColumns,
+  hasMonthlyTrackersTable,
+} from '../utils/monthlyTrackersSchema.js'
+import {
   computeMonthlyProgressUpdate,
   mapTrackerRow,
   MAX_SAVING_TRACKERS,
@@ -21,34 +25,11 @@ const LEGACY_TRACKER_SELECT_COLUMNS = `id, user_id, track_type, name, purpose_ty
             target_total, progress_amount, active, created_at, updated_at`
 
 async function getTrackerSelectColumns() {
-  if (await monthlyProgressColumnsExist()) {
+  if (await hasMonthlyProgressColumns()) {
     return TRACKER_SELECT_COLUMNS
   }
 
   return LEGACY_TRACKER_SELECT_COLUMNS
-}
-
-async function tableExists() {
-  const result = await db.query(
-    `SELECT 1
-     FROM information_schema.tables
-     WHERE table_schema = 'public'
-       AND table_name = 'monthly_trackers'`
-  )
-
-  return result.rows.length > 0
-}
-
-async function monthlyProgressColumnsExist() {
-  const result = await db.query(
-    `SELECT 1
-     FROM information_schema.columns
-     WHERE table_schema = 'public'
-       AND table_name = 'monthly_trackers'
-       AND column_name = 'monthly_progress_amount'`
-  )
-
-  return result.rows.length > 0
 }
 
 /**
@@ -56,7 +37,7 @@ async function monthlyProgressColumnsExist() {
  * Lifetime total (progress_amount) is left unchanged.
  */
 export async function resetStaleMonthlyProgress(userId) {
-  if (!(await tableExists()) || !(await monthlyProgressColumnsExist())) {
+  if (!(await hasMonthlyTrackersTable()) || !(await hasMonthlyProgressColumns())) {
     return
   }
 
@@ -77,7 +58,7 @@ export async function resetStaleMonthlyProgress(userId) {
 }
 
 export async function listActiveTrackers(userId) {
-  if (!(await tableExists())) {
+  if (!(await hasMonthlyTrackersTable())) {
     return []
   }
 
@@ -118,7 +99,7 @@ async function getActiveSpendingTracker(userId) {
 }
 
 export async function createTracker(userId, body) {
-  if (!(await tableExists())) {
+  if (!(await hasMonthlyTrackersTable())) {
     throw new Error('Monthly trackers are not available yet — run migration 013')
   }
 
@@ -151,20 +132,36 @@ export async function createTracker(userId, body) {
   }
 
   const selectColumns = await getTrackerSelectColumns()
-  const result = await db.query(
-    `INSERT INTO monthly_trackers (
-       user_id, track_type, name, purpose_type, monthly_amount, target_total
-     )
-     VALUES ($1, $2, $3, $4, $5, $6)
-     RETURNING ${selectColumns}`,
-    [userId, trackType, name, purposeType, monthlyAmount, targetTotal]
-  )
 
-  return mapTrackerRow(result.rows[0])
+  try {
+    const result = await db.query(
+      `INSERT INTO monthly_trackers (
+         user_id, track_type, name, purpose_type, monthly_amount, target_total
+       )
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING ${selectColumns}`,
+      [userId, trackType, name, purposeType, monthlyAmount, targetTotal]
+    )
+
+    return mapTrackerRow(result.rows[0])
+  } catch (err) {
+    // Race: two spending-cap creates at once — unique index enforces one active row.
+    if (err.code === '23505' && trackType === 'spending') {
+      const existing = await getActiveSpendingTracker(userId)
+      if (existing) {
+        return updateTracker(userId, existing.id, {
+          name,
+          monthlyAmount,
+        })
+      }
+    }
+
+    throw err
+  }
 }
 
 export async function updateTracker(userId, trackerId, body) {
-  if (!(await tableExists())) {
+  if (!(await hasMonthlyTrackersTable())) {
     throw new Error('Monthly trackers are not available yet — run migration 013')
   }
 
@@ -225,7 +222,7 @@ export async function updateTracker(userId, trackerId, body) {
       throw error
     }
 
-    if (!(await monthlyProgressColumnsExist())) {
+    if (!(await hasMonthlyProgressColumns())) {
       const error = new Error('Monthly savings progress is not available yet — run migration 014')
       error.statusCode = 503
       throw error
@@ -267,7 +264,7 @@ export async function updateTracker(userId, trackerId, body) {
 }
 
 export async function deleteTracker(userId, trackerId) {
-  if (!(await tableExists())) {
+  if (!(await hasMonthlyTrackersTable())) {
     throw new Error('Monthly trackers are not available yet — run migration 013')
   }
 

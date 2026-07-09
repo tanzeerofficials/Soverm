@@ -64,3 +64,29 @@ CREATE TABLE insights (
 );
 
 CREATE INDEX insights_user_id_idx ON insights(user_id);
+
+CREATE TABLE monthly_trackers (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  track_type TEXT NOT NULL CHECK (track_type IN ('spending', 'saving')),
+  name TEXT NOT NULL DEFAULT '',
+  purpose_type TEXT CHECK (
+    purpose_type IS NULL OR purpose_type IN ('debt', 'purchase', 'future')
+  ),
+  monthly_amount NUMERIC(12, 2) NOT NULL CHECK (monthly_amount > 0),
+  target_total NUMERIC(12, 2) CHECK (target_total IS NULL OR target_total > 0),
+  progress_amount NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (progress_amount >= 0),
+  monthly_progress_amount NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (monthly_progress_amount >= 0),
+  progress_month DATE,
+  active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX monthly_trackers_user_active_idx
+  ON monthly_trackers (user_id, track_type)
+  WHERE active = true;
+
+CREATE UNIQUE INDEX monthly_trackers_one_active_spending_per_user_idx
+  ON monthly_trackers (user_id)
+  WHERE track_type = 'spending' AND active = true;

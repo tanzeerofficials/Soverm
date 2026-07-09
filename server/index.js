@@ -62,8 +62,6 @@ const { default: chatRouter } = await import('./routes/chat.js')
 const { default: userRouter } = await import('./routes/user.js')
 const { default: expenseAnalyzerRouter } = await import('./routes/expenseAnalyzer.js')
 const { default: notificationsRouter } = await import('./routes/notifications.js')
-const { default: budgetRouter } = await import('./routes/budget.js')
-const { default: goalsRouter } = await import('./routes/goals.js')
 const { default: trackersRouter } = await import('./routes/trackers.js')
 const { startSyncJob } = await import('./jobs/syncAllUsers.js')
 const { GENERIC_ERROR_MESSAGE } = await import('./utils/apiErrors.js')
@@ -180,12 +178,8 @@ app.use('/api/expense-analyzer', expenseAnalyzerRouter)
 // Proactive notifications live under /api/notifications
 app.use('/api/notifications', notificationsRouter)
 
-// Monthly trackers (spending cap + savings goals) — primary API
+// Monthly trackers (spending cap + savings goals)
 app.use('/api/trackers', trackersRouter)
-
-// Legacy aliases — delegate to tracker snapshot (remove after all envs run migrate:013)
-app.use('/api/budget', budgetRouter)
-app.use('/api/goals', goalsRouter)
 
 app.use('/', healthRoutes)
 

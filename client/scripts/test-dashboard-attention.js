@@ -5,6 +5,7 @@
 
 import {
   buildAttentionItems,
+  buildTrackerAttentionItems,
   countIncompleteActions,
   daysSince,
   getInsightFreshnessNudge,
@@ -68,5 +69,53 @@ assert(firstInsight?.scrollTo === 'generate-insight-action-insight', 'first insi
 
 assert(hoursSinceSync(hoursAgo(2)) >= 2, 'hours since sync')
 assert(daysSince(daysAgo(3)) >= 3, 'days since insight')
+
+const overCap = buildTrackerAttentionItems({
+  spendingTracker: {
+    name: 'Monthly spending',
+    monthlyAmount: 1500,
+    progress: {
+      spent: 1700,
+      isOver: true,
+      overBy: 200,
+      percentUsed: 113,
+    },
+  },
+  periodLabel: 'Jul 1–today',
+})
+assert(overCap.length === 1 && overCap[0].id === 'spending-cap-over', 'flags over spending cap')
+assert(overCap[0].quickToolTab === 'tracker', 'over cap links to tracker tab')
+
+const warningCap = buildTrackerAttentionItems({
+  spendingTracker: {
+    name: 'Monthly spending',
+    monthlyAmount: 1500,
+    progress: {
+      spent: 1250,
+      isOver: false,
+      percentUsed: 83,
+      remaining: 250,
+    },
+  },
+  periodLabel: 'Jul 1–today',
+})
+assert(warningCap.length === 1 && warningCap[0].id === 'spending-cap-warning', 'flags cap warning')
+
+const attentionWithTracker = buildAttentionItems({
+  hasAccounts: true,
+  hasInsight: true,
+  highlightGenerate: false,
+  lastSyncedAt: hoursAgo(1),
+  incompleteActionCount: 0,
+  trackerSnapshot: {
+    spendingTracker: warningCap[0] ? {
+      name: 'Monthly spending',
+      monthlyAmount: 1500,
+      progress: { spent: 1250, isOver: false, percentUsed: 83, remaining: 250 },
+    } : null,
+    periodLabel: 'Jul 1–today',
+  },
+})
+assert(attentionWithTracker.some((item) => item.id === 'spending-cap-warning'), 'includes tracker alert in attention list')
 
 console.log('All dashboardAttention tests passed.')
