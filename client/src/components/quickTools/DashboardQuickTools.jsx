@@ -8,6 +8,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import Skeleton from '../Skeleton.jsx'
 import TrackerToolPanel from './TrackerToolPanel.jsx'
+import ForecastToolPanel from './ForecastToolPanel.jsx'
 import {
   assessAccountHealth,
   collectRecentTransactions,
@@ -28,6 +29,7 @@ function QuickToolsTabBar({ activeTab, onChange }) {
     { id: QUICK_TOOL_TABS.RECENT, label: 'Recent', shortLabel: 'Recent' },
     { id: QUICK_TOOL_TABS.HEALTH, label: 'Health', shortLabel: 'Health' },
     { id: QUICK_TOOL_TABS.TRACKER, label: 'Tracker', shortLabel: 'Tracker' },
+    { id: QUICK_TOOL_TABS.FORECAST, label: 'Forecast', shortLabel: 'Forecast' },
   ]
 
   return (
@@ -156,9 +158,13 @@ function DashboardQuickTools({
   lastSyncedAt,
   expenseData,
   trackerSnapshot,
+  forecast,
   trackerLoading = false,
   trackerError = null,
+  forecastLoading = false,
+  forecastError = null,
   onRetryTracker,
+  onRetryForecast,
   getToken,
   activeTab: controlledTab,
   onTabChange,
@@ -179,7 +185,7 @@ function DashboardQuickTools({
 
   return (
     <section id="dashboard-quick-tools" className="rounded-xl border border-border-default bg-surface p-4 sm:p-5">
-      <p className="text-sm text-fg-muted">Recent activity, account health, and monthly trackers</p>
+      <p className="text-sm text-fg-muted">Recent activity, account health, trackers, and cash flow forecast</p>
       <div className="mt-4">
         <QuickToolsTabBar activeTab={activeTab} onChange={handleTabChange} />
       </div>
@@ -199,6 +205,15 @@ function DashboardQuickTools({
           loadError={trackerError}
           onRetryLoad={onRetryTracker}
           getToken={getToken}
+        />
+      </QuickToolPanel>
+
+      <QuickToolPanel tabId={QUICK_TOOL_TABS.FORECAST} activeTab={activeTab}>
+        <ForecastToolPanel
+          forecast={forecast}
+          isLoading={forecastLoading}
+          loadError={forecastError}
+          onRetryLoad={onRetryForecast}
         />
       </QuickToolPanel>
     </section>

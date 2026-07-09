@@ -3,7 +3,7 @@
  *
  * Caches information_schema lookups for monthly_trackers so we do not
  * query metadata on every tracker snapshot or CRUD request.
- * Restart the server after running migrations 013/014 in dev.
+ * Restart the server after running migrations 013/014/016 in dev.
  */
 
 import db from '../db/index.js'
@@ -11,6 +11,7 @@ import db from '../db/index.js'
 const cache = {
   monthlyTrackersTable: null,
   monthlyProgressColumns: null,
+  alertThresholdColumns: null,
 }
 
 async function tableExists(tableName) {
@@ -61,8 +62,23 @@ export async function hasMonthlyProgressColumns() {
   return cache.monthlyProgressColumns
 }
 
+export async function hasAlertThresholdColumns() {
+  if (!(await hasMonthlyTrackersTable())) {
+    cache.alertThresholdColumns = false
+    return false
+  }
+
+  if (cache.alertThresholdColumns !== null) {
+    return cache.alertThresholdColumns
+  }
+
+  cache.alertThresholdColumns = await columnExists('monthly_trackers', 'alert_warning_percent')
+  return cache.alertThresholdColumns
+}
+
 /** Test helper — clears in-process cache between assertions. */
 export function resetMonthlyTrackersSchemaCache() {
   cache.monthlyTrackersTable = null
   cache.monthlyProgressColumns = null
+  cache.alertThresholdColumns = null
 }

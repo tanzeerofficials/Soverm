@@ -6,4 +6,5 @@ export const expenseAnalyzerNarrativeQueryKey = ['expense-analyzer', 'narrative'
 export const usageQueryKey = ['usage']
 export const notificationsQueryKey = ['notifications']
 export const trackerQueryKey = ['trackers']
+export const cashFlowForecastQueryKey = ['dashboard', 'forecast']
 export const chatQueryKey = (insightId) => ['chat', insightId]

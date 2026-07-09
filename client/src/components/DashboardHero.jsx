@@ -2,6 +2,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { useMemo } from 'react'
 import { useAnimatedNumber } from '../hooks/useAnimatedNumber.js'
 import { fillSpendingSeries } from '../lib/spendingSparkline.js'
+import { isSpendingCapWarningActive } from '../lib/spendingAlertThresholds.js'
 import CashFlowSummary from './CashFlowSummary.jsx'
 import SpendingSparkline from './SpendingSparkline.jsx'
 import HowCalculatedDisclosure from './HowCalculatedDisclosure.jsx'
@@ -108,7 +109,14 @@ function DashboardHero({
                   className={`h-full rounded-full ${
                     trackerSnapshot?.isOverBudget || spendingProgress?.isOver
                       ? 'bg-danger'
-                      : (trackerSnapshot?.percentUsed ?? spendingProgress?.percentUsed ?? 0) >= 80
+                      : isSpendingCapWarningActive(
+                            trackerSnapshot?.spendingTracker,
+                            spendingProgress ?? {
+                              percentUsed: trackerSnapshot?.percentUsed,
+                              remaining: trackerSnapshot?.remainingBudget,
+                              isOver: trackerSnapshot?.isOverBudget,
+                            }
+                          )
                         ? 'bg-warning'
                         : 'bg-brand'
                   }`}

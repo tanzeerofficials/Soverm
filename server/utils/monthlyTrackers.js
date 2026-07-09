@@ -14,6 +14,10 @@ export const MAX_SAVING_TRACKERS = 5
 export const MAX_TRACKER_NAME_LENGTH = 80
 export const MIN_TRACKER_AMOUNT = 1
 export const MAX_TRACKER_AMOUNT = 999_999.99
+/** Default warning when the user has not set custom % or $ thresholds. */
+export const DEFAULT_SPENDING_CAP_WARNING_PERCENT = 80
+export const MIN_ALERT_WARNING_PERCENT = 1
+export const MAX_ALERT_WARNING_PERCENT = 99
 
 export function getCurrentProgressMonth(referenceDate = new Date()) {
   const year = referenceDate.getFullYear()
@@ -85,6 +89,10 @@ export function mapTrackerRow(row) {
   const monthlyProgressAmount =
     row.monthly_progress_amount != null ? roundCurrency(row.monthly_progress_amount) : 0
   const progressMonth = toProgressMonthIso(row.progress_month)
+  const alertWarningPercent =
+    row.alert_warning_percent != null ? Number(row.alert_warning_percent) : null
+  const alertRemainingDollars =
+    row.alert_remaining_dollars != null ? roundCurrency(row.alert_remaining_dollars) : null
 
   return {
     id: row.id,
@@ -96,10 +104,53 @@ export function mapTrackerRow(row) {
     progressAmount,
     monthlyProgressAmount,
     progressMonth,
+    alertWarningPercent: Number.isFinite(alertWarningPercent) ? alertWarningPercent : null,
+    alertRemainingDollars,
     active: row.active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
+}
+
+/**
+ * Resolves which warning rules apply for a spending tracker.
+ * - Neither set → default 80%
+ * - Percent and/or dollars set → warn when either rule is crossed
+ */
+export function resolveSpendingAlertThresholds(tracker = {}) {
+  const hasPercent = tracker.alertWarningPercent != null
+  const hasDollars = tracker.alertRemainingDollars != null
+
+  return {
+    warningPercent: hasPercent
+      ? tracker.alertWarningPercent
+      : hasDollars
+        ? null
+        : DEFAULT_SPENDING_CAP_WARNING_PERCENT,
+    remainingDollars: hasDollars ? tracker.alertRemainingDollars : null,
+    usesCustomThresholds: hasPercent || hasDollars,
+  }
+}
+
+/**
+ * True when spending is still under the hard cap but has crossed a warning threshold.
+ * Dollar rule: remaining budget <= alertRemainingDollars
+ * Percent rule: percentUsed >= alertWarningPercent (or default 80%)
+ * If both are set, either one can trigger the warning.
+ */
+export function isSpendingCapWarningActive(tracker, progress) {
+  if (!progress || progress.isOver) {
+    return false
+  }
+
+  const thresholds = resolveSpendingAlertThresholds(tracker)
+  const percentHit =
+    thresholds.warningPercent != null && progress.percentUsed >= thresholds.warningPercent
+  const dollarsHit =
+    thresholds.remainingDollars != null &&
+    progress.remaining <= thresholds.remainingDollars
+
+  return percentHit || dollarsHit
 }
 
 export function computeSpendingTrackerProgress(tracker, spentThisMonth = 0) {
@@ -108,14 +159,21 @@ export function computeSpendingTrackerProgress(tracker, spentThisMonth = 0) {
   const remaining = roundCurrency(limit - spent)
   const percentUsed = limit > 0 ? Math.min(100, Math.round((spent / limit) * 100)) : 0
   const isOver = spent > limit
-
-  return {
+  const progress = {
     spent,
     remaining,
     percentUsed,
     isOver,
     overBy: isOver ? roundCurrency(spent - limit) : 0,
-    status: isOver ? 'over' : percentUsed >= 80 ? 'warning' : 'on_track',
+  }
+
+  return {
+    ...progress,
+    status: isOver
+      ? 'over'
+      : isSpendingCapWarningActive(tracker, progress)
+        ? 'warning'
+        : 'on_track',
   }
 }
 
@@ -283,6 +341,15 @@ export function parseCreateTrackerInput(body) {
     return { error: 'targetTotal applies to saving trackers only' }
   }
 
+  const alertThresholds = parseSpendingAlertThresholds(body, { optional: true })
+  if (alertThresholds.error) {
+    return { error: alertThresholds.error }
+  }
+
+  if (trackType.value === 'saving' && alertThresholds.value.hasAny) {
+    return { error: 'Alert thresholds apply to spending trackers only' }
+  }
+
   return {
     value: {
       trackType: trackType.value,
@@ -290,6 +357,93 @@ export function parseCreateTrackerInput(body) {
       purposeType: purposeType.value,
       monthlyAmount: monthlyAmount.value,
       targetTotal: targetTotal.value,
+      ...(trackType.value === 'spending'
+        ? {
+            alertWarningPercent: alertThresholds.value.alertWarningPercent,
+            alertRemainingDollars: alertThresholds.value.alertRemainingDollars,
+          }
+        : {}),
+    },
+  }
+}
+
+/**
+ * Parses optional alert thresholds.
+ * Empty string / null clears a field. Omitted fields are left unchanged on update
+ * when `forUpdate` is true; on create they default to null (use app default 80%).
+ */
+export function parseAlertWarningPercent(value, { allowNull = true } = {}) {
+  if (value === undefined) {
+    return { omitted: true }
+  }
+
+  if (value === null || value === '') {
+    return allowNull ? { value: null } : { error: 'alertWarningPercent is required' }
+  }
+
+  const parsed = Number(value)
+
+  if (!Number.isFinite(parsed) || !Number.isInteger(parsed)) {
+    return { error: 'alertWarningPercent must be a whole number' }
+  }
+
+  if (parsed < MIN_ALERT_WARNING_PERCENT || parsed > MAX_ALERT_WARNING_PERCENT) {
+    return {
+      error: `alertWarningPercent must be between ${MIN_ALERT_WARNING_PERCENT} and ${MAX_ALERT_WARNING_PERCENT}`,
+    }
+  }
+
+  return { value: parsed }
+}
+
+export function parseAlertRemainingDollars(value, { allowNull = true } = {}) {
+  if (value === undefined) {
+    return { omitted: true }
+  }
+
+  if (value === null || value === '') {
+    return allowNull ? { value: null } : { error: 'alertRemainingDollars is required' }
+  }
+
+  const parsed = Number(value)
+
+  if (!Number.isFinite(parsed)) {
+    return { error: 'alertRemainingDollars must be a number' }
+  }
+
+  if (parsed < MIN_TRACKER_AMOUNT || parsed > MAX_TRACKER_AMOUNT) {
+    return {
+      error: `alertRemainingDollars must be between ${MIN_TRACKER_AMOUNT} and ${MAX_TRACKER_AMOUNT}`,
+    }
+  }
+
+  return { value: roundCurrency(parsed) }
+}
+
+function parseSpendingAlertThresholds(body, { optional = true } = {}) {
+  const percent = parseAlertWarningPercent(body?.alertWarningPercent)
+  if (percent.error) {
+    return { error: percent.error }
+  }
+
+  const dollars = parseAlertRemainingDollars(body?.alertRemainingDollars)
+  if (dollars.error) {
+    return { error: dollars.error }
+  }
+
+  const hasAny = !percent.omitted || !dollars.omitted
+
+  if (!optional && !hasAny) {
+    return { error: 'At least one alert threshold is required' }
+  }
+
+  return {
+    value: {
+      hasAny,
+      alertWarningPercent: percent.omitted ? undefined : percent.value,
+      alertRemainingDollars: dollars.omitted ? undefined : dollars.value,
+      percentOmitted: Boolean(percent.omitted),
+      dollarsOmitted: Boolean(dollars.omitted),
     },
   }
 }
@@ -334,6 +488,18 @@ export function parseUpdateTrackerInput(body) {
       return { error: progressAmount.error }
     }
     updates.progressAmount = progressAmount.value
+  }
+
+  const alertThresholds = parseSpendingAlertThresholds(body, { optional: true })
+  if (alertThresholds.error) {
+    return { error: alertThresholds.error }
+  }
+
+  if (!alertThresholds.value.percentOmitted) {
+    updates.alertWarningPercent = alertThresholds.value.alertWarningPercent
+  }
+  if (!alertThresholds.value.dollarsOmitted) {
+    updates.alertRemainingDollars = alertThresholds.value.alertRemainingDollars
   }
 
   if (Object.keys(updates).length === 0) {

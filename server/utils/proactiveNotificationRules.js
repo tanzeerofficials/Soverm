@@ -1,5 +1,10 @@
 import { calculateTotalBalance } from './balanceHelpers.js'
 import { normalizeMerchantName } from './merchantNormalize.js'
+import {
+  DEFAULT_SPENDING_CAP_WARNING_PERCENT,
+  isSpendingCapWarningActive,
+  resolveSpendingAlertThresholds,
+} from './monthlyTrackers.js'
 
 export const TRIGGER_TYPES = {
   LARGE_TRANSACTION: 'large_transaction',
@@ -14,7 +19,9 @@ export const LARGE_TRANSACTION_MIN_ABSOLUTE = 500
 export const LARGE_TRANSACTION_MULTIPLIER = 3
 export const LOW_BALANCE_RUNWAY_DAYS = 4
 export const SPENDING_SPIKE_PERCENT = 40
-export const SPENDING_CAP_WARNING_PERCENT = 80
+/** @deprecated Prefer resolveSpendingAlertThresholds / isSpendingCapWarningActive */
+/** @deprecated Prefer resolveSpendingAlertThresholds / isSpendingCapWarningActive */
+export const SPENDING_CAP_WARNING_PERCENT = DEFAULT_SPENDING_CAP_WARNING_PERCENT
 export const DEDUP_LOOKBACK_DAYS = 7
 export const MAX_NOTIFICATIONS_PER_SYNC = 2
 export const MAX_NOTIFICATIONS_PER_DAY = 2
@@ -234,6 +241,9 @@ export function detectSpendingCapTriggers({ spendingTracker = null, periodStart 
   const spent = roundCurrency(progress.spent)
   const triggers = []
 
+  const thresholds = resolveSpendingAlertThresholds(spendingTracker)
+  const remaining = roundCurrency(progress.remaining)
+
   if (progress.isOver) {
     triggers.push({
       triggerType: TRIGGER_TYPES.SPENDING_CAP_OVER,
@@ -255,7 +265,7 @@ export function detectSpendingCapTriggers({ spendingTracker = null, periodStart 
         percentUsed: progress.percentUsed,
       },
     })
-  } else if (progress.percentUsed >= SPENDING_CAP_WARNING_PERCENT) {
+  } else if (isSpendingCapWarningActive(spendingTracker, progress)) {
     triggers.push({
       triggerType: TRIGGER_TYPES.SPENDING_CAP_WARNING,
       dedupKey: `spending_cap:warning:${periodKey}`,
@@ -264,16 +274,20 @@ export function detectSpendingCapTriggers({ spendingTracker = null, periodStart 
         capName,
         monthlyLimit: limit,
         spent,
-        remaining: roundCurrency(progress.remaining),
+        remaining,
         percentUsed: progress.percentUsed,
+        warningPercent: thresholds.warningPercent,
+        remainingDollarsThreshold: thresholds.remainingDollars,
         link: '/dashboard?tab=tools&quickTool=tracker',
       },
       facts: {
         capName,
         monthlyLimit: limit,
         spent,
-        remaining: roundCurrency(progress.remaining),
+        remaining,
         percentUsed: progress.percentUsed,
+        warningPercent: thresholds.warningPercent,
+        remainingDollarsThreshold: thresholds.remainingDollars,
       },
     })
   }
@@ -330,11 +344,16 @@ export function buildTemplateNotificationCopy(trigger) {
         title: 'Spending cap exceeded',
         body: `${trigger.facts.capName} is over for this month — $${trigger.facts.spent} spent vs $${trigger.facts.monthlyLimit} limit.`,
       }
-    case TRIGGER_TYPES.SPENDING_CAP_WARNING:
+    case TRIGGER_TYPES.SPENDING_CAP_WARNING: {
+      const remainingNote =
+        trigger.facts.remainingDollarsThreshold != null
+          ? ` $${trigger.facts.remaining} left (alert at $${trigger.facts.remainingDollarsThreshold}).`
+          : ` $${trigger.facts.remaining} left.`
       return {
         title: 'Approaching your spending cap',
-        body: `${trigger.facts.capName} is at ${trigger.facts.percentUsed}% ($${trigger.facts.spent} of $${trigger.facts.monthlyLimit}) with $${trigger.facts.remaining} left.`,
+        body: `${trigger.facts.capName} is at ${trigger.facts.percentUsed}% ($${trigger.facts.spent} of $${trigger.facts.monthlyLimit}).${remainingNote}`,
       }
+    }
     default:
       return {
         title: 'Soverm noticed something',

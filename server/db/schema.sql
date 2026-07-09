@@ -78,6 +78,10 @@ CREATE TABLE monthly_trackers (
   progress_amount NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (progress_amount >= 0),
   monthly_progress_amount NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (monthly_progress_amount >= 0),
   progress_month DATE,
+  alert_warning_percent INTEGER
+    CHECK (alert_warning_percent IS NULL OR (alert_warning_percent >= 1 AND alert_warning_percent <= 99)),
+  alert_remaining_dollars NUMERIC(12, 2)
+    CHECK (alert_remaining_dollars IS NULL OR alert_remaining_dollars > 0),
   active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
@@ -90,3 +94,25 @@ CREATE INDEX monthly_trackers_user_active_idx
 CREATE UNIQUE INDEX monthly_trackers_one_active_spending_per_user_idx
   ON monthly_trackers (user_id)
   WHERE track_type = 'spending' AND active = true;
+
+CREATE TABLE savings_transfer_detections (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  transaction_id UUID NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+  tracker_id UUID REFERENCES monthly_trackers(id) ON DELETE SET NULL,
+  amount NUMERIC(12, 2) NOT NULL CHECK (amount > 0),
+  merchant_name TEXT NOT NULL DEFAULT '',
+  transaction_date DATE NOT NULL,
+  account_label TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'applied', 'dismissed')),
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  resolved_at TIMESTAMP
+);
+
+CREATE UNIQUE INDEX savings_transfer_detections_user_txn_idx
+  ON savings_transfer_detections (user_id, transaction_id);
+
+CREATE INDEX savings_transfer_detections_user_pending_idx
+  ON savings_transfer_detections (user_id, status)
+  WHERE status = 'pending';

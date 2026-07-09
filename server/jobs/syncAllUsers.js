@@ -9,6 +9,7 @@ import cron from 'node-cron'
 import db from '../db/index.js'
 import { syncAllAccountsForUser } from '../services/plaid.js'
 import { evaluateAndCreateProactiveNotifications } from '../services/proactiveNotifications.js'
+import { scanAndStoreSavingsTransferDetections } from '../services/savingsTransferDetection.js'
 
 export function startSyncJob() {
   // TESTING ONLY — change back to '0 */4 * * *' after testing (every 4 hours)
@@ -30,6 +31,13 @@ export function startSyncJob() {
           if (notificationResult.created > 0) {
             console.log(
               `Created ${notificationResult.created} proactive notification(s) for user ${userId}`
+            )
+          }
+
+          const savingsResult = await scanAndStoreSavingsTransferDetections(userId)
+          if (savingsResult.created > 0) {
+            console.log(
+              `Detected ${savingsResult.created} savings transfer(s) for user ${userId}`
             )
           }
         } catch (userErr) {

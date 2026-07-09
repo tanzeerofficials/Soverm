@@ -125,6 +125,39 @@ const warningCap = buildTrackerAttentionItems({
 })
 assert(warningCap.length === 1 && warningCap[0].id === 'spending-cap-warning', 'flags cap warning')
 
+const dollarWarning = buildTrackerAttentionItems({
+  spendingTracker: {
+    name: 'Monthly spending',
+    monthlyAmount: 1500,
+    alertRemainingDollars: 200,
+    alertWarningPercent: null,
+    progress: {
+      spent: 1320,
+      isOver: false,
+      percentUsed: 88,
+      remaining: 180,
+    },
+  },
+  periodLabel: 'Jul 1–today',
+})
+assert(dollarWarning.length === 1 && dollarWarning[0].id === 'spending-cap-warning', 'flags dollar remaining warning')
+
+const customPercentQuiet = buildTrackerAttentionItems({
+  spendingTracker: {
+    name: 'Monthly spending',
+    monthlyAmount: 1500,
+    alertWarningPercent: 90,
+    progress: {
+      spent: 1250,
+      isOver: false,
+      percentUsed: 83,
+      remaining: 250,
+    },
+  },
+  periodLabel: 'Jul 1–today',
+})
+assert(customPercentQuiet.length === 0, 'custom 90% does not warn at 83%')
+
 const attentionWithTracker = buildAttentionItems({
   hasAccounts: true,
   hasInsight: true,
@@ -141,6 +174,30 @@ const attentionWithTracker = buildAttentionItems({
   },
 })
 assert(attentionWithTracker.some((item) => item.id === 'spending-cap-warning'), 'includes tracker alert in attention list')
+
+const savingsAttention = buildAttentionItems({
+  hasAccounts: true,
+  hasInsight: true,
+  highlightGenerate: false,
+  lastSyncedAt: hoursAgo(1),
+  incompleteActionCount: 0,
+  trackerSnapshot: {
+    savingTrackers: [{ id: 'goal-1', name: 'Emergency fund' }],
+    pendingSavingsDetections: [
+      {
+        id: 'det-1',
+        trackerId: 'goal-1',
+        amount: 200,
+        merchantName: 'Transfer to Savings',
+        transactionDate: '2026-07-08',
+      },
+    ],
+  },
+})
+assert(
+  savingsAttention.some((item) => item.id === 'savings-detection-det-1'),
+  'includes savings detection in attention list'
+)
 
 localStorageMock._reset()
 clearAttentionDismissals()

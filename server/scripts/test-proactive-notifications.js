@@ -136,6 +136,32 @@ try {
   assert(capWarning.length === 1, 'Should detect spending cap warning')
   assert(capWarning[0].triggerType === 'spending_cap_warning', 'Warning cap trigger type')
   console.log('  pass: spending cap warning detection')
+
+  const dollarWarning = detectSpendingCapTriggers({
+    spendingTracker: {
+      id: 'cap-1',
+      name: 'Monthly spending',
+      monthlyAmount: 1500,
+      alertRemainingDollars: 200,
+      progress: { spent: 1320, isOver: false, remaining: 180, percentUsed: 88 },
+    },
+    periodStart: '2026-07-01',
+  })
+  assert(dollarWarning.length === 1, 'Should detect dollar remaining warning')
+  console.log('  pass: spending cap dollar threshold detection')
+
+  const customQuiet = detectSpendingCapTriggers({
+    spendingTracker: {
+      id: 'cap-1',
+      name: 'Monthly spending',
+      monthlyAmount: 1500,
+      alertWarningPercent: 90,
+      progress: { spent: 1250, isOver: false, remaining: 250, percentUsed: 83 },
+    },
+    periodStart: '2026-07-01',
+  })
+  assert(customQuiet.length === 0, 'Custom 90% should not warn at 83%')
+  console.log('  pass: custom percent threshold quiet below line')
   passed++
 
   const evaluated = evaluateProactiveTriggers({

@@ -7,11 +7,17 @@ import {
   notificationActionLabel,
 } from './notificationNavigation.js'
 import { QUICK_TOOL_TABS } from './quickTools.js'
+import {
+  DEFAULT_SPENDING_CAP_WARNING_PERCENT,
+  isSpendingCapWarningActive,
+  resolveSpendingAlertThresholds,
+} from './spendingAlertThresholds.js'
 
 export const INSIGHT_STALE_DAYS = 5
 export const SYNC_STALE_HOURS = 24
 export const MAX_NOTIFICATION_ITEMS = 2
-export const SPENDING_CAP_WARNING_PERCENT = 80
+/** @deprecated Prefer resolveSpendingAlertThresholds / isSpendingCapWarningActive */
+export const SPENDING_CAP_WARNING_PERCENT = DEFAULT_SPENDING_CAP_WARNING_PERCENT
 
 function formatAttentionCurrency(amount) {
   return new Intl.NumberFormat('en-US', {
@@ -54,13 +60,23 @@ export function buildTrackerAttentionItems(trackerSnapshot) {
     ]
   }
 
-  if (progress.percentUsed >= SPENDING_CAP_WARNING_PERCENT) {
+  if (isSpendingCapWarningActive(spendingTracker, progress)) {
+    const thresholds = resolveSpendingAlertThresholds(spendingTracker)
+    const thresholdHint = [
+      thresholds.warningPercent != null ? `${thresholds.warningPercent}% used` : null,
+      thresholds.remainingDollars != null
+        ? `${formatAttentionCurrency(thresholds.remainingDollars)} left`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(' or ')
+
     return [
       {
         id: 'spending-cap-warning',
         tone: 'warning',
         title: `Approaching ${capName.toLowerCase()}`,
-        detail: `${formatAttentionCurrency(progress.spent)} of ${formatAttentionCurrency(limit)} spent ${periodLabel} (${progress.percentUsed}% used).`,
+        detail: `${formatAttentionCurrency(progress.spent)} of ${formatAttentionCurrency(limit)} spent ${periodLabel} (${progress.percentUsed}% used · ${formatAttentionCurrency(progress.remaining)} left${thresholdHint ? ` · alert at ${thresholdHint}` : ''}).`,
         actionLabel: 'View tracker',
         ...navigation,
       },
@@ -68,6 +84,36 @@ export function buildTrackerAttentionItems(trackerSnapshot) {
   }
 
   return []
+}
+
+/**
+ * Surfaces detected savings transfers awaiting user confirmation.
+ */
+export function buildSavingsDetectionAttentionItems(trackerSnapshot) {
+  const detections = trackerSnapshot?.pendingSavingsDetections ?? []
+  const savingTrackers = trackerSnapshot?.savingTrackers ?? []
+
+  if (detections.length === 0 || savingTrackers.length === 0) {
+    return []
+  }
+
+  const trackerNameById = new Map(savingTrackers.map((tracker) => [tracker.id, tracker.name]))
+
+  return detections.slice(0, 2).map((detection) => {
+    const suggestedName = trackerNameById.get(detection.trackerId) ?? 'your savings goal'
+
+    return {
+      id: `savings-detection-${detection.id}`,
+      detectionId: detection.id,
+      tone: 'brand',
+      title: 'Possible savings deposit',
+      detail: `${formatAttentionCurrency(detection.amount)} on ${detection.transactionDate} (${detection.merchantName}) — add to ${suggestedName}?`,
+      actionLabel: 'Review in tracker',
+      tab: 'tools',
+      quickToolTab: QUICK_TOOL_TABS.TRACKER,
+      scrollTo: 'dashboard-quick-tools',
+    }
+  })
 }
 
 export function daysSince(isoDate) {
@@ -149,6 +195,7 @@ export function buildAttentionItems({
 
   if (hasAccounts) {
     items.push(...buildTrackerAttentionItems(trackerSnapshot))
+    items.push(...buildSavingsDetectionAttentionItems(trackerSnapshot))
   }
 
   if (!hasAccounts) {

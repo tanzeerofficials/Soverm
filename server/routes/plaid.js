@@ -10,6 +10,7 @@ import { Router } from 'express'
 import { getAuth, requireAuth } from '@clerk/express'
 import { plaidClient, syncAllAccountsForUser } from '../services/plaid.js'
 import { evaluateAndCreateProactiveNotifications } from '../services/proactiveNotifications.js'
+import { scanAndStoreSavingsTransferDetections } from '../services/savingsTransferDetection.js'
 import db from '../db/index.js'
 import { ensureUserExists } from '../utils/ensureUser.js'
 import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
@@ -127,6 +128,7 @@ router.post('/exchange-public-token', plaidRateLimiter, async (req, res) => {
 
     const { added, modified, removed } = await syncAllAccountsForUser(userId)
     await evaluateAndCreateProactiveNotifications(userId)
+    await scanAndStoreSavingsTransferDetections(userId)
 
     res.json({
       success: true,
@@ -148,6 +150,7 @@ router.post('/sync-transactions', syncRateLimiter, async (req, res) => {
   try {
     const { added, modified, removed } = await syncAllAccountsForUser(userId)
     await evaluateAndCreateProactiveNotifications(userId)
+    await scanAndStoreSavingsTransferDetections(userId)
     res.json({ success: true, added, modified, removed })
   } catch (err) {
     reportServerError('to sync transactions', err, { userId, req })

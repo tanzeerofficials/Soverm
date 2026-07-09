@@ -1,5 +1,5 @@
 /*
- * Verify and optionally apply tracker migrations 013–015 on production Postgres.
+ * Verify and optionally apply tracker migrations 013–017 on production Postgres.
  *
  * Safety: refuses localhost unless ALLOW_LOCAL_DB=1.
  *
@@ -68,6 +68,27 @@ async function hasUniqueSpendingIndex() {
   return rows.length > 0
 }
 
+async function hasAlertThresholdColumns() {
+  const { rows } = await pool.query(
+    `SELECT 1
+     FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND table_name = 'monthly_trackers'
+       AND column_name = 'alert_warning_percent'`
+  )
+  return rows.length > 0
+}
+
+async function hasSavingsTransferDetectionsTable() {
+  const { rows } = await pool.query(
+    `SELECT 1
+     FROM information_schema.tables
+     WHERE table_schema = 'public'
+       AND table_name = 'savings_transfer_detections'`
+  )
+  return rows.length > 0
+}
+
 async function runMigrationScript(script) {
   const { spawn } = await import('child_process')
   const path = await import('path')
@@ -90,12 +111,16 @@ async function main() {
   let m013 = await hasMonthlyTrackersTable()
   let m014 = await hasMonthlyProgressColumn()
   let m015 = await hasUniqueSpendingIndex()
+  let m016 = await hasAlertThresholdColumns()
+  let m017 = await hasSavingsTransferDetectionsTable()
 
   console.log(`013 monthly_trackers:                    ${m013 ? 'OK' : 'MISSING'}`)
   console.log(`014 monthly_progress_amount:             ${m014 ? 'OK' : 'MISSING'}`)
   console.log(`015 unique active spending index:        ${m015 ? 'OK' : 'MISSING'}`)
+  console.log(`016 spending alert thresholds:           ${m016 ? 'OK' : 'MISSING'}`)
+  console.log(`017 savings transfer detections:         ${m017 ? 'OK' : 'MISSING'}`)
 
-  if ((!m013 || !m014 || !m015) && apply) {
+  if ((!m013 || !m014 || !m015 || !m016 || !m017) && apply) {
     if (!m013) {
       console.log('\nApplying migration 013...')
       await runMigrationScript('scripts/run-013-monthly-trackers-migration.js')
@@ -113,11 +138,23 @@ async function main() {
       await runMigrationScript('scripts/run-015-unique-spending-tracker-migration.js')
       m015 = await hasUniqueSpendingIndex()
     }
+
+    if (!m016) {
+      console.log('\nApplying migration 016...')
+      await runMigrationScript('scripts/run-016-spending-alert-thresholds-migration.js')
+      m016 = await hasAlertThresholdColumns()
+    }
+
+    if (!m017) {
+      console.log('\nApplying migration 017...')
+      await runMigrationScript('scripts/run-017-savings-transfer-detections-migration.js')
+      m017 = await hasSavingsTransferDetectionsTable()
+    }
   }
 
   await pool.end()
 
-  if (m013 && m014 && m015) {
+  if (m013 && m014 && m015 && m016 && m017) {
     console.log('\nAll tracker migrations verified.')
     process.exit(0)
   }

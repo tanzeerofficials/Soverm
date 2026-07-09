@@ -64,3 +64,43 @@ export async function deleteTracker(getToken, trackerId) {
 
   return res.json()
 }
+
+export async function applySavingsDetection(getToken, detectionId, trackerId) {
+  const token = await getToken()
+  const res = await fetch(
+    `${import.meta.env.VITE_API_URL}/api/trackers/savings-detections/${detectionId}/apply`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(trackerId ? { trackerId } : {}),
+    }
+  )
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error || `Apply savings detection failed: ${res.status}`)
+  }
+
+  return res.json()
+}
+
+export async function dismissSavingsDetection(getToken, detectionId) {
+  const token = await getToken()
+  const res = await fetch(
+    `${import.meta.env.VITE_API_URL}/api/trackers/savings-detections/${detectionId}/dismiss`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  )
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error || `Dismiss savings detection failed: ${res.status}`)
+  }
+
+  return res.json()
+}

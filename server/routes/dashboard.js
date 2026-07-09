@@ -12,6 +12,7 @@ import { calculateTotalBalance, getDisplayBalance } from '../utils/balanceHelper
 import { CONNECTED_ACCOUNT_TRANSACTION_JOINS } from '../utils/connectedAccountTransactions.js'
 import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
 import { reportServerError } from '../utils/sentry.js'
+import { buildCashFlowForecastForUser } from '../services/cashFlowForecast.js'
 
 const NON_PENDING_FILTER = 'AND (t.pending IS NOT TRUE)'
 
@@ -175,6 +176,24 @@ router.get('/summary', async (req, res) => {
     })
   } catch (err) {
     reportServerError('to load dashboard summary', err, { userId, req })
+    res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
+  }
+})
+
+/*
+ * GET /api/dashboard/forecast
+ *
+ * Projects net balance for the next 30 days using confirmed recurring
+ * charges and recent income/spending patterns.
+ */
+router.get('/forecast', async (req, res) => {
+  const { userId } = getAuth(req)
+
+  try {
+    const forecast = await buildCashFlowForecastForUser(userId)
+    res.json(forecast)
+  } catch (err) {
+    reportServerError('to load cash flow forecast', err, { userId, req })
     res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
   }
 })

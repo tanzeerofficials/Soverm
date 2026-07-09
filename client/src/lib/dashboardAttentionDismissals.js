@@ -51,6 +51,9 @@ export function getAttentionItemFingerprint(item, context = {}) {
     case 'first-insight':
       return 'needs-insight'
     default:
+      if (typeof item.id === 'string' && item.id.startsWith('savings-detection-')) {
+        return item.detectionId ?? item.id
+      }
       return 'default'
   }
 }

@@ -10,6 +10,10 @@ import { CONNECTED_ACCOUNT_TRANSACTION_JOINS } from '../utils/connectedAccountTr
 import { hasMonthlyTrackersTable } from '../utils/monthlyTrackersSchema.js'
 import { listActiveTrackers } from './monthlyTrackersService.js'
 import {
+  listPendingSavingsTransferDetections,
+  scanAndStoreSavingsTransferDetections,
+} from './savingsTransferDetection.js'
+import {
   enrichTracker,
 } from '../utils/monthlyTrackers.js'
 import {
@@ -119,6 +123,9 @@ export async function buildTrackerSnapshot(userId) {
   const safeToSpend = spendingSummary?.safeToSpend ?? null
   const spendingProgress = spendingTracker?.progress
 
+  const savingsDetectionResult = await scanAndStoreSavingsTransferDetections(userId)
+  const pendingSavingsDetections = await listPendingSavingsTransferDetections(userId)
+
   return {
     trackers: enrichedTrackers,
     spendingTracker,
@@ -136,6 +143,8 @@ export async function buildTrackerSnapshot(userId) {
     netBalance,
     suggestedSpendingLimit,
     suggestedBudget: suggestedSpendingLimit,
+    pendingSavingsDetections,
+    savingsDetectionsScanned: savingsDetectionResult.created ?? 0,
     ...period,
     accountCount: accounts.length,
     lastSyncedAt: lastSyncedResult.rows[0]?.last_synced ?? null,

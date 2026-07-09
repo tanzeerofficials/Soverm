@@ -9,9 +9,14 @@ import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import Skeleton from '../Skeleton.jsx'
 import HowCalculatedDisclosure from '../HowCalculatedDisclosure.jsx'
-import { createTracker, deleteTracker, updateTracker } from '../../lib/fetchTrackers.js'
+import { createTracker, deleteTracker, updateTracker, applySavingsDetection, dismissSavingsDetection } from '../../lib/fetchTrackers.js'
 import { trackerQueryKey } from '../../lib/queryKeys.js'
 import { GOAL_PURPOSE_OPTIONS, goalPurposeLabel } from '../../lib/savingsGoalDisplay.js'
+import {
+  DEFAULT_SPENDING_CAP_WARNING_PERCENT,
+  describeSpendingAlertThresholds,
+  isSpendingCapWarningActive,
+} from '../../lib/spendingAlertThresholds.js'
 
 const TRACK_MODES = {
   SPENDING: 'spending',
@@ -68,11 +73,22 @@ function TrackerTypeSelector({ mode, onChange }) {
   )
 }
 
+function parseOptionalNumber(value) {
+  if (value == null || value === '') {
+    return null
+  }
+
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 function TrackerCreateForm({ mode, snapshot, onCreated, isSaving, errorMessage }) {
   const [name, setName] = useState('')
   const [monthlyAmount, setMonthlyAmount] = useState('')
   const [purposeType, setPurposeType] = useState('future')
   const [targetTotal, setTargetTotal] = useState('')
+  const [alertWarningPercent, setAlertWarningPercent] = useState('')
+  const [alertRemainingDollars, setAlertRemainingDollars] = useState('')
 
   const suggested =
     mode === TRACK_MODES.SPENDING
@@ -92,6 +108,12 @@ function TrackerCreateForm({ mode, snapshot, onCreated, isSaving, errorMessage }
       purposeType: mode === TRACK_MODES.SAVING ? purposeType : undefined,
       monthlyAmount: parsed,
       targetTotal: mode === TRACK_MODES.SAVING && targetTotal ? Number(targetTotal) : undefined,
+      ...(mode === TRACK_MODES.SPENDING
+        ? {
+            alertWarningPercent: parseOptionalNumber(alertWarningPercent),
+            alertRemainingDollars: parseOptionalNumber(alertRemainingDollars),
+          }
+        : {}),
     })
   }
 
@@ -103,7 +125,7 @@ function TrackerCreateForm({ mode, snapshot, onCreated, isSaving, errorMessage }
       <p className="text-xs text-fg-muted">
         {mode === TRACK_MODES.SPENDING
           ? 'We compare your connected-account spending this calendar month against this limit.'
-          : 'Log how much you have saved toward this goal each month. Bank transfers are not auto-detected yet.'}
+          : 'Log how much you have saved toward this goal each month, or confirm detected transfers below.'}
       </p>
 
       {suggested > 0 && (
@@ -180,6 +202,59 @@ function TrackerCreateForm({ mode, snapshot, onCreated, isSaving, errorMessage }
         </label>
       )}
 
+      {mode === TRACK_MODES.SPENDING && (
+        <fieldset className="space-y-3 rounded-lg border border-border-default/70 bg-app/30 p-3">
+          <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+            Alert me when (optional)
+          </legend>
+          <p className="text-xs text-fg-muted">
+            Leave blank to use the default ({DEFAULT_SPENDING_CAP_WARNING_PERCENT}% used). Set percent,
+            dollars left, or both — either one can trigger the warning.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+                At % of cap used
+              </span>
+              <div className="relative mt-1.5">
+                <input
+                  type="number"
+                  min="1"
+                  max="99"
+                  step="1"
+                  value={alertWarningPercent}
+                  onChange={(e) => setAlertWarningPercent(e.target.value)}
+                  placeholder={String(DEFAULT_SPENDING_CAP_WARNING_PERCENT)}
+                  className="w-full rounded-lg border border-border-default bg-app py-2 pl-3 pr-8 font-mono text-sm tabular-nums text-fg outline-none focus:border-brand/50"
+                />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-fg-muted">
+                  %
+                </span>
+              </div>
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+                When $ left drops to
+              </span>
+              <div className="relative mt-1.5">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-fg-muted">
+                  $
+                </span>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={alertRemainingDollars}
+                  onChange={(e) => setAlertRemainingDollars(e.target.value)}
+                  placeholder="200"
+                  className="w-full rounded-lg border border-border-default bg-app py-2 pl-7 pr-3 font-mono text-sm tabular-nums text-fg outline-none focus:border-brand/50"
+                />
+              </div>
+            </label>
+          </div>
+        </fieldset>
+      )}
+
       {errorMessage && (
         <p className="text-sm text-danger" role="alert">
           {errorMessage}
@@ -204,6 +279,12 @@ function TrackerEditForm({ mode, tracker, onSave, onCancel, isSaving, errorMessa
   const [targetTotal, setTargetTotal] = useState(
     tracker.targetTotal != null ? String(tracker.targetTotal) : ''
   )
+  const [alertWarningPercent, setAlertWarningPercent] = useState(
+    tracker.alertWarningPercent != null ? String(tracker.alertWarningPercent) : ''
+  )
+  const [alertRemainingDollars, setAlertRemainingDollars] = useState(
+    tracker.alertRemainingDollars != null ? String(tracker.alertRemainingDollars) : ''
+  )
 
   function handleSubmit(event) {
     event.preventDefault()
@@ -220,6 +301,12 @@ function TrackerEditForm({ mode, tracker, onSave, onCancel, isSaving, errorMessa
     if (mode === TRACK_MODES.SAVING) {
       payload.purposeType = purposeType
       payload.targetTotal = targetTotal ? Number(targetTotal) : null
+    }
+
+    if (mode === TRACK_MODES.SPENDING) {
+      // Explicit null clears a custom threshold and falls back to the default 80%.
+      payload.alertWarningPercent = parseOptionalNumber(alertWarningPercent)
+      payload.alertRemainingDollars = parseOptionalNumber(alertRemainingDollars)
     }
 
     onSave(payload)
@@ -292,6 +379,58 @@ function TrackerEditForm({ mode, tracker, onSave, onCancel, isSaving, errorMessa
         </label>
       )}
 
+      {mode === TRACK_MODES.SPENDING && (
+        <fieldset className="space-y-3 rounded-lg border border-border-default/70 bg-app/30 p-3">
+          <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+            Alert thresholds
+          </legend>
+          <p className="text-xs text-fg-muted">
+            Clear both fields to use the default ({DEFAULT_SPENDING_CAP_WARNING_PERCENT}% used).
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+                At % of cap used
+              </span>
+              <div className="relative mt-1.5">
+                <input
+                  type="number"
+                  min="1"
+                  max="99"
+                  step="1"
+                  value={alertWarningPercent}
+                  onChange={(e) => setAlertWarningPercent(e.target.value)}
+                  placeholder={String(DEFAULT_SPENDING_CAP_WARNING_PERCENT)}
+                  className="w-full rounded-lg border border-border-default bg-app py-2 pl-3 pr-8 font-mono text-sm tabular-nums text-fg outline-none focus:border-brand/50"
+                />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-fg-muted">
+                  %
+                </span>
+              </div>
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+                When $ left drops to
+              </span>
+              <div className="relative mt-1.5">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-fg-muted">
+                  $
+                </span>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={alertRemainingDollars}
+                  onChange={(e) => setAlertRemainingDollars(e.target.value)}
+                  placeholder="200"
+                  className="w-full rounded-lg border border-border-default bg-app py-2 pl-7 pr-3 font-mono text-sm tabular-nums text-fg outline-none focus:border-brand/50"
+                />
+              </div>
+            </label>
+          </div>
+        </fieldset>
+      )}
+
       {errorMessage && (
         <p className="text-sm text-danger" role="alert">
           {errorMessage}
@@ -359,7 +498,11 @@ function SpendingTrackerCard({ tracker, periodLabel, getToken, onRemove, isRemov
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-elevated">
         <div
           className={`h-full rounded-full ${
-            progress.isOver ? 'bg-danger' : progress.percentUsed >= 80 ? 'bg-warning' : 'bg-brand'
+            progress.isOver
+              ? 'bg-danger'
+              : isSpendingCapWarningActive(tracker, progress)
+                ? 'bg-warning'
+                : 'bg-brand'
           }`}
           style={{ width: `${Math.min(progress.percentUsed, 100)}%` }}
         />
@@ -370,6 +513,7 @@ function SpendingTrackerCard({ tracker, periodLabel, getToken, onRemove, isRemov
           ? `Over by ${formatCurrency(progress.overBy)}`
           : `${formatCurrency(progress.remaining)} left to spend · ${progress.percentUsed}% used`}
       </p>
+      <p className="mt-1 text-xs text-fg-subtle">{describeSpendingAlertThresholds(tracker)}</p>
 
       {isEditing ? (
         <TrackerEditForm
@@ -537,6 +681,93 @@ function SavingTrackerCard({ tracker, periodLabel, getToken, onRemove, isRemovin
   )
 }
 
+function SavingsDetectionsPanel({ detections, savingTrackers, getToken }) {
+  const queryClient = useQueryClient()
+
+  const applyMutation = useMutation({
+    mutationFn: ({ detectionId, trackerId }) => applySavingsDetection(getToken, detectionId, trackerId),
+    onSuccess: (response) => {
+      queryClient.setQueryData(trackerQueryKey, response)
+    },
+  })
+
+  const dismissMutation = useMutation({
+    mutationFn: (detectionId) => dismissSavingsDetection(getToken, detectionId),
+    onSuccess: (response) => {
+      queryClient.setQueryData(trackerQueryKey, response)
+    },
+  })
+
+  if (!detections?.length) {
+    return null
+  }
+
+  return (
+    <section className="rounded-lg border border-ai/25 bg-ai/5 px-4 py-4">
+      <p className="text-sm font-semibold text-fg">Detected savings transfers</p>
+      <p className="mt-1 text-xs text-fg-muted">
+        We spotted likely transfers to savings this month. Confirm to update your goal progress.
+      </p>
+      <ul className="mt-3 space-y-3">
+        {detections.map((detection) => (
+          <li
+            key={detection.id}
+            className="rounded-lg border border-border-default/80 bg-app/50 px-3 py-3"
+          >
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-fg">{detection.merchantName}</p>
+                <p className="mt-1 text-xs text-fg-muted">
+                  {formatCurrency(detection.amount)} · {detection.transactionDate}
+                  {detection.accountLabel ? ` · ${detection.accountLabel}` : ''}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {savingTrackers.length > 1 ? (
+                  <select
+                    defaultValue={detection.trackerId ?? savingTrackers[0]?.id}
+                    className="rounded-lg border border-border-default bg-app px-2 py-1.5 text-xs text-fg outline-none focus:border-brand/50"
+                    id={`savings-detection-goal-${detection.id}`}
+                  >
+                    {savingTrackers.map((tracker) => (
+                      <option key={tracker.id} value={tracker.id}>
+                        {tracker.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
+                <button
+                  type="button"
+                  disabled={applyMutation.isPending || dismissMutation.isPending}
+                  onClick={() => {
+                    const select = document.getElementById(`savings-detection-goal-${detection.id}`)
+                    const trackerId =
+                      savingTrackers.length > 1
+                        ? select?.value
+                        : detection.trackerId ?? savingTrackers[0]?.id
+                    applyMutation.mutate({ detectionId: detection.id, trackerId })
+                  }}
+                  className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:bg-brand-soft disabled:opacity-60"
+                >
+                  Add to goal
+                </button>
+                <button
+                  type="button"
+                  disabled={applyMutation.isPending || dismissMutation.isPending}
+                  onClick={() => dismissMutation.mutate(detection.id)}
+                  className="rounded-lg border border-border-default bg-surface-elevated px-3 py-1.5 text-xs font-semibold text-fg-muted transition hover:text-fg disabled:opacity-60"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
 function TrackerToolPanel({ snapshot, isLoading, loadError, onRetryLoad, getToken }) {
   const queryClient = useQueryClient()
   const [mode, setMode] = useState(TRACK_MODES.SPENDING)
@@ -590,12 +821,21 @@ function TrackerToolPanel({ snapshot, isLoading, loadError, onRetryLoad, getToke
   const trackers = snapshot?.trackers ?? []
   const spendingTracker = snapshot?.spendingTracker
   const savingTrackers = snapshot?.savingTrackers ?? []
+  const pendingSavingsDetections = snapshot?.pendingSavingsDetections ?? []
   const periodLabel = snapshot?.periodLabel ?? 'This month'
   const hasSpending = Boolean(spendingTracker)
   const canAddSaving = savingTrackers.length < 5
 
   return (
     <div className="space-y-4">
+      {pendingSavingsDetections.length > 0 && savingTrackers.length > 0 && (
+        <SavingsDetectionsPanel
+          detections={pendingSavingsDetections}
+          savingTrackers={savingTrackers}
+          getToken={getToken}
+        />
+      )}
+
       {spendingTracker && (
         <SpendingTrackerCard
           tracker={spendingTracker}
@@ -665,9 +905,9 @@ function TrackerToolPanel({ snapshot, isLoading, loadError, onRetryLoad, getToke
         title="How tracking works"
         items={[
           'Spending trackers compare outflows from connected accounts this calendar month (pending excluded).',
-          'Saving trackers use amounts you log each calendar month — progress resets on the 1st.',
+          'Saving trackers use amounts you log each month, or you can confirm detected transfers to savings.',
           'Your total toward a goal is tracked separately and does not reset monthly.',
-          'We do not detect bank transfers automatically yet.',
+          'Detected transfers are suggestions — always confirm before they count toward a goal.',
           'Spending and saving trackers are independent; one does not reduce the other automatically.',
         ]}
       />

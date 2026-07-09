@@ -7,8 +7,11 @@ import {
   computeMonthlyProgressUpdate,
   computeSavingTrackerProgress,
   computeSpendingTrackerProgress,
+  isSpendingCapWarningActive,
   parseCreateTrackerInput,
+  parseUpdateTrackerInput,
   resolveMonthlySaved,
+  resolveSpendingAlertThresholds,
 } from '../utils/monthlyTrackers.js'
 
 function assert(condition, message) {
@@ -25,6 +28,65 @@ assert(spending.status === 'on_track', 'spending on track')
 
 const over = computeSpendingTrackerProgress({ monthlyAmount: 1500 }, 1700)
 assert(over.isOver === true, 'spending over cap')
+
+const defaultWarning = computeSpendingTrackerProgress({ monthlyAmount: 1500 }, 1250)
+assert(defaultWarning.status === 'warning', 'default 80% warning')
+
+const customPercent = computeSpendingTrackerProgress(
+  { monthlyAmount: 1500, alertWarningPercent: 90 },
+  1250
+)
+assert(customPercent.status === 'on_track', 'custom 90% not yet warning at 83%')
+
+const customPercentHit = computeSpendingTrackerProgress(
+  { monthlyAmount: 1500, alertWarningPercent: 90 },
+  1360
+)
+assert(customPercentHit.status === 'warning', 'custom 90% warning when crossed')
+
+const dollarOnly = computeSpendingTrackerProgress(
+  { monthlyAmount: 1500, alertRemainingDollars: 200 },
+  1250
+)
+assert(dollarOnly.status === 'on_track', 'dollar threshold not hit at $250 left')
+
+const dollarHit = computeSpendingTrackerProgress(
+  { monthlyAmount: 1500, alertRemainingDollars: 200 },
+  1320
+)
+assert(dollarHit.status === 'warning', 'dollar threshold warning at $180 left')
+assert(
+  isSpendingCapWarningActive(
+    { alertRemainingDollars: 200 },
+    { isOver: false, remaining: 180, percentUsed: 88 }
+  ),
+  'isSpendingCapWarningActive dollar rule'
+)
+
+const bothEither = resolveSpendingAlertThresholds({
+  alertWarningPercent: 70,
+  alertRemainingDollars: 300,
+})
+assert(bothEither.warningPercent === 70, 'both thresholds keep percent')
+assert(bothEither.remainingDollars === 300, 'both thresholds keep dollars')
+
+const createWithAlerts = parseCreateTrackerInput({
+  trackType: 'spending',
+  monthlyAmount: 2000,
+  alertWarningPercent: 75,
+  alertRemainingDollars: 250,
+})
+assert(!createWithAlerts.error, 'create spending with alerts parses')
+assert(createWithAlerts.value.alertWarningPercent === 75, 'create keeps percent')
+assert(createWithAlerts.value.alertRemainingDollars === 250, 'create keeps dollars')
+
+const updateClearAlerts = parseUpdateTrackerInput({
+  alertWarningPercent: null,
+  alertRemainingDollars: null,
+})
+assert(!updateClearAlerts.error, 'clearing alerts parses')
+assert(updateClearAlerts.value.alertWarningPercent === null, 'clears percent')
+assert(updateClearAlerts.value.alertRemainingDollars === null, 'clears dollars')
 
 const july = new Date(2026, 6, 15)
 const saving = computeSavingTrackerProgress(

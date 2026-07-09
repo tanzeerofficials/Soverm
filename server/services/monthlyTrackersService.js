@@ -6,6 +6,7 @@
 
 import db from '../db/index.js'
 import {
+  hasAlertThresholdColumns,
   hasMonthlyProgressColumns,
   hasMonthlyTrackersTable,
 } from '../utils/monthlyTrackersSchema.js'
@@ -17,19 +18,21 @@ import {
   parseUpdateTrackerInput,
 } from '../utils/monthlyTrackers.js'
 
-const TRACKER_SELECT_COLUMNS = `id, user_id, track_type, name, purpose_type, monthly_amount,
-            target_total, progress_amount, monthly_progress_amount, progress_month,
-            active, created_at, updated_at`
-
-const LEGACY_TRACKER_SELECT_COLUMNS = `id, user_id, track_type, name, purpose_type, monthly_amount,
+const BASE_TRACKER_SELECT_COLUMNS = `id, user_id, track_type, name, purpose_type, monthly_amount,
             target_total, progress_amount, active, created_at, updated_at`
 
 async function getTrackerSelectColumns() {
+  const parts = [BASE_TRACKER_SELECT_COLUMNS]
+
   if (await hasMonthlyProgressColumns()) {
-    return TRACKER_SELECT_COLUMNS
+    parts.push('monthly_progress_amount, progress_month')
   }
 
-  return LEGACY_TRACKER_SELECT_COLUMNS
+  if (await hasAlertThresholdColumns()) {
+    parts.push('alert_warning_percent, alert_remaining_dollars')
+  }
+
+  return parts.join(', ')
 }
 
 /**
@@ -110,7 +113,15 @@ export async function createTracker(userId, body) {
     throw error
   }
 
-  const { trackType, name, purposeType, monthlyAmount, targetTotal } = parsed.value
+  const {
+    trackType,
+    name,
+    purposeType,
+    monthlyAmount,
+    targetTotal,
+    alertWarningPercent,
+    alertRemainingDollars,
+  } = parsed.value
 
   if (trackType === 'spending') {
     const existing = await getActiveSpendingTracker(userId)
@@ -118,6 +129,8 @@ export async function createTracker(userId, body) {
       return updateTracker(userId, existing.id, {
         name,
         monthlyAmount,
+        ...(alertWarningPercent !== undefined ? { alertWarningPercent } : {}),
+        ...(alertRemainingDollars !== undefined ? { alertRemainingDollars } : {}),
       })
     }
   }
@@ -133,14 +146,30 @@ export async function createTracker(userId, body) {
 
   const selectColumns = await getTrackerSelectColumns()
 
+  const canStoreAlerts = trackType === 'spending' && (await hasAlertThresholdColumns())
+  const insertColumns = [
+    'user_id',
+    'track_type',
+    'name',
+    'purpose_type',
+    'monthly_amount',
+    'target_total',
+  ]
+  const insertValues = [userId, trackType, name, purposeType, monthlyAmount, targetTotal]
+
+  if (canStoreAlerts) {
+    insertColumns.push('alert_warning_percent', 'alert_remaining_dollars')
+    insertValues.push(alertWarningPercent ?? null, alertRemainingDollars ?? null)
+  }
+
+  const placeholders = insertValues.map((_, index) => `$${index + 1}`).join(', ')
+
   try {
     const result = await db.query(
-      `INSERT INTO monthly_trackers (
-         user_id, track_type, name, purpose_type, monthly_amount, target_total
-       )
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO monthly_trackers (${insertColumns.join(', ')})
+       VALUES (${placeholders})
        RETURNING ${selectColumns}`,
-      [userId, trackType, name, purposeType, monthlyAmount, targetTotal]
+      insertValues
     )
 
     return mapTrackerRow(result.rows[0])
@@ -152,6 +181,8 @@ export async function createTracker(userId, body) {
         return updateTracker(userId, existing.id, {
           name,
           monthlyAmount,
+          ...(alertWarningPercent !== undefined ? { alertWarningPercent } : {}),
+          ...(alertRemainingDollars !== undefined ? { alertRemainingDollars } : {}),
         })
       }
     }
@@ -189,9 +220,30 @@ export async function updateTracker(userId, trackerId, body) {
   const trackType = mapTrackerRow(existing.rows[0]).trackType
   const updates = parsed.value
 
-  if (trackType === 'spending' && (updates.purposeType != null || updates.targetTotal !== undefined || updates.progressAmount != null)) {
-    const error = new Error('Spending trackers only support name and monthlyAmount')
+  if (
+    trackType === 'spending' &&
+    (updates.purposeType != null || updates.targetTotal !== undefined || updates.progressAmount != null)
+  ) {
+    const error = new Error('Spending trackers only support name, monthlyAmount, and alert thresholds')
     error.statusCode = 400
+    throw error
+  }
+
+  if (
+    trackType === 'saving' &&
+    (updates.alertWarningPercent !== undefined || updates.alertRemainingDollars !== undefined)
+  ) {
+    const error = new Error('Alert thresholds apply to spending trackers only')
+    error.statusCode = 400
+    throw error
+  }
+
+  if (
+    (updates.alertWarningPercent !== undefined || updates.alertRemainingDollars !== undefined) &&
+    !(await hasAlertThresholdColumns())
+  ) {
+    const error = new Error('Custom alert thresholds are not available yet — run migration 016')
+    error.statusCode = 503
     throw error
   }
 
@@ -214,6 +266,14 @@ export async function updateTracker(userId, trackerId, body) {
   if (updates.targetTotal !== undefined) {
     fields.push(`target_total = $${paramIndex++}`)
     values.push(updates.targetTotal)
+  }
+  if (updates.alertWarningPercent !== undefined) {
+    fields.push(`alert_warning_percent = $${paramIndex++}`)
+    values.push(updates.alertWarningPercent)
+  }
+  if (updates.alertRemainingDollars !== undefined) {
+    fields.push(`alert_remaining_dollars = $${paramIndex++}`)
+    values.push(updates.alertRemainingDollars)
   }
   if (updates.progressAmount != null) {
     if (trackType !== 'saving') {

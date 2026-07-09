@@ -15,6 +15,10 @@ import {
   deleteTracker,
   updateTracker,
 } from '../services/monthlyTrackersService.js'
+import {
+  applySavingsTransferDetection,
+  dismissSavingsTransferDetection,
+} from '../services/savingsTransferDetection.js'
 import { ensureUserExists } from '../utils/ensureUser.js'
 import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
 import { reportServerError } from '../utils/sentry.js'
@@ -61,11 +65,76 @@ export function createTrackersRouter({
         return res.status(400).json({ error: err.message })
       }
 
-      if (err.statusCode === 503 || err.message.includes('migration 013') || err.message.includes('migration 014')) {
+      if (err.statusCode === 503 || err.message.includes('migration 013') || err.message.includes('migration 014') || err.message.includes('migration 016')) {
         return res.status(503).json({ error: err.message })
       }
 
       reportServerError('to create tracker', err, { userId, req })
+      res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
+    }
+  })
+
+  router.post('/savings-detections/:id/apply', async (req, res) => {
+    const userId = resolveUserId(req)
+    const { id } = req.params
+
+    const idCheck = validateUuidParam(id, 'detection id')
+    if (idCheck.error) {
+      return res.status(400).json({ error: idCheck.error })
+    }
+
+    const trackerId = req.body?.trackerId
+
+    if (trackerId != null) {
+      const trackerCheck = validateUuidParam(trackerId, 'tracker id')
+      if (trackerCheck.error) {
+        return res.status(400).json({ error: trackerCheck.error })
+      }
+    }
+
+    try {
+      const result = await applySavingsTransferDetection(userId, id, trackerId)
+      await respondWithSnapshot(res, userId, result)
+    } catch (err) {
+      if (err.statusCode === 400) {
+        return res.status(400).json({ error: err.message })
+      }
+
+      if (err.statusCode === 404) {
+        return res.status(404).json({ error: err.message })
+      }
+
+      if (err.statusCode === 503 || err.message.includes('migration 017')) {
+        return res.status(503).json({ error: err.message })
+      }
+
+      reportServerError('to apply savings detection', err, { userId, req })
+      res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
+    }
+  })
+
+  router.post('/savings-detections/:id/dismiss', async (req, res) => {
+    const userId = resolveUserId(req)
+    const { id } = req.params
+
+    const idCheck = validateUuidParam(id, 'detection id')
+    if (idCheck.error) {
+      return res.status(400).json({ error: idCheck.error })
+    }
+
+    try {
+      const result = await dismissSavingsTransferDetection(userId, id)
+      await respondWithSnapshot(res, userId, result)
+    } catch (err) {
+      if (err.statusCode === 404) {
+        return res.status(404).json({ error: err.message })
+      }
+
+      if (err.statusCode === 503 || err.message.includes('migration 017')) {
+        return res.status(503).json({ error: err.message })
+      }
+
+      reportServerError('to dismiss savings detection', err, { userId, req })
       res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
     }
   })
@@ -91,7 +160,7 @@ export function createTrackersRouter({
         return res.status(404).json({ error: err.message })
       }
 
-      if (err.statusCode === 503 || err.message.includes('migration 013') || err.message.includes('migration 014')) {
+      if (err.statusCode === 503 || err.message.includes('migration 013') || err.message.includes('migration 014') || err.message.includes('migration 016')) {
         return res.status(503).json({ error: err.message })
       }
 

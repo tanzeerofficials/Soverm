@@ -36,9 +36,10 @@ import {
 } from '../components/DashboardTabs.jsx'
 import DashboardHeroSkeleton from '../components/DashboardHeroSkeleton.jsx'
 import Skeleton from '../components/Skeleton.jsx'
-import { dashboardQueryKey, trackerQueryKey, expenseAnalyzerQueryKey, expenseAnalyzerSummaryQueryKey, notificationsQueryKey, usageQueryKey } from '../lib/queryKeys.js'
+import { dashboardQueryKey, trackerQueryKey, cashFlowForecastQueryKey, expenseAnalyzerQueryKey, expenseAnalyzerSummaryQueryKey, notificationsQueryKey, usageQueryKey } from '../lib/queryKeys.js'
 import { fetchExpenseAnalyzer, fetchExpenseAnalyzerSummary } from '../lib/fetchExpenseAnalyzer.js'
 import { fetchTrackers } from '../lib/fetchTrackers.js'
+import { fetchCashFlowForecast } from '../lib/fetchCashFlowForecast.js'
 import { QUICK_TOOL_TABS } from '../lib/quickTools.js'
 import { fetchNotifications } from '../lib/fetchNotifications.js'
 import {
@@ -213,16 +214,24 @@ function DashboardPage() {
     const tab = searchParams.get('tab')
     const quickTool = searchParams.get('quickTool')
 
-    if (tab !== DASHBOARD_TABS.TOOLS && quickTool !== QUICK_TOOL_TABS.TRACKER) {
+    if (tab !== DASHBOARD_TABS.TOOLS && quickTool !== QUICK_TOOL_TABS.TRACKER && quickTool !== QUICK_TOOL_TABS.FORECAST) {
       return
     }
 
-    if (tab === DASHBOARD_TABS.TOOLS || quickTool === QUICK_TOOL_TABS.TRACKER) {
+    if (
+      tab === DASHBOARD_TABS.TOOLS ||
+      quickTool === QUICK_TOOL_TABS.TRACKER ||
+      quickTool === QUICK_TOOL_TABS.FORECAST
+    ) {
       setActiveTab(DASHBOARD_TABS.TOOLS)
     }
 
     if (quickTool === QUICK_TOOL_TABS.TRACKER) {
       setQuickToolsTab(QUICK_TOOL_TABS.TRACKER)
+    }
+
+    if (quickTool === QUICK_TOOL_TABS.FORECAST) {
+      setQuickToolsTab(QUICK_TOOL_TABS.FORECAST)
     }
 
     requestAnimationFrame(() => {
@@ -278,6 +287,23 @@ function DashboardPage() {
     queryFn: () => fetchExpenseAnalyzer(getToken),
     enabled: hasAccounts && activeTab === DASHBOARD_TABS.TOOLS,
   })
+
+  const forecastEnabled =
+    hasAccounts && activeTab === DASHBOARD_TABS.TOOLS && quickToolsTab === QUICK_TOOL_TABS.FORECAST
+
+  const {
+    data: forecastData,
+    isPending: forecastQueryPending,
+    isError: forecastIsError,
+    error: forecastError,
+    refetch: refetchForecast,
+  } = useQuery({
+    queryKey: cashFlowForecastQueryKey,
+    queryFn: () => fetchCashFlowForecast(getToken),
+    enabled: forecastEnabled,
+  })
+
+  const forecastLoading = forecastEnabled && forecastQueryPending && forecastData === undefined
 
   const quickToolsLoading = expenseAnalyzerLoading && expenseAnalyzerData === undefined
 
@@ -715,9 +741,13 @@ function DashboardPage() {
                   lastSyncedAt={dashboardData?.lastSyncedAt}
                   expenseData={expenseAnalyzerData}
                   trackerSnapshot={trackerData}
+                  forecast={forecastData}
                   trackerLoading={trackerLoading}
-                  trackerError={trackerIsError ? trackerError : null}
+                  trackerError={trackerIsError ? trackerError?.message : null}
+                  forecastLoading={forecastLoading}
+                  forecastError={forecastIsError ? forecastError?.message : null}
                   onRetryTracker={() => refetchTrackers()}
+                  onRetryForecast={() => refetchForecast()}
                   getToken={getToken}
                   activeTab={quickToolsTab}
                   onTabChange={setQuickToolsTab}

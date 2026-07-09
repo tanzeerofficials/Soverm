@@ -12,15 +12,11 @@ export const QUICK_TOOL_TABS = {
   RECENT: 'recent',
   HEALTH: 'health',
   TRACKER: 'tracker',
+  FORECAST: 'forecast',
 }
 
 /** Bigger bets — surfaced until we ship them. */
 export const COMING_SOON_TOOLS = [
-  {
-    id: 'forecast',
-    title: 'Cash flow forecast',
-    description: 'Project balances using recurring charges and income patterns.',
-  },
   {
     id: 'alerts',
     title: 'Custom alerts',
