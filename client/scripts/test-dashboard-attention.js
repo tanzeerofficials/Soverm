@@ -14,6 +14,30 @@ import {
   INSIGHT_STALE_DAYS,
   SYNC_STALE_HOURS,
 } from '../src/lib/dashboardAttention.js'
+import {
+  clearAttentionDismissals,
+  dismissAttentionItem,
+  filterDismissedAttentionItems,
+  getAttentionItemFingerprint,
+} from '../src/lib/dashboardAttentionDismissals.js'
+
+const localStorageMock = (() => {
+  let store = {}
+  return {
+    getItem: (key) => store[key] ?? null,
+    setItem: (key, value) => {
+      store[key] = value
+    },
+    removeItem: (key) => {
+      delete store[key]
+    },
+    _reset: () => {
+      store = {}
+    },
+  }
+})()
+
+globalThis.localStorage = localStorageMock
 
 function assert(condition, message) {
   if (!condition) {
@@ -117,5 +141,24 @@ const attentionWithTracker = buildAttentionItems({
   },
 })
 assert(attentionWithTracker.some((item) => item.id === 'spending-cap-warning'), 'includes tracker alert in attention list')
+
+localStorageMock._reset()
+clearAttentionDismissals()
+
+const staleItem = { id: 'stale-sync' }
+const staleContext = { lastSyncedAt: '2026-07-01T12:00:00.000Z' }
+assert(
+  getAttentionItemFingerprint(staleItem, staleContext) === staleContext.lastSyncedAt,
+  'stale sync fingerprint uses lastSyncedAt'
+)
+dismissAttentionItem(staleItem, staleContext)
+assert(
+  filterDismissedAttentionItems([staleItem], staleContext).length === 0,
+  'dismissed stale sync hidden for same sync time'
+)
+assert(
+  filterDismissedAttentionItems([staleItem], { lastSyncedAt: '2026-07-02T12:00:00.000Z' }).length === 1,
+  'stale sync reappears after sync time changes'
+)
 
 console.log('All dashboardAttention tests passed.')

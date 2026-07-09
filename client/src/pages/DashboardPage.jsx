@@ -46,6 +46,11 @@ import {
   countIncompleteActions,
   getInsightFreshnessNudge,
 } from '../lib/dashboardAttention.js'
+import {
+  dismissAttentionItem,
+  filterDismissedAttentionItems,
+} from '../lib/dashboardAttentionDismissals.js'
+import { markNotificationRead } from '../lib/fetchNotifications.js'
 import { scrollToInsightChat } from '../lib/scrollToInsightChat.js'
 import { syncTransactions } from '../lib/syncTransactions.js'
 import { consumeFirstConnectCelebration } from '../lib/firstConnectCelebration.js'
@@ -93,6 +98,7 @@ function DashboardPage() {
   )
   const [activeTab, setActiveTab] = useState(DASHBOARD_TABS.OVERVIEW)
   const [quickToolsTab, setQuickToolsTab] = useState(QUICK_TOOL_TABS.TRACKER)
+  const [attentionDismissalVersion, setAttentionDismissalVersion] = useState(0)
   const syncInFlight = useRef(false)
   const lastAutoSyncAttempt = useRef(0)
   const prevAccountCount = useRef(null)
@@ -314,7 +320,36 @@ function DashboardPage() {
     ]
   )
 
-  const showAttentionAllClear = hasAccounts && hasInsight && attentionItems.length === 0
+  const attentionContext = useMemo(
+    () => ({
+      lastSyncedAt: dashboardData?.lastSyncedAt ?? null,
+      incompleteActionCount,
+      trackerPeriodStart: trackerData?.periodStart ?? null,
+    }),
+    [dashboardData?.lastSyncedAt, incompleteActionCount, trackerData?.periodStart]
+  )
+
+  const visibleAttentionItems = useMemo(
+    () => filterDismissedAttentionItems(attentionItems, attentionContext),
+    [attentionItems, attentionContext, attentionDismissalVersion]
+  )
+
+  const showAttentionAllClear = hasAccounts && hasInsight && visibleAttentionItems.length === 0
+
+  async function handleDismissAttentionItem(item) {
+    dismissAttentionItem(item, attentionContext)
+
+    if (item.notificationId) {
+      try {
+        await markNotificationRead(getToken, item.notificationId)
+        await queryClient.invalidateQueries({ queryKey: notificationsQueryKey })
+      } catch {
+        // Dismissal still applies locally
+      }
+    }
+
+    setAttentionDismissalVersion((version) => version + 1)
+  }
 
   useEffect(() => {
     if (accountCount === 0 || hasInsight) {
@@ -571,10 +606,11 @@ function DashboardPage() {
               {renderAccountsSection()}
 
               <DashboardNeedsAttention
-                items={attentionItems}
+                items={visibleAttentionItems}
                 getToken={getToken}
                 onSwitchTab={setActiveTab}
                 onQuickToolTabChange={setQuickToolsTab}
+                onDismiss={handleDismissAttentionItem}
                 onAllClear={showAttentionAllClear}
               />
 
