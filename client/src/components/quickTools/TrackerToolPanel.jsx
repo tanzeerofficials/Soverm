@@ -283,7 +283,7 @@ function SavingTrackerCard({ tracker, periodLabel, getToken, onUpdated, onRemove
       </div>
 
       <p className="mt-3 font-mono text-2xl font-semibold tabular-nums text-fg">
-        {formatCurrency(progress.saved)}{' '}
+        {formatCurrency(progress.savedThisMonth ?? progress.saved)}{' '}
         <span className="text-base font-normal text-fg-muted">of {formatCurrency(monthlyAmount)} this month</span>
       </p>
 
@@ -296,7 +296,8 @@ function SavingTrackerCard({ tracker, periodLabel, getToken, onUpdated, onRemove
 
       <p className="mt-2 text-xs text-fg-muted">
         {progress.percentOfMonthly}% of monthly target
-        {targetTotal != null && ` · ${formatCurrency(progress.saved)} of ${formatCurrency(targetTotal)} total`}
+        {targetTotal != null &&
+          ` · ${formatCurrency(progress.totalSaved ?? progress.saved)} of ${formatCurrency(targetTotal)} total`}
       </p>
       {progress.paceEstimate > 0 && (
         <p className="mt-1 text-xs text-fg-subtle">
@@ -310,7 +311,7 @@ function SavingTrackerCard({ tracker, periodLabel, getToken, onUpdated, onRemove
           onClick={() => setIsLogging(true)}
           className="mt-3 text-xs font-medium text-ai-soft transition hover:text-ai hover:underline"
         >
-          Update saved amount
+          Update saved this month
         </button>
       ) : (
         <form
@@ -328,7 +329,7 @@ function SavingTrackerCard({ tracker, periodLabel, getToken, onUpdated, onRemove
             type="number"
             min="0"
             step="1"
-            defaultValue={progress.saved}
+            defaultValue={progress.savedThisMonth ?? progress.saved}
             className="w-28 rounded-md border border-border-default bg-app px-2 py-1 font-mono text-xs tabular-nums text-fg"
           />
           <button type="submit" className="text-xs font-medium text-brand-soft hover:underline">
@@ -479,7 +480,9 @@ function TrackerToolPanel({ snapshot, isLoading, loadError, onRetryLoad, getToke
         title="How tracking works"
         items={[
           'Spending trackers compare outflows from connected accounts this calendar month (pending excluded).',
-          'Saving trackers use amounts you log — we do not detect bank transfers automatically yet.',
+          'Saving trackers use amounts you log each calendar month — progress resets on the 1st.',
+          'Your total toward a goal is tracked separately and does not reset monthly.',
+          'We do not detect bank transfers automatically yet.',
           'Spending and saving trackers are independent; one does not reduce the other automatically.',
         ]}
       />

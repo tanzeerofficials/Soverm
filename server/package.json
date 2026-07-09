@@ -14,6 +14,7 @@
     "migrate:011": "node scripts/run-011-monthly-budget-migration.js",
     "migrate:012": "node scripts/run-012-savings-goals-migration.js",
     "migrate:013": "node scripts/run-013-monthly-trackers-migration.js",
+    "migrate:014": "node scripts/run-014-saving-monthly-progress-migration.js",
     "test:monthly-trackers": "node scripts/test-monthly-trackers.js",
     "test:safe-to-spend": "node scripts/test-safe-to-spend.js",
     "test:savings-goals": "node scripts/test-savings-goals.js",

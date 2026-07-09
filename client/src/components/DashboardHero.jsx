@@ -98,7 +98,7 @@ function DashboardHero({
             </p>
             {primarySaving && (
               <p className="mt-1 text-xs text-fg-subtle">
-                Saving tracker: {formatCurrency(primarySaving.progress?.saved ?? 0)} of{' '}
+                Saving tracker: {formatCurrency(primarySaving.progress?.savedThisMonth ?? primarySaving.progress?.saved ?? 0)} of{' '}
                 {formatCurrency(primarySaving.monthlyAmount)} this month
               </p>
             )}

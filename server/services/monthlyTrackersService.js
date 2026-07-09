@@ -6,11 +6,27 @@
 
 import db from '../db/index.js'
 import {
+  computeMonthlyProgressUpdate,
   mapTrackerRow,
   MAX_SAVING_TRACKERS,
   parseCreateTrackerInput,
   parseUpdateTrackerInput,
 } from '../utils/monthlyTrackers.js'
+
+const TRACKER_SELECT_COLUMNS = `id, user_id, track_type, name, purpose_type, monthly_amount,
+            target_total, progress_amount, monthly_progress_amount, progress_month,
+            active, created_at, updated_at`
+
+const LEGACY_TRACKER_SELECT_COLUMNS = `id, user_id, track_type, name, purpose_type, monthly_amount,
+            target_total, progress_amount, active, created_at, updated_at`
+
+async function getTrackerSelectColumns() {
+  if (await monthlyProgressColumnsExist()) {
+    return TRACKER_SELECT_COLUMNS
+  }
+
+  return LEGACY_TRACKER_SELECT_COLUMNS
+}
 
 async function tableExists() {
   const result = await db.query(
@@ -23,14 +39,53 @@ async function tableExists() {
   return result.rows.length > 0
 }
 
+async function monthlyProgressColumnsExist() {
+  const result = await db.query(
+    `SELECT 1
+     FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND table_name = 'monthly_trackers'
+       AND column_name = 'monthly_progress_amount'`
+  )
+
+  return result.rows.length > 0
+}
+
+/**
+ * Zeroes monthly progress when the stored month is before the current calendar month.
+ * Lifetime total (progress_amount) is left unchanged.
+ */
+export async function resetStaleMonthlyProgress(userId) {
+  if (!(await tableExists()) || !(await monthlyProgressColumnsExist())) {
+    return
+  }
+
+  await db.query(
+    `UPDATE monthly_trackers
+     SET monthly_progress_amount = 0,
+         progress_month = date_trunc('month', CURRENT_DATE)::date,
+         updated_at = NOW()
+     WHERE user_id = $1
+       AND track_type = 'saving'
+       AND active = true
+       AND (
+         progress_month IS NULL
+         OR progress_month < date_trunc('month', CURRENT_DATE)::date
+       )`,
+    [userId]
+  )
+}
+
 export async function listActiveTrackers(userId) {
   if (!(await tableExists())) {
     return []
   }
 
+  await resetStaleMonthlyProgress(userId)
+
+  const selectColumns = await getTrackerSelectColumns()
   const result = await db.query(
-    `SELECT id, user_id, track_type, name, purpose_type, monthly_amount,
-            target_total, progress_amount, active, created_at, updated_at
+    `SELECT ${selectColumns}
      FROM monthly_trackers
      WHERE user_id = $1 AND active = true
      ORDER BY track_type ASC, created_at ASC`,
@@ -95,13 +150,13 @@ export async function createTracker(userId, body) {
     }
   }
 
+  const selectColumns = await getTrackerSelectColumns()
   const result = await db.query(
     `INSERT INTO monthly_trackers (
        user_id, track_type, name, purpose_type, monthly_amount, target_total
      )
      VALUES ($1, $2, $3, $4, $5, $6)
-     RETURNING id, user_id, track_type, name, purpose_type, monthly_amount,
-               target_total, progress_amount, active, created_at, updated_at`,
+     RETURNING ${selectColumns}`,
     [userId, trackType, name, purposeType, monthlyAmount, targetTotal]
   )
 
@@ -120,8 +175,10 @@ export async function updateTracker(userId, trackerId, body) {
     throw error
   }
 
+  const selectColumns = await getTrackerSelectColumns()
   const existing = await db.query(
-    `SELECT id, track_type FROM monthly_trackers
+    `SELECT ${selectColumns}
+     FROM monthly_trackers
      WHERE id = $1 AND user_id = $2 AND active = true`,
     [trackerId, userId]
   )
@@ -132,7 +189,7 @@ export async function updateTracker(userId, trackerId, body) {
     throw error
   }
 
-  const trackType = existing.rows[0].track_type
+  const trackType = mapTrackerRow(existing.rows[0]).trackType
   const updates = parsed.value
 
   if (trackType === 'spending' && (updates.purposeType != null || updates.targetTotal !== undefined || updates.progressAmount != null)) {
@@ -162,8 +219,38 @@ export async function updateTracker(userId, trackerId, body) {
     values.push(updates.targetTotal)
   }
   if (updates.progressAmount != null) {
+    if (trackType !== 'saving') {
+      const error = new Error('progressAmount applies to saving trackers only')
+      error.statusCode = 400
+      throw error
+    }
+
+    if (!(await monthlyProgressColumnsExist())) {
+      const error = new Error('Monthly savings progress is not available yet — run migration 014')
+      error.statusCode = 503
+      throw error
+    }
+
+    await resetStaleMonthlyProgress(userId)
+
+    const refreshed = await db.query(
+      `SELECT ${selectColumns}
+       FROM monthly_trackers
+       WHERE id = $1 AND user_id = $2 AND active = true`,
+      [trackerId, userId]
+    )
+
+    const progressUpdate = computeMonthlyProgressUpdate(
+      mapTrackerRow(refreshed.rows[0]),
+      updates.progressAmount
+    )
+
+    fields.push(`monthly_progress_amount = $${paramIndex++}`)
+    values.push(progressUpdate.monthlyProgressAmount)
+    fields.push(`progress_month = $${paramIndex++}`)
+    values.push(progressUpdate.progressMonth)
     fields.push(`progress_amount = $${paramIndex++}`)
-    values.push(updates.progressAmount)
+    values.push(progressUpdate.progressAmount)
   }
 
   fields.push('updated_at = NOW()')
@@ -172,8 +259,7 @@ export async function updateTracker(userId, trackerId, body) {
     `UPDATE monthly_trackers
      SET ${fields.join(', ')}
      WHERE id = $1 AND user_id = $2
-     RETURNING id, user_id, track_type, name, purpose_type, monthly_amount,
-               target_total, progress_amount, active, created_at, updated_at`,
+     RETURNING ${selectColumns}`,
     values
   )
 

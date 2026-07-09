@@ -6,7 +6,7 @@
  * the spending cap automatically.
  */
 
-import { roundCurrency } from './safeToSpend.js'
+import { formatIsoDate, roundCurrency } from './safeToSpend.js'
 
 export const TRACK_TYPES = ['spending', 'saving']
 export const TRACK_PURPOSE_TYPES = ['debt', 'purchase', 'future']
@@ -15,10 +15,76 @@ export const MAX_TRACKER_NAME_LENGTH = 80
 export const MIN_TRACKER_AMOUNT = 1
 export const MAX_TRACKER_AMOUNT = 999_999.99
 
+export function getCurrentProgressMonth(referenceDate = new Date()) {
+  const year = referenceDate.getFullYear()
+  const month = referenceDate.getMonth()
+  return formatIsoDate(new Date(year, month, 1))
+}
+
+function toProgressMonthIso(value) {
+  if (value == null) {
+    return null
+  }
+
+  if (typeof value === 'string') {
+    return value.slice(0, 10)
+  }
+
+  // node-pg returns DATE columns as UTC midnight for the calendar date.
+  const year = value.getUTCFullYear()
+  const month = String(value.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(value.getUTCDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+export function isProgressMonthCurrent(progressMonth, referenceDate = new Date()) {
+  if (!progressMonth) {
+    return false
+  }
+
+  return progressMonth === getCurrentProgressMonth(referenceDate)
+}
+
+/**
+ * Returns the amount logged for the current calendar month.
+ * Stale months (or never logged) read as zero — the server persists the reset.
+ */
+export function resolveMonthlySaved(tracker, referenceDate = new Date()) {
+  if (tracker.trackType !== 'saving') {
+    return 0
+  }
+
+  if (!isProgressMonthCurrent(tracker.progressMonth, referenceDate)) {
+    return 0
+  }
+
+  return roundCurrency(tracker.monthlyProgressAmount ?? 0)
+}
+
+/**
+ * Applies a new monthly saved amount and returns DB fields to write.
+ * Lifetime total (progressAmount) moves by the delta vs the previous month value.
+ */
+export function computeMonthlyProgressUpdate(tracker, newMonthlyAmount, referenceDate = new Date()) {
+  const previousMonthly = resolveMonthlySaved(tracker, referenceDate)
+  const nextMonthly = roundCurrency(newMonthlyAmount)
+  const delta = roundCurrency(nextMonthly - previousMonthly)
+  const progressAmount = roundCurrency(Math.max(0, (tracker.progressAmount ?? 0) + delta))
+
+  return {
+    monthlyProgressAmount: nextMonthly,
+    progressMonth: getCurrentProgressMonth(referenceDate),
+    progressAmount,
+  }
+}
+
 export function mapTrackerRow(row) {
   const monthlyAmount = roundCurrency(row.monthly_amount)
   const targetTotal = row.target_total != null ? roundCurrency(row.target_total) : null
   const progressAmount = roundCurrency(row.progress_amount)
+  const monthlyProgressAmount =
+    row.monthly_progress_amount != null ? roundCurrency(row.monthly_progress_amount) : 0
+  const progressMonth = toProgressMonthIso(row.progress_month)
 
   return {
     id: row.id,
@@ -28,6 +94,8 @@ export function mapTrackerRow(row) {
     monthlyAmount,
     targetTotal,
     progressAmount,
+    monthlyProgressAmount,
+    progressMonth,
     active: row.active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -51,22 +119,48 @@ export function computeSpendingTrackerProgress(tracker, spentThisMonth = 0) {
   }
 }
 
-export function computeSavingTrackerProgress(tracker, { income = 0, spent = 0 } = {}) {
+export function parseLoggedProgressAmount(value, fieldName = 'progressAmount') {
+  if (value == null || value === '') {
+    return { error: `${fieldName} is required` }
+  }
+
+  const parsed = Number(value)
+
+  if (!Number.isFinite(parsed)) {
+    return { error: `${fieldName} must be a number` }
+  }
+
+  if (parsed < 0 || parsed > MAX_TRACKER_AMOUNT) {
+    return { error: `${fieldName} must be between 0 and ${MAX_TRACKER_AMOUNT}` }
+  }
+
+  return { value: roundCurrency(parsed) }
+}
+
+export function computeSavingTrackerProgress(
+  tracker,
+  { income = 0, spent = 0, referenceDate = new Date() } = {}
+) {
   const monthlyTarget = roundCurrency(tracker.monthlyAmount)
-  const saved = roundCurrency(tracker.progressAmount ?? 0)
+  const savedThisMonth = resolveMonthlySaved(tracker, referenceDate)
+  const totalSaved = roundCurrency(tracker.progressAmount ?? 0)
   const paceEstimate = roundCurrency(Math.max(0, income - spent))
   const percentOfMonthly =
-    monthlyTarget > 0 ? Math.min(100, Math.round((saved / monthlyTarget) * 100)) : 0
+    monthlyTarget > 0 ? Math.min(100, Math.round((savedThisMonth / monthlyTarget) * 100)) : 0
   const totalTarget = tracker.targetTotal
   const percentOfTotal =
     totalTarget != null && totalTarget > 0
-      ? Math.min(100, Math.round((saved / totalTarget) * 100))
+      ? Math.min(100, Math.round((totalSaved / totalTarget) * 100))
       : null
 
-  const isComplete = totalTarget != null ? saved >= totalTarget : saved >= monthlyTarget
+  const isComplete =
+    totalTarget != null ? totalSaved >= totalTarget : savedThisMonth >= monthlyTarget
 
   return {
-    saved,
+    savedThisMonth,
+    totalSaved,
+    // Backward-compatible alias for monthly amount shown in older clients.
+    saved: savedThisMonth,
     monthlyTarget,
     percentOfMonthly,
     totalTarget,
@@ -235,7 +329,7 @@ export function parseUpdateTrackerInput(body) {
   }
 
   if (body?.progressAmount != null) {
-    const progressAmount = parseTrackerAmount(body.progressAmount, 'progressAmount')
+    const progressAmount = parseLoggedProgressAmount(body.progressAmount, 'progressAmount')
     if (progressAmount.error) {
       return { error: progressAmount.error }
     }
