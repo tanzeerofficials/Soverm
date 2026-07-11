@@ -84,6 +84,7 @@ export function createTrackersRouter({
     }
 
     const trackerId = req.body?.trackerId
+    const force = req.body?.force === true
 
     if (trackerId != null) {
       const trackerCheck = validateUuidParam(trackerId, 'tracker id')
@@ -93,7 +94,7 @@ export function createTrackersRouter({
     }
 
     try {
-      const result = await applySavingsTransferDetection(userId, id, trackerId)
+      const result = await applySavingsTransferDetection(userId, id, trackerId, { force })
       await respondWithSnapshot(res, userId, result)
     } catch (err) {
       if (err.statusCode === 400) {
@@ -102,6 +103,13 @@ export function createTrackersRouter({
 
       if (err.statusCode === 404) {
         return res.status(404).json({ error: err.message })
+      }
+
+      if (err.statusCode === 409) {
+        return res.status(409).json({
+          error: err.message,
+          code: err.code || 'possible_duplicate',
+        })
       }
 
       if (err.statusCode === 503 || err.message.includes('migration 017')) {

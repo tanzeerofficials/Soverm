@@ -11,6 +11,7 @@ import {
   EXPENSE_ANALYZER_TRANSACTION_SELECT,
 } from './connectedAccountTransactions.js'
 import { loadExpenseAnalyzerChatContext } from './expenseAnalyzerChatContext.js'
+import { loadChatPmfContext } from './chatPmfContext.js'
 
 const RECENT_TRANSACTION_LIMIT = 20
 const TOP_MERCHANT_LIMIT = 10
@@ -215,7 +216,7 @@ async function loadLastSyncedAt(userId) {
  * loadChatFinancialContext(userId)
  *
  * Live financial snapshot for Ask Soverm — accounts, recent activity,
- * live month-over-month, and Expense Analyzer recurring/category data.
+ * Expense Analyzer, plus PMF loop (weekly / month / memory / open actions).
  */
 export async function loadChatFinancialContext(userId) {
   const [
@@ -239,6 +240,16 @@ export async function loadChatFinancialContext(userId) {
     loadLastSyncedAt(userId),
   ])
 
+  const liveMomSnapshot = buildLiveMonthOverMonthSnapshot(liveMonthOverMonth)
+  const pmf = await loadChatPmfContext(userId, {
+    liveMonthOverMonth: liveMomSnapshot,
+  }).catch(() => ({
+    weeklyReview: null,
+    monthCondition: null,
+    openActions: [],
+    userMemory: null,
+  }))
+
   const accounts = buildAccountsSnapshot(accountsResult.rows)
   const accountSummary = accounts.items
     .map(
@@ -252,10 +263,14 @@ export async function loadChatFinancialContext(userId) {
     lastSyncedAt: lastSyncedAt ? new Date(lastSyncedAt).toISOString() : null,
     accounts,
     accountSummary,
-    liveMonthOverMonth: buildLiveMonthOverMonthSnapshot(liveMonthOverMonth),
+    liveMonthOverMonth: liveMomSnapshot,
     recentActivity: buildRecentActivitySummary(connectedTransactions),
     expenseAnalyzer,
     dataScope: buildDataScope(disconnectedTransactionCount),
+    weeklyReview: pmf.weeklyReview,
+    monthCondition: pmf.monthCondition,
+    openActions: pmf.openActions ?? [],
+    userMemory: pmf.userMemory,
   }
 }
 

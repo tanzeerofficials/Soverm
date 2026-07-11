@@ -1,28 +1,39 @@
 /*
- * LANDING COMPARISON
+ * LANDING COMPARISON (G2)
  *
- * Two-column "Without Soverm / With Soverm" section on the landing page.
- * Contrasts manual spreadsheet tracking with Soverm's automated insights.
+ * Own remaining-money coaching + weekly ritual + month-end condition
+ * vs Rocket Money, bank apps, and spreadsheets.
  */
 
-const WITHOUT_ITEMS = [
-  'Hours exporting CSVs and building pivot tables',
-  'Charts that show numbers but not what they mean',
-  'No idea which spending category is actually the problem',
-  'Advice from Reddit threads, not your real data',
-  'Out of date the moment you stop updating the sheet',
+const COLUMNS = [
+  {
+    id: 'others',
+    title: 'Rocket Money / bank apps / sheets',
+    tone: 'without',
+    items: [
+      'Cancel subscriptions — then leave you alone',
+      'Balances and charts without “what’s left until payday”',
+      'No weekly ritual that ends in one clear move',
+      'Month-end is a statement PDF, not a condition letter',
+      'You still do the coaching in your head',
+    ],
+  },
+  {
+    id: 'soverm',
+    title: 'With Soverm',
+    tone: 'with',
+    items: [
+      'What’s left until payday after known bills',
+      'Weekly check-in: how you did, one risk, one move',
+      'Month-end accountant letter (Stable / Tight / At risk)',
+      'Optional “Can I afford it?” check when you’re unsure',
+      'Bill defense + optional category caps that feed the same loop',
+    ],
+  },
 ]
 
-const WITH_ITEMS = [
-  'Bank connected in under a minute via Plaid',
-  'Plain-English insight: what matters and why',
-  'Specific stats pulled from your transactions',
-  'Three concrete actions tailored to your finances',
-  'Always current — syncs when you connect or on schedule',
-]
-
-function ComparisonColumn({ variant, title, items }) {
-  const isPositive = variant === 'with'
+function ComparisonColumn({ title, items, tone }) {
+  const isPositive = tone === 'with'
 
   return (
     <article
@@ -76,20 +87,24 @@ function LandingComparison() {
   return (
     <section className="mx-auto mt-24 max-w-4xl" aria-labelledby="comparison-heading">
       <div className="text-center">
-        <p className="text-sm font-medium uppercase tracking-wide text-brand">
-          Why Soverm
-        </p>
+        <p className="text-sm font-medium uppercase tracking-wide text-brand">Why Soverm</p>
         <h2 id="comparison-heading" className="mt-2 text-2xl font-bold text-fg sm:text-3xl">
-          Spreadsheets vs. Soverm
+          Not another cancel-subs or chart app
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-sm text-fg-muted">
-          You shouldn&apos;t need a finance degree to understand your own money.
+          We own remaining-money coaching, the weekly ritual, and the month-end condition letter.
         </p>
       </div>
 
       <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
-        <ComparisonColumn variant="without" title="Without Soverm" items={WITHOUT_ITEMS} />
-        <ComparisonColumn variant="with" title="With Soverm" items={WITH_ITEMS} />
+        {COLUMNS.map((column) => (
+          <ComparisonColumn
+            key={column.id}
+            title={column.title}
+            items={column.items}
+            tone={column.tone}
+          />
+        ))}
       </div>
     </section>
   )

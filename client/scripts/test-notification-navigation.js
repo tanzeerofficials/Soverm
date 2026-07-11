@@ -53,4 +53,25 @@ assert(
   'action label for recurring'
 )
 
+const weekly = resolveNotificationTarget({
+  trigger_type: 'weekly_truth_letter',
+  related_data: { link: '/weekly-review', weekStartIso: '2026-07-06' },
+})
+assert(weekly.pathname === '/weekly-review', 'weekly truth letter opens Your week')
+assert(
+  notificationActionLabel({ trigger_type: 'weekly_truth_letter' }) === 'Open Your week',
+  'weekly action label'
+)
+
+const monthLetter = resolveNotificationTarget({
+  trigger_type: 'month_condition_ready',
+  related_data: { monthKey: '2026-06', link: '/month-condition?month=2026-06' },
+})
+assert(monthLetter.pathname === '/month-condition', 'month letter path')
+assert(monthLetter.search.includes('month=2026-06'), 'month letter query')
+assert(
+  notificationActionLabel({ trigger_type: 'month_condition_ready' }) === 'Read month letter',
+  'month action label'
+)
+
 console.log('All notificationNavigation tests passed.')

@@ -9,10 +9,11 @@ import { calculateTotalBalance, getDisplayBalance } from '../utils/balanceHelper
 import { CONNECTED_ACCOUNT_TRANSACTION_JOINS } from '../utils/connectedAccountTransactions.js'
 import { hasMonthlyTrackersTable } from '../utils/monthlyTrackersSchema.js'
 import { listActiveTrackers } from './monthlyTrackersService.js'
-import {
-  listPendingSavingsTransferDetections,
-  scanAndStoreSavingsTransferDetections,
-} from './savingsTransferDetection.js'
+import { listPendingSavingsTransferDetections } from './savingsTransferDetection.js'
+import { listCategorySoftLimits } from './categorySoftLimits.js'
+import { getPaydayProfile } from './payday.js'
+import { loadExpenseAnalyzerData } from '../utils/expenseAnalyzerData.js'
+import { computeWhatsLeftUntilPayday } from '../utils/whatsLeftUntilPayday.js'
 import {
   enrichTracker,
 } from '../utils/monthlyTrackers.js'
@@ -20,12 +21,13 @@ import {
   getCalendarMonthWindow,
   roundCurrency,
 } from '../utils/safeToSpend.js'
+import { calendarMonthSqlBounds } from '../utils/calendarMonth.js'
 
 const NON_PENDING_FILTER = 'AND (t.pending IS NOT TRUE)'
-const CALENDAR_MONTH_FILTER = `AND t.date >= date_trunc('month', CURRENT_DATE)::date
-       AND t.date < (date_trunc('month', CURRENT_DATE) + INTERVAL '1 month')::date`
 
 export async function loadCalendarMonthCashFlow(userId) {
+  const { startIso, endExclusiveIso } = calendarMonthSqlBounds()
+
   const result = await db.query(
     `SELECT
        COALESCE(SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END), 0) AS spent,
@@ -34,8 +36,9 @@ export async function loadCalendarMonthCashFlow(userId) {
      ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
      WHERE t.user_id = $1
        ${NON_PENDING_FILTER}
-       ${CALENDAR_MONTH_FILTER}`,
-    [userId]
+       AND t.date >= $2::date
+       AND t.date < $3::date`,
+    [userId, startIso, endExclusiveIso]
   )
 
   return {
@@ -123,8 +126,24 @@ export async function buildTrackerSnapshot(userId) {
   const safeToSpend = spendingSummary?.safeToSpend ?? null
   const spendingProgress = spendingTracker?.progress
 
-  const savingsDetectionResult = await scanAndStoreSavingsTransferDetections(userId)
+  // Read-only: detections are scanned on Plaid sync / cron, not on every GET.
   const pendingSavingsDetections = await listPendingSavingsTransferDetections(userId)
+  const [categorySoftLimits, payday, expensePayload] = await Promise.all([
+    listCategorySoftLimits(userId).catch(() => []),
+    getPaydayProfile(userId).catch(() => ({
+      configured: false,
+      payCadence: null,
+      nextPaydayOn: null,
+    })),
+    loadExpenseAnalyzerData(userId).catch(() => ({ recurringCharges: [] })),
+  ])
+
+  const whatsLeftUntilPayday = computeWhatsLeftUntilPayday({
+    netBalance,
+    nextPaydayOn: payday.nextPaydayOn,
+    payCadence: payday.payCadence,
+    recurringCharges: expensePayload.recurringCharges ?? [],
+  })
 
   return {
     trackers: enrichedTrackers,
@@ -144,7 +163,10 @@ export async function buildTrackerSnapshot(userId) {
     suggestedSpendingLimit,
     suggestedBudget: suggestedSpendingLimit,
     pendingSavingsDetections,
-    savingsDetectionsScanned: savingsDetectionResult.created ?? 0,
+    categorySoftLimits,
+    payday,
+    whatsLeftUntilPayday,
+    savingsDetectionsScanned: 0,
     ...period,
     accountCount: accounts.length,
     lastSyncedAt: lastSyncedResult.rows[0]?.last_synced ?? null,

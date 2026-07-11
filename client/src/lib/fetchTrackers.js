@@ -65,7 +65,7 @@ export async function deleteTracker(getToken, trackerId) {
   return res.json()
 }
 
-export async function applySavingsDetection(getToken, detectionId, trackerId) {
+export async function applySavingsDetection(getToken, detectionId, trackerId, { force = false } = {}) {
   const token = await getToken()
   const res = await fetch(
     `${import.meta.env.VITE_API_URL}/api/trackers/savings-detections/${detectionId}/apply`,
@@ -75,13 +75,19 @@ export async function applySavingsDetection(getToken, detectionId, trackerId) {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(trackerId ? { trackerId } : {}),
+      body: JSON.stringify({
+        ...(trackerId ? { trackerId } : {}),
+        ...(force ? { force: true } : {}),
+      }),
     }
   )
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
-    throw new Error(body.error || `Apply savings detection failed: ${res.status}`)
+    const error = new Error(body.error || `Apply savings detection failed: ${res.status}`)
+    error.status = res.status
+    error.code = body.code
+    throw error
   }
 
   return res.json()

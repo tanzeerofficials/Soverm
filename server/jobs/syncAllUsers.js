@@ -11,9 +11,17 @@ import { syncAllAccountsForUser } from '../services/plaid.js'
 import { evaluateAndCreateProactiveNotifications } from '../services/proactiveNotifications.js'
 import { scanAndStoreSavingsTransferDetections } from '../services/savingsTransferDetection.js'
 
+let syncRunning = false
+
 export function startSyncJob() {
-  // TESTING ONLY — change back to '0 */4 * * *' after testing (every 4 hours)
+  // Every 4 hours. Skip if a previous run is still in progress.
   cron.schedule('0 */4 * * *', async () => {
+    if (syncRunning) {
+      console.warn('Scheduled sync skipped — previous run still in progress')
+      return
+    }
+
+    syncRunning = true
     console.log('Starting scheduled sync for all users...')
 
     try {
@@ -22,9 +30,11 @@ export function startSyncJob() {
 
       for (const userId of userIds) {
         try {
-          const { added, modified, removed } = await syncAllAccountsForUser(userId)
+          const { added, modified, removed, partial } = await syncAllAccountsForUser(userId)
           console.log(
-            `Synced for user ${userId}: ${added} added, ${modified} modified, ${removed} removed`
+            `Synced for user ${userId}: ${added} added, ${modified} modified, ${removed} removed${
+              partial ? ' (partial)' : ''
+            }`
           )
 
           const notificationResult = await evaluateAndCreateProactiveNotifications(userId)
@@ -48,6 +58,8 @@ export function startSyncJob() {
       console.log('Scheduled sync complete')
     } catch (err) {
       console.error('Scheduled sync failed:', err.message)
+    } finally {
+      syncRunning = false
     }
   })
 }

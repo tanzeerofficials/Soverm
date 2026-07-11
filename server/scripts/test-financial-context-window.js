@@ -39,6 +39,20 @@ try {
   passed++
 
   assert(
+    source.includes('CONNECTED_ACCOUNT_TRANSACTION_JOINS'),
+    'loadFinancialContextForUser must use connected-account joins (exclude disconnected txns)'
+  )
+  console.log('  pass: insight context uses connected-account filter')
+  passed++
+
+  assert(
+    !source.includes("COALESCE(a.account_name, 'Disconnected account')"),
+    'insight context must not include disconnected-account transaction labels'
+  )
+  console.log('  pass: disconnected account labels removed from insight context')
+  passed++
+
+  assert(
     !/loadFinancialContextForUser[\s\S]*?LIMIT\s+50/.test(source),
     'loadFinancialContextForUser must not use a fixed LIMIT 50'
   )

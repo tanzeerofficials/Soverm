@@ -6,6 +6,7 @@
  * the spending cap automatically.
  */
 
+import { getCurrentProgressMonth as getZonedCurrentProgressMonth } from './calendarMonth.js'
 import { formatIsoDate, roundCurrency } from './safeToSpend.js'
 
 export const TRACK_TYPES = ['spending', 'saving']
@@ -20,9 +21,7 @@ export const MIN_ALERT_WARNING_PERCENT = 1
 export const MAX_ALERT_WARNING_PERCENT = 99
 
 export function getCurrentProgressMonth(referenceDate = new Date()) {
-  const year = referenceDate.getFullYear()
-  const month = referenceDate.getMonth()
-  return formatIsoDate(new Date(year, month, 1))
+  return getZonedCurrentProgressMonth(referenceDate)
 }
 
 function toProgressMonthIso(value) {
@@ -348,6 +347,16 @@ export function parseCreateTrackerInput(body) {
 
   if (trackType.value === 'saving' && alertThresholds.value.hasAny) {
     return { error: 'Alert thresholds apply to spending trackers only' }
+  }
+
+  if (
+    trackType.value === 'spending' &&
+    alertThresholds.value.alertRemainingDollars != null &&
+    alertThresholds.value.alertRemainingDollars >= monthlyAmount.value
+  ) {
+    return {
+      error: 'alertRemainingDollars must be less than monthlyAmount (otherwise the warning fires immediately)',
+    }
   }
 
   return {

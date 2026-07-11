@@ -261,6 +261,32 @@ try {
   console.log('  pass: live prompt block coverage')
   passed++
 
+  // T2.6 — PMF loop fields when present on context
+  const pmfContext = {
+    ...chatContext,
+    weeklyReview: {
+      weekLabel: 'Jul 6–12',
+      whatsLeft: { configured: true, amount: 200 },
+      risk: { title: 'Tight runway' },
+      move: { title: 'Cook twice' },
+    },
+    monthCondition: {
+      condition: { grade: 'tight', title: 'Tight' },
+    },
+    userMemory: {
+      payday: { configured: true },
+      coachingNote: 'as we talked about',
+    },
+    openActions: [{ description: 'Cook twice', status: 'accepted' }],
+  }
+  const pmfBlock = buildLiveFinancialChatPromptBlock(pmfContext, { insightActions })
+  assert(pmfBlock.block.includes('weeklyReview'), 'prompt must include weekly review')
+  assert(pmfBlock.block.includes('monthCondition'), 'prompt must include month condition')
+  assert(pmfBlock.block.includes('userMemory'), 'prompt must include user memory')
+  assert(pmfBlock.instruction.includes('DEFAULT FRAME'), 'prompt must default to PMF frame')
+  console.log('  pass: PMF weekly/monthly/memory grounding')
+  passed++
+
   for (const audit of AUDIT_QUESTIONS) {
     for (const fragment of audit.mustInclude) {
       assert(

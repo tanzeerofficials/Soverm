@@ -3,12 +3,16 @@
  *
  * Persistent dashboard access to ChatPanel without scrolling to the insight.
  * Full-screen on mobile, centered modal on desktop.
+ *
+ * Works with or without a weekly insight: when insightId is missing we use
+ * the shared "general" chat thread grounded in live synced data.
  */
 
 import { useEffect } from 'react'
 import ChatPanel from './ChatPanel.jsx'
 import ChatBubbleIcon from './ChatBubbleIcon.jsx'
 import { buildDashboardSuggestedPrompts } from '../lib/chatSuggestedPrompts.js'
+import { GENERAL_CHAT_KEY } from '../lib/queryKeys.js'
 
 function FloatingCfoChatButton({ onClick }) {
   return (
@@ -24,7 +28,17 @@ function FloatingCfoChatButton({ onClick }) {
   )
 }
 
-function FloatingCfoChatModal({ isOpen, onClose, insightId, onChatError }) {
+function FloatingCfoChatModal({
+  isOpen,
+  onClose,
+  insightId,
+  onChatError,
+  initialDraft = '',
+  suggestedPrompts,
+}) {
+  const threadId = insightId || GENERAL_CHAT_KEY
+  const prompts = suggestedPrompts ?? buildDashboardSuggestedPrompts()
+
   useEffect(() => {
     if (!isOpen) {
       return
@@ -83,36 +97,27 @@ function FloatingCfoChatModal({ isOpen, onClose, insightId, onChatError }) {
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 sm:px-6">
-          {insightId ? (
-            <ChatPanel
-              key={insightId}
-              layout="modal"
-              scrollMode="modal"
-              insightId={insightId}
-              onError={onChatError}
-              expanded
-              suggestedPrompts={buildDashboardSuggestedPrompts()}
-              contextLabel="Grounded in your synced accounts, recent transactions, and Expense Analyzer data."
-              onExpandedChange={(expanded) => {
-                if (!expanded) {
-                  onClose()
-                }
-              }}
-            />
-          ) : (
-            <div className="flex flex-col items-center justify-center gap-4 py-12 text-center">
-              <p className="max-w-sm text-sm leading-relaxed text-fg-muted">
-                Generate your first insight to ask Soverm a question to get started
-              </p>
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-lg border border-border-default bg-surface px-5 py-2.5 text-sm font-medium text-fg transition hover:bg-surface-elevated"
-              >
-                Close
-              </button>
-            </div>
-          )}
+          <ChatPanel
+            key={`${threadId}:${initialDraft}`}
+            layout="modal"
+            scrollMode="modal"
+            threadId={threadId}
+            insightId={insightId}
+            initialDraft={initialDraft}
+            onError={onChatError}
+            expanded
+            suggestedPrompts={prompts}
+            contextLabel={
+              insightId
+                ? 'Uses your accounts, recent transactions, and Expense Analyzer — plus this week’s check-in when available.'
+                : 'Uses your accounts and spending — plus this week’s check-in and what’s left when available.'
+            }
+            onExpandedChange={(expanded) => {
+              if (!expanded) {
+                onClose()
+              }
+            }}
+          />
         </div>
       </div>
     </div>

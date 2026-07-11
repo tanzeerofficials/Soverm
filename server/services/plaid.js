@@ -326,6 +326,8 @@ export async function syncAllAccountsForUser(userId) {
           `Failed to sync Plaid item for user ${userId} (${groupAccounts.length} account(s)):`,
           itemErr.message
         )
+        counts.itemErrors = (counts.itemErrors ?? 0) + 1
+        counts.partial = true
       }
     }
 

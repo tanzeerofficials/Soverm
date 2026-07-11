@@ -9,11 +9,7 @@ import { useState } from 'react'
 import { useAuth } from '@clerk/clerk-react'
 import { useQueryClient } from '@tanstack/react-query'
 import {
-  dashboardQueryKey,
-  expenseAnalyzerQueryKey,
-  expenseAnalyzerSummaryQueryKey,
-  notificationsQueryKey,
-  trackerQueryKey,
+  invalidateAfterAccountChange,
 } from '../lib/queryKeys.js'
 import { syncTransactions } from '../lib/syncTransactions.js'
 
@@ -29,16 +25,12 @@ function SyncTransactionsButton({ className = '', showToast }) {
       const data = await syncTransactions(getToken)
 
       showToast?.(
-        `Synced ${data.added} new, ${data.modified} updated, ${data.removed} removed`,
-        'success'
+        data.partial
+          ? `Partial sync: ${data.added} new, ${data.modified} updated, ${data.removed} removed — some banks may still be stale`
+          : `Synced ${data.added} new, ${data.modified} updated, ${data.removed} removed`,
+        data.partial ? 'warning' : 'success'
       )
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: dashboardQueryKey }),
-        queryClient.invalidateQueries({ queryKey: trackerQueryKey }),
-        queryClient.invalidateQueries({ queryKey: expenseAnalyzerQueryKey }),
-        queryClient.invalidateQueries({ queryKey: expenseAnalyzerSummaryQueryKey }),
-        queryClient.invalidateQueries({ queryKey: notificationsQueryKey }),
-      ])
+      await invalidateAfterAccountChange(queryClient)
     } catch (err) {
       console.error('Sync failed:', err.message)
       showToast?.('Sync failed — please try again', 'error')

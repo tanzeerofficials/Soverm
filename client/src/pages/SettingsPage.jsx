@@ -4,14 +4,15 @@
  * Account management: connected banks, plan/usage, and permanent deletion.
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth, useClerk } from '@clerk/clerk-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import AppNavbar from '../components/AppNavbar.jsx'
 import ConfirmModal from '../components/ConfirmModal.jsx'
 import PageHeader from '../components/PageHeader.jsx'
 import SettingsSection from '../components/SettingsSection.jsx'
+import PaydaySettingsSection from '../components/PaydaySettingsSection.jsx'
 import Skeleton from '../components/Skeleton.jsx'
 import UsageBadge from '../components/UsageBadge.jsx'
 import { useToastContext } from '../context/ToastContext.jsx'
@@ -19,8 +20,19 @@ import { disconnectAccount, getDisconnectConfirmMessage } from '../lib/disconnec
 import { deleteAccount } from '../lib/deleteAccount.js'
 import { fetchUsage } from '../lib/fetchUsage.js'
 import { fetchNotifications, updateNotificationPreferences } from '../lib/fetchNotifications.js'
-import { dashboardQueryKey, notificationsQueryKey, usageQueryKey } from '../lib/queryKeys.js'
+import {
+  dashboardSummaryQueryKey,
+  invalidateAfterAccountChange,
+  notificationsAllQueryKey,
+  notificationsQueryKey,
+  usageQueryKey,
+} from '../lib/queryKeys.js'
 import { getDisplayBalance } from '../lib/balanceHelpers.js'
+import { trackUpgradeProClick } from '../lib/analytics.js'
+import {
+  checkoutErrorToastMessage,
+  startProCheckout,
+} from '../lib/startProCheckout.js'
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-US', {
@@ -53,12 +65,37 @@ function SettingsPage() {
   const { getToken } = useAuth()
   const { signOut } = useClerk()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
   const { showToast } = useToastContext()
 
   const [accountToDelete, setAccountToDelete] = useState(null)
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false)
   const [isDeletingAccount, setIsDeletingAccount] = useState(false)
+  const [checkoutLoading, setCheckoutLoading] = useState(false)
+
+  /*
+   * What this does: reads ?billing=success|canceled after Stripe Checkout redirect.
+   * Why: Stripe sends users back here; we toast and clear the query so refresh
+   * does not repeat the message. Pro status still comes from the Stripe webhook.
+   */
+  useEffect(() => {
+    const billing = searchParams.get('billing')
+    if (!billing) {
+      return
+    }
+
+    if (billing === 'success') {
+      showToast('Payment received — Pro unlocks once Stripe confirms (usually seconds)', 'success')
+      queryClient.invalidateQueries({ queryKey: usageQueryKey })
+    } else if (billing === 'canceled') {
+      showToast('Checkout canceled — you can upgrade anytime', 'success')
+    }
+
+    const next = new URLSearchParams(searchParams)
+    next.delete('billing')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams, showToast, queryClient])
 
   const { data: usage } = useQuery({
     queryKey: usageQueryKey,
@@ -66,7 +103,7 @@ function SettingsPage() {
   })
 
   const { data: notificationData } = useQuery({
-    queryKey: notificationsQueryKey,
+    queryKey: notificationsAllQueryKey,
     queryFn: () => fetchNotifications(getToken),
   })
 
@@ -84,10 +121,10 @@ function SettingsPage() {
   })
 
   const { data: dashboardData, isPending: accountsLoading } = useQuery({
-    queryKey: dashboardQueryKey,
+    queryKey: dashboardSummaryQueryKey('30d'),
     queryFn: async () => {
       const token = await getToken()
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/summary`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/summary?range=30d`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) {
@@ -99,6 +136,22 @@ function SettingsPage() {
 
   const accounts = dashboardData?.accounts ?? []
 
+  /*
+   * What this does: opens Stripe Checkout for monthly Pro.
+   * Why: Settings "Your plan" is the natural place to upgrade after hitting
+   * free-tier limits; success/cancel return to /settings?billing=...
+   */
+  async function handleUpgrade() {
+    trackUpgradeProClick('settings')
+    setCheckoutLoading(true)
+    try {
+      await startProCheckout(getToken)
+    } catch (err) {
+      showToast(checkoutErrorToastMessage(err), 'error')
+      setCheckoutLoading(false)
+    }
+  }
+
   async function handleDisconnectConfirm() {
     if (!accountToDelete) return
 
@@ -109,7 +162,7 @@ function SettingsPage() {
       await disconnectAccount(getToken, accountId)
       setAccountToDelete(null)
       showToast(`"${accountName}" disconnected`, 'success')
-      await queryClient.invalidateQueries({ queryKey: dashboardQueryKey })
+      await invalidateAfterAccountChange(queryClient)
     } catch (err) {
       console.error('Failed to disconnect account:', err.message)
       showToast('Failed to disconnect account — please try again', 'error')
@@ -124,6 +177,7 @@ function SettingsPage() {
     try {
       await deleteAccount(getToken)
       setShowDeleteAccountModal(false)
+      queryClient.clear()
       await signOut()
       navigate('/', { replace: true })
     } catch (err) {
@@ -140,7 +194,7 @@ function SettingsPage() {
       <main className="mx-auto max-w-2xl px-4 pb-16 pt-24 sm:px-6 sm:pt-28">
         <PageHeader
           title="Settings"
-          description="Manage your plan, connected banks, notifications, and account data."
+          description="Manage your plan, payday, connected banks, notifications, and account data."
         />
 
         <div className="space-y-8">
@@ -151,10 +205,20 @@ function SettingsPage() {
               </p>
               <UsageBadge usage={usage} />
               {usage && !usage.isPro && (
-                <p className="text-xs text-fg-subtle">
-                  {usage.generatedToday ?? 0} insight
-                  {(usage.generatedToday ?? 0) === 1 ? '' : 's'} generated today
-                </p>
+                <>
+                  <p className="text-xs text-fg-subtle">
+                    {usage.generatedToday ?? 0} insight
+                    {(usage.generatedToday ?? 0) === 1 ? '' : 's'} generated today
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleUpgrade}
+                    disabled={checkoutLoading}
+                    className="mt-1 w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-brand-soft disabled:opacity-60 sm:w-auto"
+                  >
+                    {checkoutLoading ? 'Redirecting…' : 'Upgrade to Soverm Pro'}
+                  </button>
+                </>
               )}
             </div>
           </SettingsSection>
@@ -164,8 +228,9 @@ function SettingsPage() {
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-fg">Proactive alerts</p>
                 <p className="mt-1 text-sm leading-relaxed text-fg-muted">
-                  Soverm flags unusual charges, low balance, new subscriptions, and spending
-                  spikes after each sync. Alerts appear in the bell icon and on your dashboard.
+                  Soverm sends your weekly check-in and month letter when ready, plus unusual
+                  charges, low balance, new subscriptions, and spending-cap alerts after each sync.
+                  Alerts appear in the bell icon and on your dashboard.
                 </p>
               </div>
               <button
@@ -192,6 +257,10 @@ function SettingsPage() {
                 notifications stay in your history.
               </p>
             )}
+          </SettingsSection>
+
+          <SettingsSection title="Payday (for what’s left)">
+            <PaydaySettingsSection />
           </SettingsSection>
 
           <SettingsSection title="Connected banks">

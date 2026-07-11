@@ -1,7 +1,5 @@
 /*
- * LANDING HOW IT WORKS
- *
- * Three equal-height step cards explaining the connect → analyze → insight flow.
+ * LANDING HOW IT WORKS — ICP activation path
  */
 
 const STEPS = [
@@ -9,19 +7,19 @@ const STEPS = [
     step: '1',
     title: 'Connect your bank',
     description:
-      'Link through Plaid in under a minute — the same secure technology used by Venmo, Coinbase, and major banks.',
+      'Link through Plaid in under a minute — read-only. We never move money or see your bank password.',
   },
   {
     step: '2',
-    title: 'Soverm reads your activity',
+    title: 'Confirm payday',
     description:
-      'Every transaction and balance is analyzed for patterns — not just what you have, but where money is actually going.',
+      'Tell us when you get paid. Soverm shows what’s left after known bills — the number you check before you spend.',
   },
   {
     step: '3',
-    title: 'Get honest, specific advice',
+    title: 'Check your week',
     description:
-      'A plain-English insight with real numbers, risks, and three concrete actions you can take this week.',
+      'How you did, what’s at risk, one better move — then a month-end accountant letter when the month closes.',
   },
 ]
 
@@ -37,7 +35,7 @@ function LandingHowItWorks() {
           How it works
         </h2>
         <p className="mt-3 text-sm text-fg-muted">
-          Three steps from bank connection to actionable advice.
+          From bank link to what&apos;s left — usually within minutes.
         </p>
       </div>
 

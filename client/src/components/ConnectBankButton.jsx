@@ -3,17 +3,38 @@
  *
  * Opens Plaid Link via the shared PlaidLinkProvider context.
  * usePlaidLink lives in one place only — Plaid requires a single embed per page.
+ *
+ * If the link token failed to load, we show a retry path instead of a
+ * permanently disabled button with no explanation.
  */
 
 import { usePlaidLinkContext } from '../context/PlaidLinkContext.jsx'
 import { trackConnectBankClick } from '../lib/analytics.js'
 
 function ConnectBankButton({ className = '', highlighted = false, showSecurityNote = true }) {
-  const { open, ready, isExchanging } = usePlaidLinkContext()
+  const {
+    open,
+    ready,
+    isExchanging,
+    isFetchingLinkToken,
+    linkTokenError,
+    retryLinkToken,
+  } = usePlaidLinkContext()
 
-  const label = isExchanging ? 'Connecting & syncing…' : 'Connect Your Bank'
+  const label = isExchanging
+    ? 'Connecting & syncing…'
+    : isFetchingLinkToken
+      ? 'Preparing connection…'
+      : linkTokenError
+        ? 'Retry bank connection'
+        : 'Connect Your Bank'
 
   function handleClick() {
+    if (linkTokenError) {
+      retryLinkToken()
+      return
+    }
+
     trackConnectBankClick()
     open()
   }
@@ -29,14 +50,19 @@ function ConnectBankButton({ className = '', highlighted = false, showSecurityNo
       <button
         type="button"
         onClick={handleClick}
-        disabled={!ready || isExchanging}
+        disabled={(!ready && !linkTokenError) || isExchanging || isFetchingLinkToken}
         className={`min-h-11 w-full rounded-lg bg-brand px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-60 ${
           highlighted && !isExchanging ? 'animate-pulse' : ''
         } ${className}`}
       >
         {label}
       </button>
-      {showSecurityNote && (
+      {linkTokenError && (
+        <p className="mt-2 max-w-[280px] text-center text-[11px] leading-snug text-danger sm:text-xs">
+          {linkTokenError}
+        </p>
+      )}
+      {showSecurityNote && !linkTokenError && (
       <p className="mt-2 flex max-w-[280px] items-center justify-center gap-1.5 px-1 text-center text-[11px] leading-snug text-fg-muted sm:text-xs">
         <svg
           className="h-3.5 w-3.5 flex-shrink-0"

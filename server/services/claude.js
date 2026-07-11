@@ -811,8 +811,30 @@ export function buildLiveFinancialChatPromptBlock(chatFinancialContext, { insigh
   }
 
   const capturedAtLabel = formatInsightGeneratedAt(chatFinancialContext.capturedAt)
-  const { accounts, liveMonthOverMonth, recentActivity, expenseAnalyzer, dataScope } =
-    chatFinancialContext
+  const {
+    accounts,
+    liveMonthOverMonth,
+    recentActivity,
+    expenseAnalyzer,
+    dataScope,
+    weeklyReview = null,
+    monthCondition = null,
+    openActions = [],
+    userMemory = null,
+  } = chatFinancialContext
+
+  const mergedOpenActions = [
+    ...insightActions.map((action) => ({
+      description: action.description,
+      completed: Boolean(action.completed),
+      source: 'insight',
+    })),
+    ...(openActions ?? []).map((action) => ({
+      description: action.description,
+      status: action.status,
+      source: action.source ?? 'weekly',
+    })),
+  ]
 
   return {
     block: `
@@ -825,6 +847,10 @@ ${JSON.stringify(
     liveMonthOverMonth,
     recentActivity,
     expenseAnalyzer,
+    weeklyReview,
+    monthCondition,
+    userMemory,
+    openActions: mergedOpenActions,
     insightActions,
   },
   null,
@@ -833,7 +859,11 @@ ${JSON.stringify(
     instruction: `
 
 LIVE DATA RULES — use this block for spending, subscriptions, categories, accounts, and affordability:
-- Prefer liveMonthOverMonth and expenseAnalyzer over the older insight snapshot for "right now" questions
+- DEFAULT FRAME for general questions: start from weeklyReview (what's left until payday, runwayCoach, one risk, one move) and monthCondition.condition grade — not generic budgeting advice
+- Prefer weeklyReview.whatsLeft / runwayCoach over raw balances for "can I afford X?" and "how am I doing this week?"
+- Prefer monthCondition for "how is this month going?" / accountant-style condition questions
+- userMemory compounds payday, problem categories, soft limits, goals, and prior actions — say "as we talked about…" when referencing them
+- Prefer liveMonthOverMonth and expenseAnalyzer over the older insight snapshot for "right now" category/subscription questions
 - expenseAnalyzer.categoryBreakdown has per-category MoM deltas — use for "which category went up/down most"
 - expenseAnalyzer.topMover is the largest significant category change (≥5%)
 - expenseAnalyzer.confirmedRecurring = high-confidence subscriptions in totals; cite monthlyEquivalent, annualEquivalent, confidenceLabel, sourceLabel
@@ -842,7 +872,7 @@ LIVE DATA RULES — use this block for spending, subscriptions, categories, acco
 - If dataScope.disconnectedOrphanedTransactionCountLast90Days > 0, mention disconnected-account filtering when user asks why old merchants/subscriptions vanished
 - accounts.items: credit cards (isCredit true) show balance owed; checking/savings show available cash; netTotalBalance nets them
 - recentActivity is connected accounts only — use for merchant-specific purchase questions
-- insightActions lists suggested actions from the insight with completed status — reference when user asks about their to-do list
+- openActions / insightActions are the user's to-dos — reference when they ask what to do next
 - Never say data is unavailable when this block contains it; only cite figures that appear here or in the insight snapshot`,
   }
 }
@@ -893,11 +923,61 @@ export function buildInsightChatSystemPrompt({
         }
       : null)
 
-  const generatedAtLabel = formatInsightGeneratedAt(generatedAt)
   const momContext = buildMonthOverMonthPromptContext(monthOverMonthComparison)
   const liveContextBlock = buildLiveFinancialChatPromptBlock(resolvedChatContext, {
     insightActions,
   })
+  const liveCapturedLabel = resolvedChatContext?.capturedAt
+    ? formatInsightGeneratedAt(resolvedChatContext.capturedAt)
+    : null
+
+  /*
+   * General chat (no insight yet): still ground answers in live synced data.
+   * Why: users should be able to ask Soverm before generating their first insight.
+   */
+  if (insightBody == null) {
+    return `You are Soverm, a personal AI CFO for paycheck-to-paycheck users — a knowledgeable, direct financial assistant in an ongoing chat. They have not opened a weekly insight thread yet. Answer using their live synced financial data below. Answer like a capable advisor: thorough when the question needs depth, concise when it doesn't.
+
+DEFAULT JOB (unless they clearly ask something else):
+- Ground answers in this week's remaining money (weeklyReview.whatsLeft / runwayCoach), the one risk + one move, openActions, and this month's condition grade (monthCondition).
+- Prefer "what's left until payday" coaching over generic budgeting lectures.
+- When userMemory has prior actions, soft limits, or payday facts, refer back ("as we talked about…").
+
+DATA SOURCES:
+1. Live financial snapshot (below) — weekly review, month condition, user memory, balances, 30-day MoM, recent transactions, Expense Analyzer.
+2. There is no weekly insight snapshot in this thread — do not invent one. If helpful, point them to Your week (/weekly-review) or the month letter for the structured ritual.
+
+TRUST AND ACCURACY:
+- Only cite dollar amounts, merchants, and categories that appear in the data below — never invent figures
+- For recurring charges: cite merchant, monthly cost, annual cost, confidenceLabel (Confirmed/Likely/Uncertain), and sourceLabel
+- Review-tier recurring (expenseAnalyzer.reviewRecurring) is uncertain — not counted in confirmed totals
+- Credit card balances in accounts.items are debt owed; checking/savings are spendable cash
+- If data is missing, say so plainly instead of guessing
+- When giving opinions, ground them in their actual numbers
+
+CONVERSATION STYLE:
+- Natural back-and-forth — ask a clarifying question when it would genuinely help
+- Match answer length to the question
+- General finance questions: answer fully and practically, then connect to their situation when relevant
+- Use markdown when it improves readability
+- Be honest but constructive
+- Not a licensed advisor — brief disclaimer only when the question needs licensed advice
+
+TIMING:
+${liveCapturedLabel ? `- Live financial snapshot refreshed ${liveCapturedLabel}.` : '- Live financial snapshot timing is unknown.'}
+
+${liveContextBlock.block}
+${liveContextBlock.instruction}
+
+Prior messages in this thread are in the messages array — maintain continuity and refer back when relevant.
+
+FORMATTING:
+- Write conversationally, like a knowledgeable friend who knows their numbers
+- Dollar amounts written naturally ($1,072.80 not 1072.8 in prose)
+- Short paragraphs beat walls of text; structure longer answers clearly`
+  }
+
+  const generatedAtLabel = formatInsightGeneratedAt(generatedAt)
   const snapshotCapturedAt = monthOverMonthComparison?.capturedAt
     ? formatInsightGeneratedAt(monthOverMonthComparison.capturedAt)
     : null
@@ -906,14 +986,15 @@ export function buildInsightChatSystemPrompt({
     ? `Insight snapshot month-over-month figures were captured on ${snapshotCapturedAt}.`
     : 'Insight snapshot month-over-month figures come from when the insight was generated.'
 
-  const liveCapturedLabel = resolvedChatContext?.capturedAt
-    ? formatInsightGeneratedAt(resolvedChatContext.capturedAt)
-    : null
+  return `You are Soverm, a personal AI CFO for paycheck-to-paycheck users — a knowledgeable, direct financial assistant in an ongoing chat with this user. You have access to their real synced financial data below. Answer like a capable advisor: thorough when the question needs depth, concise when it doesn't. This should feel like talking to a smart financial assistant, not reading a report.
 
-  return `You are Soverm, a personal AI CFO — a knowledgeable, direct financial assistant in an ongoing chat with this user. You have access to their real synced financial data below. Answer like a capable advisor: thorough when the question needs depth, concise when it doesn't. This should feel like talking to a smart financial assistant, not reading a report.
+DEFAULT JOB (unless they clearly ask something else):
+- Ground answers in this week's remaining money (weeklyReview.whatsLeft / runwayCoach), the one risk + one move, openActions, and this month's condition grade (monthCondition).
+- Prefer "what's left until payday" coaching over generic budgeting lectures.
+- When userMemory has prior actions, soft limits, or payday facts, refer back ("as we talked about…").
 
 DATA SOURCES — pick the right one for each question:
-1. Live financial snapshot (below) — current balances, live 30-day spending/income comparison, recent transactions, Expense Analyzer categories and recurring charges. Use this for "what's happening now", subscriptions, categories, recent purchases, and affordability questions.
+1. Live financial snapshot (below) — weekly review, month condition, user memory, balances, live 30-day MoM, recent transactions, Expense Analyzer. Use this for "what's happening now", subscriptions, categories, recent purchases, and affordability questions.
 2. Insight snapshot (below) — the weekly insight Soverm generated on ${generatedAtLabel}. Use for what was flagged then; prefer live data when the user asks about current state.
 3. Insight snapshot month-over-month block — frozen figures from insight generation. Prefer liveMonthOverMonth in the live snapshot for current comparisons.
 
@@ -968,10 +1049,17 @@ export async function askFinancialQuestion(
   newQuestion,
   { generatedAt, chatFinancialContext = null, expenseAnalyzerContext = null, insightActions = [] } = {}
 ) {
-  const insightForPrompt = normalizeInsightForPrompt(originalInsight)
-  const { insightBody, monthOverMonthComparison, generatedAt: metadataGeneratedAt } =
-    splitInsightForChatPrompt(insightForPrompt)
   const historyMessages = chatHistory.map(({ role, content }) => ({ role, content }))
+
+  let insightBody = null
+  let monthOverMonthComparison = null
+  let metadataGeneratedAt = null
+
+  if (originalInsight != null) {
+    const insightForPrompt = normalizeInsightForPrompt(originalInsight)
+    ;({ insightBody, monthOverMonthComparison, generatedAt: metadataGeneratedAt } =
+      splitInsightForChatPrompt(insightForPrompt))
+  }
 
   const systemPrompt = buildInsightChatSystemPrompt({
     insightBody,

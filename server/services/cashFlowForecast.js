@@ -3,11 +3,14 @@
  *
  * Loads live account balances, recent cash flow, and confirmed recurring
  * charges, then returns a 30-day projection for the dashboard.
+ *
+ * Income/spend baselines exclude transfer-like transactions so moving money
+ * between your own accounts does not inflate both income and spending.
  */
 
 import db from '../db/index.js'
 import { calculateTotalBalance, getDisplayBalance } from '../utils/balanceHelpers.js'
-import { loadMonthOverMonthComparison } from '../utils/financialContext.js'
+import { CONNECTED_ACCOUNT_TRANSACTION_JOINS } from '../utils/connectedAccountTransactions.js'
 import { loadExpenseAnalyzerData } from '../utils/expenseAnalyzerData.js'
 import {
   buildCashFlowForecast,
@@ -16,14 +19,41 @@ import {
 } from '../utils/cashFlowForecast.js'
 import { roundCurrency } from '../utils/safeToSpend.js'
 
+const NON_PENDING_FILTER = 'AND (t.pending IS NOT TRUE)'
+/** Drop internal moves that would otherwise count as both spend and income. */
+const EXCLUDE_TRANSFER_FILTER = `
+  AND COALESCE(t.category, '') !~* 'transfer'
+  AND COALESCE(t.name, '') !~* '\\btransfer\\b'
+`
+
 function sumRecurringMonthly(recurringCharges = []) {
   return roundCurrency(
     recurringCharges.reduce((sum, charge) => sum + (charge.monthlyEquivalent ?? 0), 0)
   )
 }
 
+async function loadForecastBaselines(userId) {
+  const result = await db.query(
+    `SELECT
+       COALESCE(SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END), 0) AS spending,
+       COALESCE(SUM(CASE WHEN t.amount < 0 THEN ABS(t.amount) ELSE 0 END), 0) AS income
+     FROM transactions t
+     ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
+     WHERE t.user_id = $1
+       ${NON_PENDING_FILTER}
+       ${EXCLUDE_TRANSFER_FILTER}
+       AND t.date >= NOW() - INTERVAL '30 days'`,
+    [userId]
+  )
+
+  return {
+    spendingLast30Days: roundCurrency(result.rows[0].spending),
+    incomeLast30Days: roundCurrency(result.rows[0].income),
+  }
+}
+
 export async function buildCashFlowForecastForUser(userId, { referenceDate = new Date() } = {}) {
-  const [accountsResult, monthOverMonth, expensePayload] = await Promise.all([
+  const [accountsResult, baselines, expensePayload] = await Promise.all([
     db.query(
       `SELECT id, bank_name, account_name, account_type,
               balance_current, balance_available, currency
@@ -31,7 +61,7 @@ export async function buildCashFlowForecastForUser(userId, { referenceDate = new
        WHERE user_id = $1`,
       [userId]
     ),
-    loadMonthOverMonthComparison(userId),
+    loadForecastBaselines(userId),
     loadExpenseAnalyzerData(userId),
   ])
 
@@ -44,13 +74,10 @@ export async function buildCashFlowForecastForUser(userId, { referenceDate = new
   const confirmedRecurringMonthly =
     expensePayload.totalRecurringMonthly ?? sumRecurringMonthly(recurringCharges)
 
-  const incomeLast30Days = monthOverMonth.currentPeriod?.income?.total ?? 0
-  const spendingLast30Days = monthOverMonth.currentPeriod?.spending?.total ?? 0
-
   const forecast = buildCashFlowForecast({
     startingBalance,
-    incomeLast30Days,
-    spendingLast30Days,
+    incomeLast30Days: baselines.incomeLast30Days,
+    spendingLast30Days: baselines.spendingLast30Days,
     confirmedRecurringMonthly,
     recurringCharges,
     horizonDays: FORECAST_HORIZON_DAYS,

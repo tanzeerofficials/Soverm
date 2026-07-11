@@ -17,6 +17,7 @@ import {
   parseCreateTrackerInput,
   parseUpdateTrackerInput,
 } from '../utils/monthlyTrackers.js'
+import { getCurrentProgressMonth } from '../utils/calendarMonth.js'
 
 const BASE_TRACKER_SELECT_COLUMNS = `id, user_id, track_type, name, purpose_type, monthly_amount,
             target_total, progress_amount, active, created_at, updated_at`
@@ -38,34 +39,43 @@ async function getTrackerSelectColumns() {
 /**
  * Zeroes monthly progress when the stored month is before the current calendar month.
  * Lifetime total (progress_amount) is left unchanged.
+ *
+ * Uses the app-timezone month start (not Postgres CURRENT_DATE) so SQL and
+ * Node agree at month boundaries.
  */
 export async function resetStaleMonthlyProgress(userId) {
   if (!(await hasMonthlyTrackersTable()) || !(await hasMonthlyProgressColumns())) {
     return
   }
 
+  const currentMonth = getCurrentProgressMonth()
+
   await db.query(
     `UPDATE monthly_trackers
      SET monthly_progress_amount = 0,
-         progress_month = date_trunc('month', CURRENT_DATE)::date,
+         progress_month = $2::date,
          updated_at = NOW()
      WHERE user_id = $1
        AND track_type = 'saving'
        AND active = true
        AND (
          progress_month IS NULL
-         OR progress_month < date_trunc('month', CURRENT_DATE)::date
+         OR progress_month < $2::date
        )`,
-    [userId]
+    [userId, currentMonth]
   )
 }
 
-export async function listActiveTrackers(userId) {
+export async function listActiveTrackers(userId, { persistMonthReset = false } = {}) {
   if (!(await hasMonthlyTrackersTable())) {
     return []
   }
 
-  await resetStaleMonthlyProgress(userId)
+  // Persist month rollover only on write paths (create/update/apply).
+  // GET/list should not mutate savings progress as a side effect of reading.
+  if (persistMonthReset) {
+    await resetStaleMonthlyProgress(userId)
+  }
 
   const selectColumns = await getTrackerSelectColumns()
   const result = await db.query(
@@ -123,6 +133,9 @@ export async function createTracker(userId, body) {
     alertRemainingDollars,
   } = parsed.value
 
+  if (trackType === 'saving') {
+    await resetStaleMonthlyProgress(userId)
+  }
   if (trackType === 'spending') {
     const existing = await getActiveSpendingTracker(userId)
     if (existing) {
@@ -244,6 +257,26 @@ export async function updateTracker(userId, trackerId, body) {
   ) {
     const error = new Error('Custom alert thresholds are not available yet — run migration 016')
     error.statusCode = 503
+    throw error
+  }
+
+  const existingTracker = mapTrackerRow(existing.rows[0])
+  const effectiveMonthly =
+    updates.monthlyAmount != null ? updates.monthlyAmount : existingTracker.monthlyAmount
+  const effectiveRemainingDollars =
+    updates.alertRemainingDollars !== undefined
+      ? updates.alertRemainingDollars
+      : existingTracker.alertRemainingDollars
+
+  if (
+    trackType === 'spending' &&
+    effectiveRemainingDollars != null &&
+    effectiveRemainingDollars >= effectiveMonthly
+  ) {
+    const error = new Error(
+      'alertRemainingDollars must be less than monthlyAmount (otherwise the warning fires immediately)'
+    )
+    error.statusCode = 400
     throw error
   }
 

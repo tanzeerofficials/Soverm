@@ -19,6 +19,11 @@ import { formatInsightDate } from '../lib/formatInsightDate.js'
 import { groupInsightsByMonth } from '../lib/historyTimeline.js'
 import { useToastContext } from '../context/ToastContext.jsx'
 import { trackUpgradeProClick } from '../lib/analytics.js'
+import {
+  checkoutErrorToastMessage,
+  startProCheckout,
+} from '../lib/startProCheckout.js'
+import { downloadMonthlySnapshotCsv } from '../lib/downloadMonthlySnapshot.js'
 
 function HistoryMetaChip({ children }) {
   return (
@@ -76,6 +81,26 @@ function HistoryEmptyState() {
   )
 }
 
+function HistoryErrorState({ message, onRetry }) {
+  return (
+    <div className="mx-auto max-w-lg rounded-2xl border border-danger/30 bg-danger/5 px-6 py-14 text-center">
+      <p className="text-base font-semibold text-fg">Couldn&apos;t load history</p>
+      <p className="mt-2 text-sm leading-relaxed text-fg-muted">
+        {message || 'Something went wrong while loading your insights.'}
+      </p>
+      {onRetry && (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="mt-6 inline-flex rounded-xl border border-border-default bg-surface-elevated px-6 py-3 text-sm font-semibold text-fg transition hover:border-border-hover"
+        >
+          Try again
+        </button>
+      )}
+    </div>
+  )
+}
+
 function HistoryPage() {
   const { getToken } = useAuth()
   const navigate = useNavigate()
@@ -83,7 +108,13 @@ function HistoryPage() {
   const [selectedInsight, setSelectedInsight] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
 
-  const { data: historyData, isLoading: historyLoading } = useQuery({
+  const {
+    data: historyData,
+    isLoading: historyLoading,
+    isError: historyIsError,
+    error: historyError,
+    refetch: refetchHistory,
+  } = useQuery({
     queryKey: historyQueryKey,
     queryFn: async () => {
       const token = await getToken()
@@ -120,9 +151,23 @@ function HistoryPage() {
     [filteredInsights]
   )
 
-  function handleUpgrade() {
+  async function handleUpgrade() {
     trackUpgradeProClick('history')
-    showToast('Soverm Pro checkout is coming soon — stay tuned!', 'success')
+    try {
+      await startProCheckout(getToken)
+    } catch (err) {
+      showToast(checkoutErrorToastMessage(err), 'error')
+    }
+  }
+
+  async function handleExportSnapshot() {
+    try {
+      await downloadMonthlySnapshotCsv(getToken)
+      showToast('Monthly snapshot downloaded', 'success')
+    } catch (err) {
+      console.error('Failed to export monthly snapshot:', err.message)
+      showToast('Couldn’t download snapshot — please try again', 'error')
+    }
   }
 
   function handleCloseModal() {
@@ -141,7 +186,15 @@ function HistoryPage() {
         <PageHeader
           title="Insight History"
           description="Your past insights, organized by date."
-        />
+        >
+          <button
+            type="button"
+            onClick={handleExportSnapshot}
+            className="mt-4 rounded-lg border border-border-default bg-surface px-3 py-2 text-xs font-semibold text-fg transition hover:border-border-hover hover:bg-surface-elevated"
+          >
+            Export monthly CSV
+          </button>
+        </PageHeader>
 
         {!historyLoading && (insights.length > 0 || lockedCount > 0) && (
           <div className="mb-6 flex flex-wrap items-center gap-2">
@@ -169,6 +222,11 @@ function HistoryPage() {
           <div aria-busy="true" aria-label="Loading insights">
             <HistoryTimelineSkeleton />
           </div>
+        ) : historyIsError ? (
+          <HistoryErrorState
+            message={historyError?.message}
+            onRetry={() => refetchHistory()}
+          />
         ) : insights.length === 0 && lockedCount === 0 ? (
           <HistoryEmptyState />
         ) : (

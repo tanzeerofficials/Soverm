@@ -3,7 +3,7 @@
  *
  * Projects net balance over the next N days using:
  * - Current connected-account balance (starting point)
- * - Confirmed recurring outflows on their expected dates
+ * - Confirmed recurring outflows on their expected dates (including today)
  * - Average daily income from the last 30 days
  * - Average daily discretionary spend (30-day spend minus recurring)
  *
@@ -138,6 +138,36 @@ function indexEventsByDate(events) {
 }
 
 /**
+ * Discretionary monthly burn = recent spend minus confirmed recurring.
+ * Cap the recurring subtraction so we never assume $0 discretionary when
+ * recurring estimates exceed the 30-day spend window (annual bills, lag).
+ */
+export function resolveDiscretionaryMonthly(spendingLast30Days, confirmedRecurringMonthly) {
+  const spending = Math.max(0, spendingLast30Days)
+  const recurring = Math.max(0, confirmedRecurringMonthly)
+  const cappedRecurring = Math.min(recurring, spending * 0.95)
+  return roundCurrency(Math.max(0, spending - cappedRecurring))
+}
+
+/**
+ * Runway from the simulated daily points: first day projected balance <= 0.
+ * Falls back to average daily burn when the horizon never goes non-positive.
+ */
+export function resolveRunwayDays(points, startingBalance, dailyBurn) {
+  for (let index = 1; index < points.length; index += 1) {
+    if (points[index].balance <= 0) {
+      return index
+    }
+  }
+
+  if (dailyBurn > 0 && startingBalance > 0) {
+    return Math.round((startingBalance / dailyBurn) * 10) / 10
+  }
+
+  return null
+}
+
+/**
  * Builds daily balance points from today through horizonDays.
  */
 export function buildCashFlowForecast({
@@ -153,29 +183,37 @@ export function buildCashFlowForecast({
   const endDate = addDaysToIso(todayIso, horizonDays)
 
   const dailyIncome = roundCurrency(incomeLast30Days / 30)
-  const discretionaryMonthly = Math.max(0, spendingLast30Days - confirmedRecurringMonthly)
+  const discretionaryMonthly = resolveDiscretionaryMonthly(
+    spendingLast30Days,
+    confirmedRecurringMonthly
+  )
   const dailyDiscretionary = roundCurrency(discretionaryMonthly / 30)
 
+  // Include today so bills due today appear in the list and today's balance point.
   const scheduledOutflows = buildScheduledOutflows(recurringCharges, {
-    startDate: addDaysToIso(todayIso, 1),
+    startDate: todayIso,
     endDate,
   })
   const outflowsByDate = indexEventsByDate(scheduledOutflows)
 
+  const todayRecurring = roundCurrency(
+    (outflowsByDate.get(todayIso) ?? []).reduce((sum, event) => sum + event.amount, 0)
+  )
+
+  let balance = roundCurrency(startingBalance - todayRecurring)
+  let lowestBalance = balance
+  let lowestBalanceDate = todayIso
+
   const points = [
     {
       date: todayIso,
-      balance: roundCurrency(startingBalance),
+      balance,
       income: 0,
       discretionarySpend: 0,
-      recurringSpend: 0,
+      recurringSpend: todayRecurring,
       label: 'Today',
     },
   ]
-
-  let balance = roundCurrency(startingBalance)
-  let lowestBalance = balance
-  let lowestBalanceDate = todayIso
 
   for (let dayOffset = 1; dayOffset <= horizonDays; dayOffset += 1) {
     const date = addDaysToIso(todayIso, dayOffset)
@@ -183,9 +221,7 @@ export function buildCashFlowForecast({
       (outflowsByDate.get(date) ?? []).reduce((sum, event) => sum + event.amount, 0)
     )
 
-    balance = roundCurrency(
-      balance + dailyIncome - dailyDiscretionary - recurringSpend
-    )
+    balance = roundCurrency(balance + dailyIncome - dailyDiscretionary - recurringSpend)
 
     if (balance < lowestBalance) {
       lowestBalance = balance
@@ -202,8 +238,7 @@ export function buildCashFlowForecast({
   }
 
   const dailyBurn = roundCurrency(dailyDiscretionary + confirmedRecurringMonthly / 30)
-  const runwayDays =
-    dailyBurn > 0 ? Math.round((startingBalance / dailyBurn) * 10) / 10 : null
+  const runwayDays = resolveRunwayDays(points, roundCurrency(startingBalance), dailyBurn)
 
   return {
     horizonDays,
@@ -221,7 +256,8 @@ export function buildCashFlowForecast({
       spendingLast30Days: roundCurrency(spendingLast30Days),
       confirmedRecurringMonthly: roundCurrency(confirmedRecurringMonthly),
     },
-    scheduledOutflows: scheduledOutflows.slice(0, 12),
+    // Cap for response size — enough for a 30-day bill calendar view.
+    scheduledOutflows: scheduledOutflows.slice(0, 40),
     points,
     hasBaselineData: spendingLast30Days > 0 || incomeLast30Days > 0,
   }
@@ -238,11 +274,22 @@ export function summarizeForecastRisk(forecast) {
     return null
   }
 
+  if (!forecast.hasBaselineData) {
+    return {
+      tone: 'warning',
+      title: 'Not enough history yet',
+      detail:
+        'This projection is mostly your current balance. Check back after a few days of synced transactions.',
+      lowestBalanceDate: forecast.lowestBalanceDate,
+    }
+  }
+
   if (forecast.startingBalance < 0) {
     return {
       tone: 'danger',
       title: 'Balance is negative',
       detail: 'Connect accounts and review recent charges before relying on this projection.',
+      lowestBalanceDate: forecast.lowestBalanceDate,
     }
   }
 
@@ -250,7 +297,8 @@ export function summarizeForecastRisk(forecast) {
     return {
       tone: 'danger',
       title: 'Projected shortfall ahead',
-      detail: `Balance may dip to about $${Math.abs(forecast.lowestBalance).toFixed(0)} around ${forecast.lowestBalanceDate}.`,
+      detail: `Balance may dip to about $${Math.abs(forecast.lowestBalance).toFixed(0)}.`,
+      lowestBalanceDate: forecast.lowestBalanceDate,
     }
   }
 
@@ -259,6 +307,7 @@ export function summarizeForecastRisk(forecast) {
       tone: 'warning',
       title: 'Cash runway is tight',
       detail: `At your recent pace, connected balances cover about ${forecast.runwayDays} days.`,
+      lowestBalanceDate: forecast.lowestBalanceDate,
     }
   }
 
@@ -267,6 +316,7 @@ export function summarizeForecastRisk(forecast) {
       tone: 'warning',
       title: 'Spending may outpace income',
       detail: `Projected balance in ${forecast.horizonDays} days is lower than today.`,
+      lowestBalanceDate: forecast.lowestBalanceDate,
     }
   }
 
@@ -274,5 +324,6 @@ export function summarizeForecastRisk(forecast) {
     tone: 'brand',
     title: 'Cash flow looks stable',
     detail: `Projected balance stays positive over the next ${forecast.horizonDays} days.`,
+    lowestBalanceDate: forecast.lowestBalanceDate,
   }
 }

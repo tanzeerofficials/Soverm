@@ -11,8 +11,11 @@ import {
   fetchNotifications,
   markNotificationRead,
 } from '../lib/fetchNotifications.js'
-import { notificationsQueryKey } from '../lib/queryKeys.js'
-import { navigateToNotification } from '../lib/notificationNavigation.js'
+import { notificationsQueryKey, notificationsUnreadQueryKey } from '../lib/queryKeys.js'
+import {
+  navigateToNotification,
+  notificationActionLabel,
+} from '../lib/notificationNavigation.js'
 
 function ProactiveNoticeBanner() {
   const { getToken } = useAuth()
@@ -20,7 +23,7 @@ function ProactiveNoticeBanner() {
   const queryClient = useQueryClient()
 
   const { data } = useQuery({
-    queryKey: notificationsQueryKey,
+    queryKey: notificationsUnreadQueryKey,
     queryFn: () => fetchNotifications(getToken, { unreadOnly: true }),
   })
 
@@ -67,7 +70,7 @@ function ProactiveNoticeBanner() {
           onClick={handleOpen}
           className="shrink-0 rounded-lg bg-ai px-4 py-2 text-sm font-medium text-white transition hover:brightness-110"
         >
-          View details
+          {notificationActionLabel(latest)}
         </button>
       </div>
       {unread.length > 1 && (

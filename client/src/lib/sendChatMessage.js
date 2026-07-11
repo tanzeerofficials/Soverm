@@ -1,4 +1,4 @@
-import { chatQueryKey } from './queryKeys.js'
+import { chatQueryKey, GENERAL_CHAT_KEY } from './queryKeys.js'
 import { captureClientError } from './sentry.js'
 
 async function getAuthToken(getToken) {
@@ -9,14 +9,23 @@ async function getAuthToken(getToken) {
   return token
 }
 
-export async function fetchChatMessages(getToken, insightId) {
+function chatApiPath(threadId) {
+  return threadId === GENERAL_CHAT_KEY
+    ? `${import.meta.env.VITE_API_URL}/api/chat/general`
+    : `${import.meta.env.VITE_API_URL}/api/chat/${threadId}`
+}
+
+/*
+ * What this does: loads messages for either a weekly insight thread or the
+ * shared "general" thread (no insight required).
+ *
+ * Why: Ask Soverm should work before the user generates their first insight.
+ */
+export async function fetchChatMessages(getToken, threadId) {
   const token = await getAuthToken(getToken)
-  const response = await fetch(
-    `${import.meta.env.VITE_API_URL}/api/chat/${insightId}`,
-    {
-      headers: { Authorization: `Bearer ${token}` },
-    }
-  )
+  const response = await fetch(chatApiPath(threadId), {
+    headers: { Authorization: `Bearer ${token}` },
+  })
 
   if (!response.ok) {
     throw new Error(`Failed to load chat: ${response.status}`)
@@ -26,19 +35,16 @@ export async function fetchChatMessages(getToken, insightId) {
   return data.messages ?? []
 }
 
-export async function sendChatMessage(getToken, insightId, message) {
+export async function sendChatMessage(getToken, threadId, message) {
   const token = await getAuthToken(getToken)
-  const response = await fetch(
-    `${import.meta.env.VITE_API_URL}/api/chat/${insightId}`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ message }),
-    }
-  )
+  const response = await fetch(chatApiPath(threadId), {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ message }),
+  })
 
   const data = await response.json()
 
@@ -55,7 +61,7 @@ export async function sendChatMessage(getToken, insightId, message) {
 export async function sendChatMessageAndRefresh(
   queryClient,
   getToken,
-  insightId,
+  threadId,
   message
 ) {
   const trimmed = message.trim()
@@ -65,27 +71,27 @@ export async function sendChatMessageAndRefresh(
     created_at: new Date().toISOString(),
   }
 
-  await queryClient.cancelQueries({ queryKey: chatQueryKey(insightId) })
+  await queryClient.cancelQueries({ queryKey: chatQueryKey(threadId) })
 
-  queryClient.setQueryData(chatQueryKey(insightId), (old) => [
+  queryClient.setQueryData(chatQueryKey(threadId), (old) => [
     ...(old ?? []),
     userMessage,
   ])
 
   try {
-    const reply = await sendChatMessage(getToken, insightId, trimmed)
+    const reply = await sendChatMessage(getToken, threadId, trimmed)
     const assistantMessage = {
       role: 'assistant',
       content: reply,
       created_at: new Date().toISOString(),
     }
 
-    queryClient.setQueryData(chatQueryKey(insightId), (old) => [
+    queryClient.setQueryData(chatQueryKey(threadId), (old) => [
       ...(old ?? []),
       assistantMessage,
     ])
   } catch (err) {
-    queryClient.setQueryData(chatQueryKey(insightId), (old) => {
+    queryClient.setQueryData(chatQueryKey(threadId), (old) => {
       const messages = old ?? []
       const last = messages[messages.length - 1]
       if (

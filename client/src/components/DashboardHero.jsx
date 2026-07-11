@@ -1,5 +1,6 @@
 import { formatDistanceToNow } from 'date-fns'
 import { useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import { useAnimatedNumber } from '../hooks/useAnimatedNumber.js'
 import { fillSpendingSeries } from '../lib/spendingSparkline.js'
 import { isSpendingCapWarningActive } from '../lib/spendingAlertThresholds.js'
@@ -21,6 +22,13 @@ const RANGE_LABELS = {
   '1y': 'in the last year',
 }
 
+const WHATS_LEFT_HELP = [
+  'What’s left = your connected account balance minus known bills due on or before your next payday.',
+  'Bills come from detected recurring charges (rent, subscriptions, etc.) scheduled before payday.',
+  'No extra buffer is reserved yet (buffer = $0). A spending cap “safe to spend” is separate if you set one.',
+  'Confirm or edit payday anytime in Settings.',
+]
+
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -38,8 +46,12 @@ function DashboardHero({
   spent = 0,
   spendingSeries = [],
   trackerSnapshot = null,
+  trackerLoading = false,
 }) {
+  const whatsLeft = trackerSnapshot?.whatsLeftUntilPayday
+  const whatsLeftConfigured = whatsLeft?.configured === true
   const animatedBalance = useAnimatedNumber(totalBalance)
+  const animatedWhatsLeft = useAnimatedNumber(whatsLeft?.amount ?? 0)
   const animatedSafeToSpend = useAnimatedNumber(trackerSnapshot?.safeToSpend ?? 0)
   const filledSpendingSeries = useMemo(
     () => fillSpendingSeries(spendingSeries, selectedRange),
@@ -49,6 +61,7 @@ function DashboardHero({
     trackerSnapshot?.spendingTracker != null || trackerSnapshot?.configured === true
   const spendingProgress = trackerSnapshot?.spendingTracker?.progress ?? null
   const primarySaving = trackerSnapshot?.savingTrackers?.[0]
+  const hasSavingOnly = !hasSpendingTracker && Boolean(primarySaving)
 
   if (!hasAccounts) {
     return (
@@ -71,6 +84,24 @@ function DashboardHero({
     )
   }
 
+  if (trackerLoading && trackerSnapshot == null) {
+    return (
+      <section
+        id="dashboard-hero"
+        className="relative overflow-hidden rounded-2xl border border-border-default bg-gradient-to-b from-surface-deep/90 via-surface to-app px-6 py-10 text-center sm:px-10 sm:py-12"
+        aria-busy="true"
+        aria-label="Loading balance summary"
+      >
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(16,185,129,0.14),transparent_60%)]" />
+        <div className="relative space-y-4">
+          <div className="mx-auto h-3 w-28 animate-pulse rounded bg-surface-elevated" />
+          <div className="mx-auto h-14 w-48 animate-pulse rounded bg-surface-elevated sm:h-16 sm:w-64" />
+          <div className="mx-auto h-4 w-56 animate-pulse rounded bg-surface-elevated" />
+        </div>
+      </section>
+    )
+  }
+
   return (
     <section
       id="dashboard-hero"
@@ -80,7 +111,47 @@ function DashboardHero({
       <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-ai/10 blur-3xl" />
 
       <div className="relative">
-        {hasSpendingTracker ? (
+        {whatsLeftConfigured ? (
+          <>
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-fg-muted">
+              What’s left until payday
+            </p>
+            <p className="mt-4 font-mono text-4xl font-light tabular-nums tracking-tight text-brand-soft sm:text-6xl md:text-7xl">
+              {formatCurrency(animatedWhatsLeft)}
+            </p>
+            <p className="mt-3 text-sm text-fg-muted">
+              {whatsLeft.daysUntilPayday === 0
+                ? 'Payday is today'
+                : `${whatsLeft.daysUntilPayday} day${whatsLeft.daysUntilPayday === 1 ? '' : 's'} until ${whatsLeft.nextPaydayOn}`}
+              {whatsLeft.billsUntilPaydayTotal > 0
+                ? ` · ${formatCurrency(whatsLeft.billsUntilPaydayTotal)} in bills before then`
+                : ' · no known bills before payday'}
+            </p>
+            {whatsLeft.bills?.length > 0 && (
+              <p className="mx-auto mt-2 max-w-md text-xs text-fg-subtle">
+                Next bills:{' '}
+                {whatsLeft.bills
+                  .slice(0, 3)
+                  .map((bill) => `${bill.merchant} (${formatCurrency(bill.amount)})`)
+                  .join(' · ')}
+                {whatsLeft.bills.length > 3 ? ` · +${whatsLeft.bills.length - 3} more` : ''}
+              </p>
+            )}
+            {hasSpendingTracker && trackerSnapshot?.safeToSpend != null && (
+              <p className="mt-2 text-xs text-fg-subtle">
+                Spending-cap safe to spend: {formatCurrency(trackerSnapshot.safeToSpend)} (separate
+                from payday remaining)
+              </p>
+            )}
+            <p className="mt-4 text-xs text-fg-subtle">
+              Total balance {formatCurrency(totalBalance)}
+              {trackerSnapshot?.accountCount > 0
+                ? ` · ${trackerSnapshot.accountCount} connected account${trackerSnapshot.accountCount === 1 ? '' : 's'}`
+                : ''}
+            </p>
+            <HowCalculatedDisclosure title="How what’s left is calculated" items={WHATS_LEFT_HELP} />
+          </>
+        ) : hasSpendingTracker ? (
           <>
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-fg-muted">
               Safe to spend
@@ -99,8 +170,11 @@ function DashboardHero({
             </p>
             {primarySaving && (
               <p className="mt-1 text-xs text-fg-subtle">
-                Saving tracker: {formatCurrency(primarySaving.progress?.savedThisMonth ?? primarySaving.progress?.saved ?? 0)} of{' '}
-                {formatCurrency(primarySaving.monthlyAmount)} this month
+                Saving tracker:{' '}
+                {formatCurrency(
+                  primarySaving.progress?.savedThisMonth ?? primarySaving.progress?.saved ?? 0
+                )}{' '}
+                of {formatCurrency(primarySaving.monthlyAmount)} this month
               </p>
             )}
             <div className="mx-auto mt-4 max-w-md">
@@ -141,6 +215,66 @@ function DashboardHero({
                 'Pending transactions are excluded until they post.',
               ]}
             />
+            <div className="mx-auto mt-4 max-w-md rounded-xl border border-border-default bg-app/50 px-4 py-3 text-left">
+              <p className="text-sm font-medium text-fg">Confirm payday to see what’s left</p>
+              <p className="mt-1 text-xs leading-relaxed text-fg-muted">
+                We’ll subtract known bills before your next paycheck from your balance.
+              </p>
+              <Link
+                to="/settings"
+                className="mt-3 inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-brand-fg transition hover:bg-brand-hover"
+              >
+                Set payday in Settings
+              </Link>
+            </div>
+          </>
+        ) : hasSavingOnly ? (
+          <>
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-fg-muted">
+              Savings goal
+            </p>
+            <p className="mt-4 font-mono text-4xl font-light tabular-nums tracking-tight text-brand-soft sm:text-6xl md:text-7xl">
+              {formatCurrency(
+                primarySaving.progress?.savedThisMonth ?? primarySaving.progress?.saved ?? 0
+              )}
+            </p>
+            <p className="mt-3 text-sm text-fg-muted">
+              {primarySaving.name}:{' '}
+              {formatCurrency(
+                primarySaving.progress?.savedThisMonth ?? primarySaving.progress?.saved ?? 0
+              )}{' '}
+              of {formatCurrency(primarySaving.monthlyAmount)} this month
+              {trackerSnapshot?.periodLabel ? ` · ${trackerSnapshot.periodLabel}` : ''}
+            </p>
+            <div className="mx-auto mt-4 max-w-md">
+              <div className="h-1.5 overflow-hidden rounded-full bg-surface-elevated">
+                <div
+                  className="h-full rounded-full bg-brand"
+                  style={{
+                    width: `${Math.min(
+                      ((primarySaving.progress?.savedThisMonth ??
+                        primarySaving.progress?.saved ??
+                        0) /
+                        Math.max(primarySaving.monthlyAmount || 1, 1)) *
+                        100,
+                      100
+                    )}%`,
+                  }}
+                />
+              </div>
+            </div>
+            <p className="mt-4 text-xs text-fg-subtle">
+              Total balance {formatCurrency(totalBalance)}
+            </p>
+            <div className="mx-auto mt-4 max-w-md rounded-xl border border-border-default bg-app/50 px-4 py-3 text-left">
+              <p className="text-sm font-medium text-fg">Confirm payday to see what’s left</p>
+              <Link
+                to="/settings"
+                className="mt-3 inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-brand-fg transition hover:bg-brand-hover"
+              >
+                Set payday in Settings
+              </Link>
+            </div>
           </>
         ) : (
           <>
@@ -150,6 +284,19 @@ function DashboardHero({
             <p className="mt-4 font-mono text-4xl font-light tabular-nums tracking-tight text-fg sm:text-6xl md:text-7xl">
               {formatCurrency(animatedBalance)}
             </p>
+            <div className="mx-auto mt-6 max-w-md rounded-xl border border-border-default bg-app/50 px-4 py-3 text-left">
+              <p className="text-sm font-medium text-fg">Confirm payday so we can show what’s left</p>
+              <p className="mt-1 text-xs leading-relaxed text-fg-muted">
+                Balance minus known bills before your next paycheck — the number paycheck-to-paycheck
+                users check most.
+              </p>
+              <Link
+                to="/settings"
+                className="mt-3 inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-brand-fg transition hover:bg-brand-hover"
+              >
+                Set payday in Settings
+              </Link>
+            </div>
           </>
         )}
 

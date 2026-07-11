@@ -21,3 +21,13 @@ export const CHART_VALUE = '#f9fafb'
 export const SPARKLINE_POSITIVE = '#10b981'
 export const SPARKLINE_NEGATIVE = '#ef4444'
 export const SPARKLINE_NEUTRAL = '#9ca3af'
+
+/** Shorten long category labels for narrow chart axes. */
+export function truncateChartLabel(label, maxLength = 14) {
+  const text = String(label ?? '')
+  if (text.length <= maxLength) {
+    return text
+  }
+
+  return `${text.slice(0, Math.max(0, maxLength - 1))}…`
+}

@@ -218,4 +218,33 @@ assert(
   'stale sync reappears after sync time changes'
 )
 
+localStorageMock._reset()
+clearAttentionDismissals()
+
+const userA = 'user_a'
+const userB = 'user_b'
+dismissAttentionItem(staleItem, staleContext, userA)
+assert(
+  filterDismissedAttentionItems([staleItem], staleContext, userA).length === 0,
+  'user A dismissal applies for user A'
+)
+assert(
+  filterDismissedAttentionItems([staleItem], staleContext, userB).length === 1,
+  'user A dismissal does not hide item for user B'
+)
+
+localStorageMock._reset()
+localStorage.setItem(
+  'soverm:attention-dismissals',
+  JSON.stringify({ [staleItem.id]: staleContext.lastSyncedAt })
+)
+assert(
+  filterDismissedAttentionItems([staleItem], staleContext, userA).length === 0,
+  'legacy global dismissal migrates into user-scoped key on read'
+)
+assert(
+  localStorage.getItem(`soverm:attention-dismissals:${userA}`) != null,
+  'legacy dismissal copied to user-scoped key'
+)
+
 console.log('All dashboardAttention tests passed.')

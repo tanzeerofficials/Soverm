@@ -22,9 +22,12 @@ let passed = 0
 console.log('Expense Analyzer chart constraint tests\n')
 
 assert(CHART_BAR_SEQUENCE.every((color) => color.startsWith('#')), 'Bar colors are hex values')
-assert(CHART_BAR_SEQUENCE.includes('#8B5CF6'), 'Uses established purple accent')
-assert(SPARKLINE_POSITIVE === '#10B981', 'Sparkline positive matches app emerald')
-assert(SPARKLINE_NEGATIVE === '#EF4444', 'Sparkline negative matches app red')
+assert(
+  CHART_BAR_SEQUENCE.some((color) => color.toLowerCase() === '#8b5cf6'),
+  'Uses established purple accent'
+)
+assert(SPARKLINE_POSITIVE.toLowerCase() === '#10b981', 'Sparkline positive matches app emerald')
+assert(SPARKLINE_NEGATIVE.toLowerCase() === '#ef4444', 'Sparkline negative matches app red')
 console.log('  pass: chart theme uses established palette only')
 passed++
 

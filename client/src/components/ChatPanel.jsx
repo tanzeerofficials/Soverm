@@ -5,11 +5,12 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '@clerk/clerk-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import ReactMarkdown from 'react-markdown'
 import ChatWithCfoButton from './ChatWithCfoButton.jsx'
-import { chatQueryKey } from '../lib/queryKeys.js'
+import { chatQueryKey, GENERAL_CHAT_KEY } from '../lib/queryKeys.js'
 import { fetchChatMessages, sendChatMessageAndRefresh } from '../lib/sendChatMessage.js'
 import ChatBubbleIcon from './ChatBubbleIcon.jsx'
 
@@ -53,6 +54,7 @@ function ChatSuggestedPrompts({ prompts, disabled, onSelect }) {
 
 function ChatPanel({
   insightId,
+  threadId,
   onError,
   expanded,
   onExpandedChange,
@@ -60,21 +62,29 @@ function ChatPanel({
   scrollMode = 'internal',
   suggestedPrompts = [],
   contextLabel = 'Answers use your synced accounts, recent transactions, and Expense Analyzer data.',
+  initialDraft = '',
 }) {
   const isModalLayout = layout === 'modal'
+  const resolvedThreadId = threadId ?? insightId ?? GENERAL_CHAT_KEY
   const { getToken } = useAuth()
   const queryClient = useQueryClient()
   const inputRef = useRef(null)
   const messagesContainerRef = useRef(null)
   const messagesEndRef = useRef(null)
-  const [inputValue, setInputValue] = useState('')
+  const [inputValue, setInputValue] = useState(initialDraft)
   const [isSending, setIsSending] = useState(false)
 
-  const { data, isPending, isError } = useQuery({
-    queryKey: chatQueryKey(insightId),
-    queryFn: () => fetchChatMessages(getToken, insightId),
+  const { data, isPending, isError, refetch } = useQuery({
+    queryKey: chatQueryKey(resolvedThreadId),
+    queryFn: () => fetchChatMessages(getToken, resolvedThreadId),
     enabled: expanded,
   })
+
+  useEffect(() => {
+    if (initialDraft) {
+      setInputValue(initialDraft)
+    }
+  }, [initialDraft])
 
   const messages = data ?? []
   const showSuggestedPrompts = !isPending && !isError && messages.length === 0 && !isSending
@@ -144,7 +154,7 @@ function ChatPanel({
     scrollMessagesToBottom('auto')
 
     try {
-      await sendChatMessageAndRefresh(queryClient, getToken, insightId, trimmed)
+      await sendChatMessageAndRefresh(queryClient, getToken, resolvedThreadId, trimmed)
     } catch (err) {
       console.error('Failed to send chat message:', err.message)
       setInputValue(trimmed)
@@ -232,13 +242,29 @@ function ChatPanel({
           <p className="text-center text-xs text-fg-muted">Loading conversation…</p>
         )}
         {isError && (
-          <p className="text-center text-xs text-danger">Couldn&apos;t load messages.</p>
+          <div className="rounded-lg border border-danger/30 bg-danger/5 px-3 py-3 text-center">
+            <p className="text-xs text-danger">Couldn&apos;t load messages.</p>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="mt-2 text-xs font-semibold text-brand-soft hover:underline"
+            >
+              Try again
+            </button>
+          </div>
         )}
         {showSuggestedPrompts && (
           <div className="rounded-lg border border-dashed border-border-default bg-app/50 px-4 py-4">
             <p className="text-sm leading-relaxed text-fg-muted">
-              Ask anything about your spending, subscriptions, categories, or general money
-              questions — Soverm has your synced data.
+              Ask about what&apos;s left until payday, this week&apos;s move, subscriptions, or
+              general money questions — Soverm has your synced data.
+            </p>
+            <p className="mt-2 text-xs text-fg-subtle">
+              For the full weekly check-in, open{' '}
+              <Link to="/weekly-review" className="font-semibold text-ai-soft hover:underline">
+                Your week
+              </Link>
+              .
             </p>
             <div className="mt-4">
               <ChatSuggestedPrompts

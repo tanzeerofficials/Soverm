@@ -2,46 +2,29 @@
  * SAFE-TO-SPEND CALCULATION
  *
  * Pure helpers for monthly budget progress and the safe-to-spend number.
- * Calendar-month spending is compared against the user's monthly budget,
- * capped by net balance across connected accounts.
+ * Calendar-month windows come from calendarMonth.js (app timezone).
  */
+
+import {
+  formatIsoDateInAppTz,
+  getCalendarMonthWindow as getZonedCalendarMonthWindow,
+} from './calendarMonth.js'
 
 export function roundCurrency(amount) {
   return Math.round(Number(amount) * 100) / 100
 }
 
+/** @deprecated Prefer formatIsoDateInAppTz — kept for call sites that pass local Dates. */
 export function formatIsoDate(date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+  return formatIsoDateInAppTz(date)
 }
 
 /**
  * Returns calendar-month window metadata for labels and queries.
+ * Delegates to the shared APP_TIMEZONE helper.
  */
 export function getCalendarMonthWindow(referenceDate = new Date()) {
-  const year = referenceDate.getFullYear()
-  const month = referenceDate.getMonth()
-  const today = referenceDate.getDate()
-  const periodStart = new Date(year, month, 1)
-  const lastDayOfMonth = new Date(year, month + 1, 0).getDate()
-  const isLastDay = today === lastDayOfMonth
-
-  const monthFormatter = new Intl.DateTimeFormat(undefined, { month: 'short' })
-  const monthLabel = monthFormatter.format(periodStart)
-  const periodLabel = isLastDay
-    ? `${monthLabel} 1–${lastDayOfMonth}`
-    : `${monthLabel} 1–today`
-
-  return {
-    periodStart: formatIsoDate(periodStart),
-    periodEnd: formatIsoDate(new Date(year, month, lastDayOfMonth)),
-    daysLeftInMonth: Math.max(0, lastDayOfMonth - today),
-    dayOfMonth: today,
-    periodLabel,
-    monthLabel,
-  }
+  return getZonedCalendarMonthWindow(referenceDate)
 }
 
 /**

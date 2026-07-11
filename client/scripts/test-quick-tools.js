@@ -23,6 +23,7 @@ console.log('quickTools tests\n')
 
 assert(QUICK_TOOL_TABS.RECENT === 'recent', 'recent tab id')
 assert(QUICK_TOOL_TABS.TRACKER === 'tracker', 'tracker tab id')
+assert(QUICK_TOOL_TABS.SPEND === 'spend', 'spend tab id')
 
 const transactions = collectRecentTransactions([
   {

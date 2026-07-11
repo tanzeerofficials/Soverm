@@ -14,8 +14,11 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from '../lib/fetchNotifications.js'
-import { notificationsQueryKey } from '../lib/queryKeys.js'
-import { navigateToNotification } from '../lib/notificationNavigation.js'
+import { notificationsAllQueryKey, notificationsQueryKey } from '../lib/queryKeys.js'
+import {
+  notificationActionLabel,
+  navigateToNotification,
+} from '../lib/notificationNavigation.js'
 
 function BellIcon({ className = 'h-5 w-5' }) {
   return (
@@ -34,7 +37,7 @@ function NotificationBell() {
   const [open, setOpen] = useState(false)
 
   const { data, isPending } = useQuery({
-    queryKey: notificationsQueryKey,
+    queryKey: notificationsAllQueryKey,
     queryFn: () => fetchNotifications(getToken),
     refetchInterval: 60_000,
   })
@@ -165,6 +168,8 @@ function NotificationBell() {
                 <p className="text-xs leading-relaxed text-fg-muted">{notification.body}</p>
                 <p className="text-[11px] text-fg-subtle">
                   {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
+                  {' · '}
+                  {notificationActionLabel(notification)}
                 </p>
               </button>
             ))}

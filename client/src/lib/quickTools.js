@@ -13,6 +13,7 @@ export const QUICK_TOOL_TABS = {
   HEALTH: 'health',
   TRACKER: 'tracker',
   FORECAST: 'forecast',
+  SPEND: 'spend',
 }
 
 /** Bigger bets — surfaced until we ship them. */

@@ -11,7 +11,8 @@ import db from '../db/index.js'
 import { generateFinancialSummary, buildPersistedInsightContent } from '../services/claude.js'
 import { loadFinancialContextForUser, loadMonthOverMonthComparison } from '../utils/financialContext.js'
 import { loadExpenseAnalyzerData } from '../utils/expenseAnalyzerData.js'
-import { getUsageSummary } from '../utils/usage.js'
+import { getUsageSummary, reserveFreeInsightSlot } from '../utils/usage.js'
+import { ensureUserExists } from '../utils/ensureUser.js'
 import {
   getGenerateRateLimitMessage,
   isGenerateRateLimited,
@@ -49,39 +50,51 @@ router.get('/usage', async (req, res) => {
  * POST /api/insights/generate
  *
  * What it does:
- * - Loads recent transactions and account balances
+ * - Reserves a free-tier insight slot under a DB lock (race-safe)
+ * - Loads recent connected-account transactions and balances
  * - Asks Claude for a plain-English financial summary
- * - Saves the summary to the insights table and returns it
+ * - Saves the summary + actions in one transaction
  *
  * Why we need it:
  * - Users want AI advice without re-calling Claude every page load
  *
  * How it fits the app:
  * - Dashboard calls this after syncing transactions to refresh insights
- * - Free tier is capped at 1 insight/day; Pro is unlimited. Limit is
- *   checked first so we never spend a Claude call we're about to reject
+ * - Free tier is capped at 1 insight/day; Pro is unlimited. The slot is
+ *   reserved before Claude so concurrent free requests cannot both pass.
  */
 router.post('/generate', async (req, res) => {
   const { userId } = getAuth(req)
+  const client = await db.connect()
 
   try {
-    const usage = await getUsageSummary(userId)
+    await ensureUserExists(userId)
 
-    if (!usage.isPro && usage.remainingToday <= 0) {
+    await client.query('BEGIN')
+
+    const reservation = await reserveFreeInsightSlot(client, userId)
+
+    if (!reservation.allowed) {
+      await client.query('ROLLBACK')
       return res.status(403).json({
         error: 'limit_reached',
         message:
           "You've used today's free insight. Upgrade to Soverm Pro for unlimited insights.",
-        usage,
+        usage: reservation.usage,
       })
     }
 
-    if (isGenerateRateLimited(usage)) {
+    if (isGenerateRateLimited(reservation.usage)) {
+      await client.query('ROLLBACK')
       return res.status(429).json({
         error: 'rate_limit_exceeded',
         message: getGenerateRateLimitMessage(),
       })
     }
+
+    // Hold the user-row lock only for the quota check. Claude can take seconds;
+    // keeping FOR UPDATE open that long would block other requests for this user.
+    await client.query('COMMIT')
 
     const [
       { transactions, accountSummary },
@@ -106,7 +119,22 @@ router.post('/generate', async (req, res) => {
       { transactionCount: transactions.length }
     )
 
-    const insightResult = await db.query(
+    await client.query('BEGIN')
+
+    // Re-check under lock after Claude so a parallel request that finished
+    // while we were waiting cannot push a free user over the daily limit.
+    const postClaudeReservation = await reserveFreeInsightSlot(client, userId)
+    if (!postClaudeReservation.allowed) {
+      await client.query('ROLLBACK')
+      return res.status(403).json({
+        error: 'limit_reached',
+        message:
+          "You've used today's free insight. Upgrade to Soverm Pro for unlimited insights.",
+        usage: postClaudeReservation.usage,
+      })
+    }
+
+    const insightResult = await client.query(
       `INSERT INTO insights (id, user_id, type, content)
        VALUES (gen_random_uuid(), $1, 'weekly_summary', $2)
        RETURNING id`,
@@ -117,7 +145,7 @@ router.post('/generate', async (req, res) => {
     const actionIds = []
 
     for (const actionText of persistedInsight.actions ?? []) {
-      const actionResult = await db.query(
+      const actionResult = await client.query(
         `INSERT INTO actions (id, user_id, insight_id, description)
          VALUES (gen_random_uuid(), $1, $2, $3)
          RETURNING id`,
@@ -125,6 +153,8 @@ router.post('/generate', async (req, res) => {
       )
       actionIds.push(actionResult.rows[0].id)
     }
+
+    await client.query('COMMIT')
 
     const updatedUsage = await getUsageSummary(userId)
 
@@ -136,8 +166,15 @@ router.post('/generate', async (req, res) => {
       usage: updatedUsage,
     })
   } catch (err) {
+    try {
+      await client.query('ROLLBACK')
+    } catch {
+      // Transaction may already be closed.
+    }
     reportServerError('to generate insight', err, { userId, req })
     res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
+  } finally {
+    client.release()
   }
 })
 

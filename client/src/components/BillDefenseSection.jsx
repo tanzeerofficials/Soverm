@@ -1,0 +1,174 @@
+/*
+ * BILL / SUBSCRIPTION DEFENSE UI
+ *
+ * Shows price hikes, new recurrings, trials, and duplicates — with
+ * keep / cancel / watch decisions that become closed-loop actions.
+ */
+
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useAuth } from '@clerk/clerk-react'
+import { createClosedLoopAction } from '../lib/fetchActions.js'
+import { useToastContext } from '../context/ToastContext.jsx'
+import { markActivationStep } from '../lib/activationChecklist.js'
+
+function toneClasses(tone) {
+  if (tone === 'warning') {
+    return 'border-warning/30 bg-warning/10'
+  }
+  return 'border-border-default bg-surface'
+}
+
+function decisionDescription(decision, finding) {
+  const merchant = finding.merchant || 'this subscription'
+  if (decision === 'cancel') {
+    return `Cancel ${merchant}`
+  }
+  if (decision === 'watch') {
+    return `Watch ${merchant} one more cycle`
+  }
+  return `Keep ${merchant}`
+}
+
+/**
+ * What this does: renders bill-defense findings and logs keep/cancel/watch
+ * as closed-loop actions (same lifecycle as Weekly Review moves).
+ * Why: paycheck-to-paycheck users need a clear decision, not just a flag.
+ * How it fits: S1–S3 detection + S3 decision flow; reused on Weekly Review,
+ * Expense Analyzer Recurring, and (read-only-ish) Month letter.
+ */
+function BillDefenseSection({
+  findings = [],
+  weekStartOn = null,
+  onAskSoverm,
+  showDecisions = true,
+  invalidateKeys = [],
+  title = 'Bills & subscriptions to review',
+  emptyMessage = null,
+}) {
+  const { getToken, userId } = useAuth()
+  const queryClient = useQueryClient()
+  const { showToast } = useToastContext()
+
+  const decisionMutation = useMutation({
+    mutationFn: async ({ decision, finding }) =>
+      createClosedLoopAction(getToken, {
+        description: decisionDescription(decision, finding),
+        source: 'weekly',
+        status: 'accepted',
+        weekStartOn,
+        metadata: {
+          kind: 'bill_defense',
+          decision,
+          findingType: finding.type,
+          merchant: finding.merchant,
+          otherMerchant: finding.otherMerchant ?? null,
+          monthlyEquivalent: finding.monthlyEquivalent ?? null,
+        },
+      }),
+    onSuccess: async (_result, variables) => {
+      const label =
+        variables.decision === 'cancel'
+          ? 'Cancel logged — we’ll follow up'
+          : variables.decision === 'watch'
+            ? 'Watching one more cycle'
+            : 'Marked keep'
+      showToast(label, 'success')
+      markActivationStep(userId, 'actionTaken')
+      await Promise.all(
+        invalidateKeys.map((queryKey) =>
+          queryClient.invalidateQueries({ queryKey })
+        )
+      )
+    },
+    onError: (err) => {
+      showToast(err.message || 'Couldn’t save that decision', 'error')
+    },
+  })
+
+  if (!findings.length) {
+    if (!emptyMessage) {
+      return null
+    }
+    return (
+      <section className="rounded-xl border border-border-default bg-surface px-5 py-5 text-left">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-fg-subtle">
+          {title}
+        </p>
+        <p className="mt-3 text-sm text-fg-muted">{emptyMessage}</p>
+      </section>
+    )
+  }
+
+  return (
+    <section
+      className="rounded-xl border border-border-default bg-surface px-5 py-5 text-left"
+      aria-label={title}
+    >
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-fg-subtle">
+        {title}
+      </p>
+      <p className="mt-2 text-sm text-fg-muted">
+        Price hikes, new charges, trials, and possible duplicates — decide keep, cancel, or
+        watch. Cancel or watch gets logged so we can follow up next week.
+      </p>
+      <ul className="mt-4 space-y-3">
+        {findings.map((finding) => (
+          <li
+            key={`${finding.type}-${finding.merchant}-${finding.otherMerchant ?? ''}`}
+            className={`rounded-lg border px-3 py-3 ${toneClasses(finding.tone)}`}
+          >
+            <p className="text-sm font-semibold text-fg">{finding.title}</p>
+            <p className="mt-1 text-xs leading-relaxed text-fg-muted">{finding.detail}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {showDecisions && (
+                <>
+                  <button
+                    type="button"
+                    disabled={decisionMutation.isPending}
+                    onClick={() =>
+                      decisionMutation.mutate({ decision: 'keep', finding })
+                    }
+                    className="rounded-md border border-border-default px-2.5 py-1.5 text-[11px] font-semibold text-fg-muted hover:text-fg disabled:opacity-60"
+                  >
+                    Keep
+                  </button>
+                  <button
+                    type="button"
+                    disabled={decisionMutation.isPending}
+                    onClick={() =>
+                      decisionMutation.mutate({ decision: 'cancel', finding })
+                    }
+                    className="rounded-md bg-danger/15 px-2.5 py-1.5 text-[11px] font-semibold text-danger disabled:opacity-60"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={decisionMutation.isPending}
+                    onClick={() =>
+                      decisionMutation.mutate({ decision: 'watch', finding })
+                    }
+                    className="rounded-md bg-warning/15 px-2.5 py-1.5 text-[11px] font-semibold text-warning disabled:opacity-60"
+                  >
+                    Watch
+                  </button>
+                </>
+              )}
+              {onAskSoverm && (
+                <button
+                  type="button"
+                  onClick={() => onAskSoverm(finding)}
+                  className="rounded-md border border-ai/40 bg-ai/10 px-2.5 py-1.5 text-[11px] font-semibold text-ai hover:bg-ai/20"
+                >
+                  Ask Soverm
+                </button>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+export default BillDefenseSection

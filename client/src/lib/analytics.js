@@ -11,8 +11,9 @@
 
 import posthog from 'posthog-js'
 
-const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY
-const POSTHOG_HOST = import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com'
+const env = typeof import.meta !== 'undefined' ? import.meta.env : undefined
+const POSTHOG_KEY = env?.VITE_POSTHOG_KEY
+const POSTHOG_HOST = env?.VITE_POSTHOG_HOST || 'https://us.i.posthog.com'
 
 let enabled = false
 
@@ -25,7 +26,7 @@ export function initAnalytics() {
     api_host: POSTHOG_HOST,
     capture_pageview: false,
     autocapture: false,
-    disable_session_recording: import.meta.env.VITE_POSTHOG_SESSION_RECORDING !== 'true',
+    disable_session_recording: env?.VITE_POSTHOG_SESSION_RECORDING !== 'true',
     person_profiles: 'identified_only',
     persistence: 'localStorage',
   })
@@ -44,6 +45,8 @@ const TRACKED_PAGES = {
   '/': 'landing',
   '/dashboard': 'dashboard',
   '/history': 'history',
+  '/weekly-review': 'weekly_review',
+  '/month-condition': 'month_condition',
 }
 
 export function trackPageView(pathname) {
@@ -70,4 +73,17 @@ export function trackGenerateInsightResult(outcome) {
 /** @param {'pricing' | 'history' | 'dashboard_paywall'} source */
 export function trackUpgradeProClick(source) {
   track('upgrade_pro_click', { source })
+}
+
+/** @param {'weeklyReview' | 'actionTaken' | 'monthLetter' | 'connected' | 'payday'} step */
+export function trackActivationStep(step) {
+  track('activation_step', { step })
+}
+
+export function trackWeeklyReviewView() {
+  track('weekly_review_view')
+}
+
+export function trackMonthLetterView() {
+  track('month_letter_view')
 }

@@ -5,9 +5,9 @@
  * and detected recurring charges.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@clerk/clerk-react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import AppNavbar from '../components/AppNavbar.jsx'
 import PageHeader from '../components/PageHeader.jsx'
@@ -22,7 +22,7 @@ import {
 import HeadlineTypeBadge from '../components/HeadlineTypeBadge.jsx'
 import StatDeltaBadge from '../components/StatDeltaBadge.jsx'
 import Skeleton from '../components/Skeleton.jsx'
-import { expenseAnalyzerQueryKey } from '../lib/queryKeys.js'
+import { expenseAnalyzerQueryKey, trackerQueryKey, categoryLimitsQueryKey } from '../lib/queryKeys.js'
 import { fetchExpenseAnalyzer } from '../lib/fetchExpenseAnalyzer.js'
 import { annualizeRecurringMonthly } from '../lib/recurringAnnual.js'
 import {
@@ -39,6 +39,17 @@ import {
   formatRecurringAccountSource,
   formatCurrency,
 } from '../components/expenseAnalyzer/ExpenseAnalyzerDisplay.jsx'
+import { upsertCategoryLimit, fetchCategoryLimits, deleteCategoryLimit } from '../lib/fetchCategoryLimits.js'
+import CategorySoftLimitControl, {
+  CategorySoftLimitsIntro,
+} from '../components/CategorySoftLimitControl.jsx'
+import { useToastContext } from '../context/ToastContext.jsx'
+import {
+  buildCancelKeepWatchPrompt,
+  buildRecurringPortfolioPrompt,
+  buildRecurringReviewPrompt,
+} from '../lib/chatSuggestedPrompts.js'
+import BillDefenseSection from '../components/BillDefenseSection.jsx'
 
 function formatChargeDate(dateString) {
   if (!dateString) {
@@ -84,7 +95,7 @@ function formatOverallRecurringLine(recurringMonthly) {
   return `Recurring: ${formatCurrency(recurringMonthly)}/mo`
 }
 
-function RecurringChargeCard({ charge, variant = 'confirmed' }) {
+function RecurringChargeCard({ charge, variant = 'confirmed', onAskSoverm }) {
   const borderClass =
     variant === 'review'
       ? 'border-warning/30 border-l-warning bg-surface'
@@ -115,6 +126,15 @@ function RecurringChargeCard({ charge, variant = 'confirmed' }) {
               {charge.detectionReason.summary}
             </p>
           )}
+
+          {typeof charge.amountDelta === 'number' &&
+            charge.amountDelta >= 1 &&
+            charge.firstAmount > 0 && (
+              <p className="mt-1.5 text-xs font-medium text-warning">
+                Price up {formatCurrency(charge.amountDelta)} from{' '}
+                {formatCurrency(charge.firstAmount)} → {formatCurrency(charge.lastAmount)}
+              </p>
+            )}
 
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-fg-muted">
             <span className="text-ai">{formatCadenceLabel(charge.cadence)}</span>
@@ -155,11 +175,22 @@ function RecurringChargeCard({ charge, variant = 'confirmed' }) {
         </div>
       </div>
 
-      <p className="mt-3 border-t border-border-default pt-3 text-xs text-fg-subtle">
-        {charge.occurrenceCount} charge{charge.occurrenceCount === 1 ? '' : 's'} · last{' '}
-        {formatChargeDate(charge.lastChargedDate)} · next{' '}
-        {formatChargeDate(charge.nextExpectedDate)}
-      </p>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border-default pt-3">
+        <p className="text-xs text-fg-subtle">
+          {charge.occurrenceCount} charge{charge.occurrenceCount === 1 ? '' : 's'} · last{' '}
+          {formatChargeDate(charge.lastChargedDate)} · next{' '}
+          {formatChargeDate(charge.nextExpectedDate)}
+        </p>
+        {onAskSoverm && (
+          <button
+            type="button"
+            onClick={() => onAskSoverm(charge)}
+            className="rounded-lg border border-ai/40 bg-ai/10 px-3 py-1.5 text-xs font-semibold text-ai transition hover:bg-ai/20"
+          >
+            Ask Soverm
+          </button>
+        )}
+      </div>
     </li>
   )
 }
@@ -209,12 +240,78 @@ function formatOverallSpendingLine(overallSpending) {
 function ExpenseAnalyzerPage() {
   const { getToken } = useAuth()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const { showToast } = useToastContext()
   const [searchParams, setSearchParams] = useSearchParams()
   const [expandedCategory, setExpandedCategory] = useState(null)
   const [activeTab, setActiveTab] = useState(EXPENSE_ANALYZER_TABS.OVERVIEW)
+  const [limitSaving, setLimitSaving] = useState(false)
 
   const tabParam = searchParams.get('tab')
   const highlightCategory = searchParams.get('highlight')
+
+  /*
+   * What this does: opens dashboard Ask Soverm with a starter prompt.
+   * Why: subscription review should jump from RECURRING cards into chat
+   * without forcing the user to invent the question.
+   */
+  function openChatWithPrompt(prompt) {
+    const params = new URLSearchParams({ chat: 'open' })
+    if (prompt) {
+      params.set('prompt', prompt)
+    }
+    navigate(`/dashboard?${params.toString()}`)
+  }
+
+  function handleAskAboutCharge(charge) {
+    openChatWithPrompt(buildRecurringReviewPrompt(charge))
+  }
+
+  function handleAskAboutFinding(finding) {
+    openChatWithPrompt(finding.reviewPrompt || buildCancelKeepWatchPrompt(finding))
+  }
+
+  function handleReviewAllSubscriptions() {
+    openChatWithPrompt(buildRecurringPortfolioPrompt())
+  }
+
+  async function handleSaveCategoryLimit({ category, monthlyLimit }) {
+    setLimitSaving(true)
+    try {
+      await upsertCategoryLimit(getToken, {
+        category,
+        monthlyLimit,
+        alertWarningPercent: 80,
+      })
+      showToast(`Soft limit set for ${formatCategoryDisplayName(category)}`, 'success')
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: trackerQueryKey }),
+        queryClient.invalidateQueries({ queryKey: categoryLimitsQueryKey }),
+      ])
+    } catch (err) {
+      showToast(err.message || 'Couldn’t save category limit', 'error')
+      throw err
+    } finally {
+      setLimitSaving(false)
+    }
+  }
+
+  async function handleRemoveCategoryLimit(limitId) {
+    setLimitSaving(true)
+    try {
+      await deleteCategoryLimit(getToken, limitId)
+      showToast('Category limit removed', 'success')
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: trackerQueryKey }),
+        queryClient.invalidateQueries({ queryKey: categoryLimitsQueryKey }),
+      ])
+    } catch (err) {
+      showToast(err.message || 'Couldn’t remove category limit', 'error')
+      throw err
+    } finally {
+      setLimitSaving(false)
+    }
+  }
 
   useEffect(() => {
     const tabMap = {
@@ -229,14 +326,25 @@ function ExpenseAnalyzerPage() {
     }
   }, [tabParam])
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: expenseAnalyzerQueryKey,
     queryFn: () => fetchExpenseAnalyzer(getToken),
   })
 
+  const { data: categoryLimits = [] } = useQuery({
+    queryKey: categoryLimitsQueryKey,
+    queryFn: () => fetchCategoryLimits(getToken),
+  })
+
+  const limitsByCategory = useMemo(
+    () => new Map(categoryLimits.map((limit) => [limit.category, limit])),
+    [categoryLimits]
+  )
+
   const categoryBreakdown = data?.categoryBreakdown ?? []
   const recurringCharges = data?.recurringCharges ?? []
   const reviewCharges = data?.reviewCharges ?? []
+  const billDefense = data?.billDefense ?? []
   const topMover = isNotableTopMover(data?.topMover) ? data.topMover : null
   const topMoverHeadline = topMover
     ? buildTopMoverHeadline({
@@ -327,6 +435,13 @@ function ExpenseAnalyzerPage() {
             <p className="text-sm text-fg-muted">
               Couldn&apos;t load your expense breakdown. Please try again in a moment.
             </p>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="mt-4 rounded-lg border border-border-default bg-surface-elevated px-4 py-2 text-sm font-medium text-fg transition hover:border-border-hover"
+            >
+              Try again
+            </button>
           </div>
         ) : (
           <div className="space-y-6 sm:space-y-8">
@@ -410,6 +525,8 @@ function ExpenseAnalyzerPage() {
                     </Link>
                   </div>
                 ) : (
+                  <>
+                  <CategorySoftLimitsIntro activeCount={categoryLimits.length} />
                   <ul className="space-y-3">
                   {[...categoryBreakdown]
                     .sort((left, right) => right.currentTotal - left.currentTotal)
@@ -460,6 +577,17 @@ function ExpenseAnalyzerPage() {
 
                                 <CategoryRecurringLine
                                   recurringMonthly={entry.recurringMonthly ?? 0}
+                                />
+
+                                <CategorySoftLimitControl
+                                  category={entry.category}
+                                  displayName={displayCategory}
+                                  limit={limitsByCategory.get(entry.category) ?? null}
+                                  activeLimitCount={categoryLimits.length}
+                                  spendHint={entry.currentTotal}
+                                  onSave={handleSaveCategoryLimit}
+                                  onRemove={handleRemoveCategoryLimit}
+                                  isSaving={limitSaving}
                                 />
                               </div>
 
@@ -575,6 +703,7 @@ function ExpenseAnalyzerPage() {
                       )
                     })}
                 </ul>
+                  </>
                 )}
               </section>
             </ExpenseAnalyzerTabPanel>
@@ -584,6 +713,13 @@ function ExpenseAnalyzerPage() {
               activeTab={activeTab}
               className="space-y-8"
             >
+              <BillDefenseSection
+                findings={billDefense}
+                invalidateKeys={[expenseAnalyzerQueryKey]}
+                onAskSoverm={handleAskAboutFinding}
+                title="Flags to review"
+              />
+
               <section aria-label="Recurring charges">
                 {recurringCharges.length > 0 && (
                   <>
@@ -600,6 +736,13 @@ function ExpenseAnalyzerPage() {
                           ? ' · 1 confirmed subscription'
                           : ` · ${recurringCharges.length} confirmed subscriptions`}
                       </p>
+                      <button
+                        type="button"
+                        onClick={handleReviewAllSubscriptions}
+                        className="mt-4 rounded-lg bg-ai px-4 py-2 text-sm font-semibold text-app transition hover:brightness-110"
+                      >
+                        Review subscriptions with Soverm
+                      </button>
                     </div>
                     <p className="mt-3 font-mono text-sm font-semibold text-fg-muted">
                       Total recurring: {formatCurrency(totalRecurringMonthly)}/mo
@@ -620,6 +763,7 @@ function ExpenseAnalyzerPage() {
                       <RecurringChargeCard
                         key={`${charge.merchant}-${charge.lastChargedDate}`}
                         charge={charge}
+                        onAskSoverm={handleAskAboutCharge}
                       />
                     ))}
                   </ul>
@@ -650,6 +794,7 @@ function ExpenseAnalyzerPage() {
                         key={`review-${charge.merchant}-${charge.lastChargedDate}`}
                         charge={charge}
                         variant="review"
+                        onAskSoverm={handleAskAboutCharge}
                       />
                     ))}
                   </ul>

@@ -15,13 +15,15 @@
  * added later, verify the Plaid-Verification JWT per Plaid docs using
  * plaidClient.webhookVerificationKeyGet() (ES256 + request_body_sha256 check).
  *
- * CLERK WEBHOOKS: Used for user.created only (inserts a row in Postgres).
- * user.updated and user.deleted are not processed; we still return 200 so Clerk does not retry.
+ * CLERK WEBHOOKS: user.created inserts a Postgres row; user.updated syncs
+ * email/name; user.deleted purges app data. Unknown events still return 200
+ * so Clerk does not retry forever.
  */
 
 import { Router } from 'express'
 import { Webhook } from 'svix'
 import db from '../db/index.js'
+import { deleteAllUserData } from '../utils/deleteUserData.js'
 import { reportServerError } from '../utils/sentry.js'
 
 const router = Router()
@@ -91,6 +93,50 @@ router.post('/clerk', async (req, res) => {
     } catch (err) {
       reportServerError('to insert user from webhook', err, { req })
       return res.status(500).json({ error: 'Failed to save user' })
+    }
+
+    return res.status(200).json({ received: true })
+  }
+
+  if (event.type === 'user.updated') {
+    const { id, email_addresses, first_name, last_name } = event.data
+    const email = email_addresses?.[0]?.email_address
+    if (!id || !email) {
+      return res.status(200).json({ received: true })
+    }
+
+    const name = `${first_name ?? ''} ${last_name ?? ''}`.trim() || email
+
+    try {
+      await db.query(
+        `UPDATE users
+         SET email = $1, name = $2
+         WHERE id = $3`,
+        [email, name, id]
+      )
+    } catch (err) {
+      reportServerError('to update user from webhook', err, { req })
+      return res.status(500).json({ error: 'Failed to update user' })
+    }
+
+    return res.status(200).json({ received: true })
+  }
+
+  if (event.type === 'user.deleted') {
+    const { id } = event.data
+    if (!id) {
+      return res.status(200).json({ received: true })
+    }
+
+    try {
+      // Purge Postgres + revoke Plaid; Clerk user is already deleted.
+      await deleteAllUserData(id)
+    } catch (err) {
+      // Missing user is fine — already purged or never synced.
+      if (!/not found|does not exist/i.test(err.message)) {
+        reportServerError('to delete user from webhook', err, { req })
+        return res.status(500).json({ error: 'Failed to delete user data' })
+      }
     }
 
     return res.status(200).json({ received: true })

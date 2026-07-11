@@ -1,15 +1,24 @@
+import { Link } from 'react-router-dom'
+
 function DashboardOnboarding({
   hasAccounts,
   hasSynced,
+  hasPayday = false,
+  hasWhatsLeft = false,
   hasInsight,
   collapsed = false,
   onCollapsedChange,
 }) {
-  if (hasInsight) {
+  if (hasInsight && hasPayday) {
     return null
   }
 
-  const currentStep = !hasAccounts ? 1 : !hasSynced ? 2 : 3
+  // Hide once payday + what's left are live (ICP activation), even before first insight
+  if (hasAccounts && hasSynced && hasPayday && hasWhatsLeft) {
+    return null
+  }
+
+  const currentStep = !hasAccounts ? 1 : !hasSynced ? 2 : !hasPayday ? 3 : 4
 
   const steps = [
     {
@@ -21,14 +30,24 @@ function DashboardOnboarding({
     {
       number: 2,
       title: 'Sync transactions',
-      detail: 'Pull your latest activity into Soverm.',
+      detail: 'Use Sync on the dashboard to pull your latest activity.',
       done: hasSynced,
     },
     {
       number: 3,
-      title: 'Generate your first insight',
-      detail: 'Let Soverm analyze your finances.',
-      done: false,
+      title: 'Confirm payday',
+      detail: 'So Soverm can show what’s left until you’re paid.',
+      done: hasPayday,
+      href: '/settings',
+      actionLabel: 'Set payday',
+    },
+    {
+      number: 4,
+      title: 'See what’s left',
+      detail: 'Balance minus known bills before payday — your first clear number.',
+      done: hasWhatsLeft,
+      href: '/weekly-review',
+      actionLabel: 'Open Your week',
     },
   ]
 
@@ -39,15 +58,19 @@ function DashboardOnboarding({
     currentStep === 1
       ? 'Connect your bank to get started'
       : currentStep === 3
-        ? 'You’re ready for your first insight'
-        : 'Get started with Soverm'
+        ? 'Confirm payday to unlock what’s left'
+        : currentStep === 4
+          ? 'You’re ready — check what’s left'
+          : 'Get started with Soverm'
 
   const subheading =
     currentStep === 1
       ? 'This is the only step you need right now — Soverm can’t read your finances until a bank is linked.'
       : currentStep === 3
-        ? 'Your accounts are synced. Hit Generate Insights to see what Soverm finds.'
-        : 'Follow these steps to see your first personalized financial insight.'
+        ? 'Without payday, we can’t show what’s left until you’re paid.'
+        : currentStep === 4
+          ? 'Open Your week or the dashboard hero to see what’s left until payday.'
+          : 'Follow these steps to see what’s left until payday.'
 
   if (collapsed) {
     return (
@@ -56,7 +79,7 @@ function DashboardOnboarding({
           <div className="min-w-0 text-left">
             <p className="text-sm font-semibold text-fg">Getting started</p>
             <p className="mt-0.5 truncate text-xs text-fg-muted">
-              {completedCount} of 3 complete
+              {completedCount} of 4 complete
               {currentStepMeta && !currentStepMeta.done
                 ? ` · Next: ${currentStepMeta.title}`
                 : ''}
@@ -101,28 +124,27 @@ function DashboardOnboarding({
               }`}
             >
               <span
-                className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
                   step.done
-                    ? 'bg-brand text-slate-950'
+                    ? 'bg-brand/20 text-brand-soft'
                     : isCurrent
-                      ? 'border border-brand bg-brand/10 text-brand-soft'
-                      : 'border border-border-default bg-surface-elevated text-fg-muted'
+                      ? 'bg-brand text-slate-950'
+                      : 'bg-surface-elevated text-fg-subtle'
                 }`}
               >
                 {step.done ? '✓' : step.number}
               </span>
-              <div>
-                <p
-                  className={`text-sm font-medium ${
-                    step.done ? 'text-fg-muted' : 'text-fg'
-                  }`}
-                >
-                  {step.title}
-                  {isCurrent && (
-                    <span className="ml-2 text-xs font-normal text-brand-soft">← next</span>
-                  )}
-                </p>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-fg">{step.title}</p>
                 <p className="mt-0.5 text-xs text-fg-muted">{step.detail}</p>
+                {isCurrent && step.href && (
+                  <Link
+                    to={step.href}
+                    className="mt-2 inline-block text-xs font-semibold text-ai-soft hover:underline"
+                  >
+                    {step.actionLabel || 'Continue'} →
+                  </Link>
+                )}
               </div>
             </li>
           )

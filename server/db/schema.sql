@@ -5,20 +5,39 @@ CREATE TABLE users (
   email TEXT UNIQUE NOT NULL,
   name TEXT NOT NULL,
   subscription_tier TEXT NOT NULL DEFAULT 'free' CHECK (subscription_tier IN ('free', 'pro')),
+  stripe_customer_id TEXT,
+  stripe_subscription_id TEXT,
   proactive_notifications_enabled BOOLEAN NOT NULL DEFAULT true,
   monthly_budget NUMERIC(12, 2),
+  pay_cadence TEXT CHECK (pay_cadence IS NULL OR pay_cadence IN ('weekly', 'biweekly', 'semimonthly', 'monthly')),
+  next_payday_on DATE,
+  payday_source TEXT CHECK (payday_source IS NULL OR payday_source IN ('inferred', 'user')),
+  payday_updated_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT NOW()
 );
+
+CREATE UNIQUE INDEX users_stripe_customer_id_uidx
+  ON users (stripe_customer_id)
+  WHERE stripe_customer_id IS NOT NULL;
+
+CREATE UNIQUE INDEX users_stripe_subscription_id_uidx
+  ON users (stripe_subscription_id)
+  WHERE stripe_subscription_id IS NOT NULL;
 
 CREATE TABLE plaid_items (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id TEXT NOT NULL REFERENCES users(id),
   plaid_access_token TEXT UNIQUE NOT NULL,
+  plaid_external_item_id TEXT,
   plaid_cursor TEXT,
   last_synced_at TIMESTAMP,
   institution_name TEXT,
   created_at TIMESTAMP DEFAULT NOW()
 );
+
+CREATE UNIQUE INDEX plaid_items_external_item_id_uidx
+  ON plaid_items (plaid_external_item_id)
+  WHERE plaid_external_item_id IS NOT NULL;
 
 CREATE TABLE accounts (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -64,6 +83,81 @@ CREATE TABLE insights (
 );
 
 CREATE INDEX insights_user_id_idx ON insights(user_id);
+
+CREATE TABLE actions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id TEXT REFERENCES users(id),
+  insight_id UUID REFERENCES insights(id),
+  description TEXT NOT NULL,
+  completed BOOLEAN DEFAULT false,
+  status TEXT NOT NULL DEFAULT 'suggested'
+    CHECK (status IN ('suggested', 'accepted', 'done', 'skipped', 'dismissed')),
+  source TEXT NOT NULL DEFAULT 'insight'
+    CHECK (source IN ('insight', 'weekly')),
+  week_start_on DATE,
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  outcome_summary TEXT,
+  accepted_at TIMESTAMP,
+  resolved_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_actions_user_id ON actions(user_id);
+CREATE INDEX idx_actions_insight_id ON actions(insight_id);
+CREATE INDEX idx_actions_user_status ON actions (user_id, status);
+CREATE INDEX idx_actions_user_week ON actions (user_id, week_start_on)
+  WHERE week_start_on IS NOT NULL;
+
+CREATE TABLE chat_messages (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id TEXT REFERENCES users(id),
+  insight_id UUID REFERENCES insights(id),
+  role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+  content TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_chat_messages_insight_id ON chat_messages(insight_id);
+CREATE INDEX idx_chat_messages_user_id ON chat_messages(user_id);
+
+CREATE TABLE notifications (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  trigger_type TEXT NOT NULL CHECK (
+    trigger_type IN (
+      'large_transaction',
+      'low_balance',
+      'new_recurring_charge',
+      'spending_spike',
+      'spending_cap_over',
+      'spending_cap_warning',
+      'weekly_truth_letter',
+      'month_condition_ready'
+    )
+  ),
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  related_data JSONB NOT NULL DEFAULT '{}',
+  dedup_key TEXT NOT NULL,
+  read BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_notifications_user_created ON notifications(user_id, created_at DESC);
+CREATE INDEX idx_notifications_user_unread ON notifications(user_id, read) WHERE read = false;
+CREATE INDEX idx_notifications_dedup ON notifications(user_id, trigger_type, dedup_key, created_at DESC);
+
+CREATE TABLE expense_analyzer_narratives (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  payload_fingerprint TEXT NOT NULL,
+  lead TEXT NOT NULL,
+  paragraphs JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (user_id, payload_fingerprint)
+);
+
+CREATE INDEX idx_expense_analyzer_narratives_user_created
+  ON expense_analyzer_narratives (user_id, created_at DESC);
 
 CREATE TABLE monthly_trackers (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -116,3 +210,23 @@ CREATE UNIQUE INDEX savings_transfer_detections_user_txn_idx
 CREATE INDEX savings_transfer_detections_user_pending_idx
   ON savings_transfer_detections (user_id, status)
   WHERE status = 'pending';
+
+CREATE TABLE category_soft_limits (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  category TEXT NOT NULL,
+  monthly_limit NUMERIC(12, 2) NOT NULL CHECK (monthly_limit > 0),
+  alert_warning_percent INTEGER NOT NULL DEFAULT 80
+    CHECK (alert_warning_percent >= 1 AND alert_warning_percent <= 99),
+  active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX category_soft_limits_user_category_active_uidx
+  ON category_soft_limits (user_id, category)
+  WHERE active = true;
+
+CREATE INDEX category_soft_limits_user_active_idx
+  ON category_soft_limits (user_id)
+  WHERE active = true;

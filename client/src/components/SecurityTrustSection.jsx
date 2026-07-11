@@ -95,11 +95,11 @@ function SecurityTrustSection() {
           id="security-trust-heading"
           className="mt-2 text-2xl font-bold text-fg sm:text-3xl"
         >
-          Your money stays yours — we only read, never touch
+          Built to help you make it to payday — without touching your money
         </h2>
         <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-fg-muted">
-          Connecting a bank can feel risky. Here is exactly how Soverm works: through
-          Plaid, with read-only access, and with a clear off-switch whenever you want.
+          Anxious about linking a bank? Fair. Soverm is read-only via Plaid: we coach on what&apos;s
+          left and what to do this week. We cannot move money, and you can disconnect anytime.
         </p>
       </div>
 
@@ -199,7 +199,7 @@ function SecurityTrustSection() {
           href="https://plaid.com/safety/"
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex flex-shrink-0 items-center gap-2 rounded-lg border border-border-default bg-surface-elevated px-3 py-1.5 transition hover:border-border-hover hover:bg-surface"
+          className="inline-flex flex-shrink-0 items-center gap-2 rounded-lg border border-border-default bg-white px-3 py-1.5 transition hover:bg-neutral-100"
           aria-label="Learn about Plaid security (opens in new tab)"
         >
           <img

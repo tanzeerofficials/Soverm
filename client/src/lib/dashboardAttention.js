@@ -116,6 +116,28 @@ export function buildSavingsDetectionAttentionItems(trackerSnapshot) {
   })
 }
 
+/**
+ * Surfaces category soft-limit warnings / overages.
+ */
+export function buildCategoryLimitAttentionItems(trackerSnapshot) {
+  const limits = trackerSnapshot?.categorySoftLimits ?? []
+
+  return limits
+    .filter((limit) => limit.isOver || limit.isWarning)
+    .slice(0, 2)
+    .map((limit) => ({
+      id: `category-limit-${limit.id}`,
+      tone: limit.isOver ? 'danger' : 'warning',
+      title: limit.isOver
+        ? `${limit.category} over limit`
+        : `${limit.category} approaching limit`,
+      detail: `${formatAttentionCurrency(limit.spentThisMonth)} of ${formatAttentionCurrency(limit.monthlyLimit)} this month (${limit.percentUsed}%).`,
+      actionLabel: 'Open categories',
+      tab: 'overview',
+      href: '/expense-analyzer?tab=categories',
+    }))
+}
+
 export function daysSince(isoDate) {
   if (!isoDate) {
     return Infinity
@@ -196,6 +218,7 @@ export function buildAttentionItems({
   if (hasAccounts) {
     items.push(...buildTrackerAttentionItems(trackerSnapshot))
     items.push(...buildSavingsDetectionAttentionItems(trackerSnapshot))
+    items.push(...buildCategoryLimitAttentionItems(trackerSnapshot))
   }
 
   if (!hasAccounts) {

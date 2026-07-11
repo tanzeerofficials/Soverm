@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import Skeleton from './Skeleton.jsx'
 import ChatPanel from './ChatPanel.jsx'
 import ChatBubbleIcon from './ChatBubbleIcon.jsx'
 import { buildExpenseAnalyzerSuggestedPrompts } from '../lib/chatSuggestedPrompts.js'
+import { GENERAL_CHAT_KEY } from '../lib/queryKeys.js'
 import {
   formatCurrency,
   formatGeneratedAt,
@@ -149,25 +149,14 @@ function ExpenseAnalyzerNarrativeSection({
             </h3>
           </div>
 
-          {latestInsightId ? (
-            <ChatPanel
-              insightId={latestInsightId}
-              expanded={chatExpanded}
-              onExpandedChange={setChatExpanded}
-              suggestedPrompts={suggestedPrompts}
-              contextLabel="Grounded in your synced transactions, recurring charges, and category breakdown."
-            />
-          ) : (
-            <div className="rounded-lg border border-border-default bg-app/40 px-4 py-4">
-              <p className="text-sm leading-relaxed text-fg-muted">
-                Generate your first insight on the{' '}
-                <Link to="/dashboard" className="text-ai underline-offset-2 hover:underline">
-                  dashboard
-                </Link>{' '}
-                to ask follow-up questions about your spending.
-              </p>
-            </div>
-          )}
+          <ChatPanel
+            threadId={latestInsightId || GENERAL_CHAT_KEY}
+            insightId={latestInsightId}
+            expanded={chatExpanded}
+            onExpandedChange={setChatExpanded}
+            suggestedPrompts={suggestedPrompts}
+            contextLabel="Uses your synced transactions, recurring charges, and category breakdown."
+          />
         </div>
       </div>
     </section>

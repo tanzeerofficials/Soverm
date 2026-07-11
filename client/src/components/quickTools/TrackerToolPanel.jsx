@@ -42,21 +42,23 @@ function statusLabel(status, trackType) {
   return { text: 'Building', tone: 'muted' }
 }
 
-function TrackerTypeSelector({ mode, onChange }) {
+function TrackerTypeSelector({ mode, onChange, allowSpending = true }) {
   return (
-    <div className="grid grid-cols-2 gap-2">
-      <button
-        type="button"
-        onClick={() => onChange(TRACK_MODES.SPENDING)}
-        className={`rounded-lg border px-3 py-3 text-left transition ${
-          mode === TRACK_MODES.SPENDING
-            ? 'border-brand/40 bg-brand/10 ring-1 ring-brand/30'
-            : 'border-border-default bg-app/40 hover:border-border-hover'
-        }`}
-      >
-        <p className="text-sm font-semibold text-fg">Track spending</p>
-        <p className="mt-1 text-xs text-fg-muted">Set a monthly spending cap</p>
-      </button>
+    <div className={`grid gap-2 ${allowSpending ? 'grid-cols-2' : 'grid-cols-1'}`}>
+      {allowSpending && (
+        <button
+          type="button"
+          onClick={() => onChange(TRACK_MODES.SPENDING)}
+          className={`rounded-lg border px-3 py-3 text-left transition ${
+            mode === TRACK_MODES.SPENDING
+              ? 'border-brand/40 bg-brand/10 ring-1 ring-brand/30'
+              : 'border-border-default bg-app/40 hover:border-border-hover'
+          }`}
+        >
+          <p className="text-sm font-semibold text-fg">Track spending</p>
+          <p className="mt-1 text-xs text-fg-muted">Set a monthly spending cap</p>
+        </button>
+      )}
       <button
         type="button"
         onClick={() => onChange(TRACK_MODES.SAVING)}
@@ -683,17 +685,37 @@ function SavingTrackerCard({ tracker, periodLabel, getToken, onRemove, isRemovin
 
 function SavingsDetectionsPanel({ detections, savingTrackers, getToken }) {
   const queryClient = useQueryClient()
+  const [applyError, setApplyError] = useState(null)
+  const [pendingForce, setPendingForce] = useState(null)
 
   const applyMutation = useMutation({
-    mutationFn: ({ detectionId, trackerId }) => applySavingsDetection(getToken, detectionId, trackerId),
+    mutationFn: ({ detectionId, trackerId, force }) =>
+      applySavingsDetection(getToken, detectionId, trackerId, { force }),
     onSuccess: (response) => {
+      setApplyError(null)
+      setPendingForce(null)
       queryClient.setQueryData(trackerQueryKey, response)
+    },
+    onError: (error, variables) => {
+      if (error.status === 409 || error.code === 'possible_duplicate') {
+        setPendingForce({
+          detectionId: variables.detectionId,
+          trackerId: variables.trackerId,
+          message: error.message,
+        })
+        setApplyError(null)
+        return
+      }
+
+      setApplyError(error.message)
     },
   })
 
   const dismissMutation = useMutation({
     mutationFn: (detectionId) => dismissSavingsDetection(getToken, detectionId),
     onSuccess: (response) => {
+      setApplyError(null)
+      setPendingForce(null)
       queryClient.setQueryData(trackerQueryKey, response)
     },
   })
@@ -708,6 +730,36 @@ function SavingsDetectionsPanel({ detections, savingTrackers, getToken }) {
       <p className="mt-1 text-xs text-fg-muted">
         We spotted likely transfers to savings this month. Confirm to update your goal progress.
       </p>
+      {applyError && <p className="mt-2 text-xs text-danger">{applyError}</p>}
+      {pendingForce && (
+        <div className="mt-3 rounded-lg border border-warning/30 bg-warning/10 px-3 py-3">
+          <p className="text-xs text-fg">{pendingForce.message}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={applyMutation.isPending}
+              onClick={() =>
+                applyMutation.mutate({
+                  detectionId: pendingForce.detectionId,
+                  trackerId: pendingForce.trackerId,
+                  force: true,
+                })
+              }
+              className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:bg-brand-soft disabled:opacity-60"
+            >
+              Add it anyway
+            </button>
+            <button
+              type="button"
+              disabled={applyMutation.isPending}
+              onClick={() => setPendingForce(null)}
+              className="rounded-lg border border-border-default bg-surface-elevated px-3 py-1.5 text-xs font-semibold text-fg-muted transition hover:text-fg"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
       <ul className="mt-3 space-y-3">
         {detections.map((detection) => (
           <li
@@ -745,6 +797,7 @@ function SavingsDetectionsPanel({ detections, savingTrackers, getToken }) {
                       savingTrackers.length > 1
                         ? select?.value
                         : detection.trackerId ?? savingTrackers[0]?.id
+                    setPendingForce(null)
                     applyMutation.mutate({ detectionId: detection.id, trackerId })
                   }}
                   className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:bg-brand-soft disabled:opacity-60"
@@ -804,7 +857,9 @@ function TrackerToolPanel({ snapshot, isLoading, loadError, onRetryLoad, getToke
     return (
       <div className="rounded-lg border border-danger/30 bg-danger/5 px-4 py-4">
         <p className="text-sm font-medium text-fg">Couldn&apos;t load trackers</p>
-        <p className="mt-1 text-sm text-fg-muted">{loadError.message}</p>
+        <p className="mt-1 text-sm text-fg-muted">
+          {typeof loadError === 'string' ? loadError : loadError?.message || 'Please try again.'}
+        </p>
         {onRetryLoad && (
           <button
             type="button"
@@ -871,7 +926,13 @@ function TrackerToolPanel({ snapshot, isLoading, loadError, onRetryLoad, getToke
       {!showCreate && (canAddSaving || !hasSpending) && (
         <button
           type="button"
-          onClick={() => setShowCreate(true)}
+          onClick={() => {
+            // Spending cap is unique — if one already exists, open create in saving mode
+            // so "Add tracker" cannot accidentally upsert the existing cap.
+            setMode(hasSpending ? TRACK_MODES.SAVING : TRACK_MODES.SPENDING)
+            setCreateError(null)
+            setShowCreate(true)
+          }}
           className="text-sm font-semibold text-brand-soft transition hover:text-brand hover:underline"
         >
           + Add tracker
@@ -880,7 +941,11 @@ function TrackerToolPanel({ snapshot, isLoading, loadError, onRetryLoad, getToke
 
       {showCreate && (
         <>
-          <TrackerTypeSelector mode={mode} onChange={setMode} />
+          <TrackerTypeSelector
+            mode={mode}
+            onChange={setMode}
+            allowSpending={!hasSpending}
+          />
           <TrackerCreateForm
             mode={mode}
             snapshot={snapshot}
@@ -893,6 +958,7 @@ function TrackerToolPanel({ snapshot, isLoading, loadError, onRetryLoad, getToke
             onClick={() => {
               setShowCreate(false)
               setCreateError(null)
+              setMode(hasSpending ? TRACK_MODES.SAVING : TRACK_MODES.SPENDING)
             }}
             className="text-sm text-fg-muted hover:text-fg"
           >

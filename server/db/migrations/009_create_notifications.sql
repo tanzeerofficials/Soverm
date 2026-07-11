@@ -1,3 +1,5 @@
+-- Fresh installs include spending_cap_* trigger types.
+-- Existing DBs created before those types need migration 018 to widen the CHECK.
 CREATE TABLE notifications (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -6,7 +8,9 @@ CREATE TABLE notifications (
       'large_transaction',
       'low_balance',
       'new_recurring_charge',
-      'spending_spike'
+      'spending_spike',
+      'spending_cap_over',
+      'spending_cap_warning'
     )
   ),
   title TEXT NOT NULL,

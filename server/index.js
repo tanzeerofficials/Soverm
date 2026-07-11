@@ -53,6 +53,7 @@ const { default: express } = await import('express')
 const { clerkMiddleware, requireAuth } = await import('@clerk/express')
 const { default: healthRoutes } = await import('./routes/health.js')
 const { default: webhooksRouter } = await import('./routes/webhooks.js')
+const { default: stripeWebhooksRouter } = await import('./routes/stripeWebhooks.js')
 const { default: plaidRouter } = await import('./routes/plaid.js')
 const { default: insightsRouter } = await import('./routes/insights.js')
 const { default: dashboardRouter } = await import('./routes/dashboard.js')
@@ -63,7 +64,17 @@ const { default: userRouter } = await import('./routes/user.js')
 const { default: expenseAnalyzerRouter } = await import('./routes/expenseAnalyzer.js')
 const { default: notificationsRouter } = await import('./routes/notifications.js')
 const { default: trackersRouter } = await import('./routes/trackers.js')
+const { default: billingRouter } = await import('./routes/billing.js')
+const { default: exportRouter } = await import('./routes/export.js')
+const { default: categoryLimitsRouter } = await import('./routes/categoryLimits.js')
+const { default: paydayRouter } = await import('./routes/payday.js')
+const { default: weeklyReviewRouter } = await import('./routes/weeklyReview.js')
+const { default: monthConditionRouter } = await import('./routes/monthCondition.js')
+const { default: beforeYouSpendRouter } = await import('./routes/beforeYouSpend.js')
+const { default: plaidWebhooksRouter } = await import('./routes/plaidWebhooks.js')
 const { startSyncJob } = await import('./jobs/syncAllUsers.js')
+const { startWeeklyDigestJob } = await import('./jobs/weeklyDigest.js')
+const { startMonthConditionNotifyJob } = await import('./jobs/monthConditionNotify.js')
 const { GENERIC_ERROR_MESSAGE } = await import('./utils/apiErrors.js')
 const { globalRateLimiter, securityHeaders } = await import('./middleware/security.js')
 
@@ -136,7 +147,10 @@ app.use(
 )
 
 // Webhooks must read the raw body (not JSON) so signatures can be verified.
-// That is why this route comes BEFORE express.json().
+// That is why these routes come BEFORE express.json().
+// Mount Stripe under its own path first so it is not handled by the Clerk router.
+app.use('/webhooks/stripe', express.raw({ type: 'application/json' }), stripeWebhooksRouter)
+app.use('/webhooks/plaid', express.raw({ type: 'application/json' }), plaidWebhooksRouter)
 app.use('/webhooks', express.raw({ type: 'application/json' }), webhooksRouter)
 
 // express.json() turns incoming JSON text into req.body objects we can use.
@@ -178,8 +192,27 @@ app.use('/api/expense-analyzer', expenseAnalyzerRouter)
 // Proactive notifications live under /api/notifications
 app.use('/api/notifications', notificationsRouter)
 
-// Monthly trackers (spending cap + savings goals)
+// Monthly trackers live under /api/trackers
 app.use('/api/trackers', trackersRouter)
+
+// Stripe Checkout for Soverm Pro
+app.use('/api/billing', billingRouter)
+
+// Monthly snapshot export
+app.use('/api/export', exportRouter)
+
+// Category soft limits
+app.use('/api/category-limits', categoryLimitsRouter)
+
+// Payday preferences (paycheck-to-paycheck what's left)
+app.use('/api/payday', paydayRouter)
+
+// Weekly check-in for paycheck-to-paycheck ICP
+app.use('/api/weekly-review', weeklyReviewRouter)
+
+// Month-end / month-so-far accountant condition letter
+app.use('/api/month-condition', monthConditionRouter)
+app.use('/api/before-you-spend', beforeYouSpendRouter)
 
 app.use('/', healthRoutes)
 
@@ -223,6 +256,8 @@ const server = app.listen(port, '0.0.0.0', () => {
   console.log(`CFO Agent API listening on port ${port}`)
   startSyncJob()
   console.log('Auto-sync job scheduled (every 4 hours)')
+  startWeeklyDigestJob()
+  startMonthConditionNotifyJob()
 })
 
 server.on('error', (error) => {

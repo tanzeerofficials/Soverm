@@ -47,3 +47,78 @@ export async function getUsageSummary(userId) {
     historyDaysLimit: isPro ? null : FREE_HISTORY_DAYS,
   }
 }
+
+/**
+ * Atomically checks whether a free-tier insight slot is still available today.
+ *
+ * What it does:
+ * - Locks the users row (FOR UPDATE) so concurrent generates serialize
+ * - Counts today's insights inside that lock
+ * - Returns whether the caller may proceed, plus a usage snapshot
+ *
+ * Why we need it:
+ * - A plain check-then-insert race lets two free-tier requests both pass
+ *   when remainingToday === 1, burning an extra Claude call and storing
+ *   two insights for a free user.
+ *
+ * How it fits the app:
+ * - POST /api/insights/generate calls this before Claude (fast reject) and
+ *   again under lock right before INSERT so a parallel request that finished
+ *   while Claude was running cannot push a free user over the daily limit.
+ *
+ * Important: keep the lock only around the check/insert — never across the
+ * Claude API call (that can take seconds and would block other user requests).
+ *
+ * @param {import('pg').PoolClient} client - open transaction client
+ * @param {string} userId
+ */
+export async function reserveFreeInsightSlot(client, userId) {
+  const tierResult = await client.query(
+    `SELECT subscription_tier
+     FROM users
+     WHERE id = $1
+     FOR UPDATE`,
+    [userId]
+  )
+
+  const tier = tierResult.rows[0]?.subscription_tier ?? 'free'
+  const isPro = tier === 'pro'
+
+  const countResult = await client.query(
+    `SELECT COUNT(*) AS count
+     FROM insights
+     WHERE user_id = $1
+       AND created_at::date = NOW()::date`,
+    [userId]
+  )
+  const generatedToday = Number(countResult.rows[0].count)
+
+  if (isPro) {
+    return {
+      allowed: true,
+      usage: {
+        tier,
+        isPro: true,
+        generatedToday,
+        limit: null,
+        remainingToday: null,
+        historyDaysLimit: null,
+      },
+    }
+  }
+
+  const limit = FREE_DAILY_INSIGHT_LIMIT
+  const remainingToday = Math.max(limit - generatedToday, 0)
+
+  return {
+    allowed: remainingToday > 0,
+    usage: {
+      tier,
+      isPro: false,
+      generatedToday,
+      limit,
+      remainingToday,
+      historyDaysLimit: FREE_HISTORY_DAYS,
+    },
+  }
+}

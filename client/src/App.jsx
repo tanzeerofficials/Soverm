@@ -18,6 +18,8 @@ import SettingsPage from './pages/SettingsPage.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
 import HistoryPage from './pages/HistoryPage.jsx'
 import ExpenseAnalyzerPage from './pages/ExpenseAnalyzerPage.jsx'
+import WeeklyReviewPage from './pages/WeeklyReviewPage.jsx'
+import MonthConditionPage from './pages/MonthConditionPage.jsx'
 import LandingPage from './pages/LandingPage.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
 import PrivacyPage from './pages/PrivacyPage.jsx'
@@ -58,6 +60,8 @@ function App() {
             <Route path="/terms" element={<TermsPage />} />
             <Route element={<PrivateRoutes />}>
               <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/weekly-review" element={<WeeklyReviewPage />} />
+              <Route path="/month-condition" element={<MonthConditionPage />} />
               <Route path="/history" element={<HistoryPage />} />
               <Route path="/expense-analyzer" element={<ExpenseAnalyzerPage />} />
               <Route path="/settings" element={<SettingsPage />} />

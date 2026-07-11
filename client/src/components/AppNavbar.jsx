@@ -10,21 +10,37 @@ const PRIMARY_NAV = [
   {
     to: '/dashboard',
     label: 'Dashboard',
+    shortLabel: 'Home',
     match: (path) => path === '/dashboard',
+  },
+  {
+    to: '/weekly-review',
+    label: 'Your week',
+    shortLabel: 'Week',
+    match: (path) => path.startsWith('/weekly-review'),
+  },
+  {
+    to: '/month-condition',
+    label: 'Month letter',
+    shortLabel: 'Letter',
+    match: (path) => path.startsWith('/month-condition'),
   },
   {
     to: '/expense-analyzer',
     label: 'Expenses',
+    shortLabel: 'Expenses',
     match: (path) => path.startsWith('/expense-analyzer'),
   },
   {
     to: '/history',
     label: 'History',
+    shortLabel: 'History',
     match: (path) => path.startsWith('/history'),
   },
   {
     to: '/settings',
     label: 'Settings',
+    shortLabel: 'Settings',
     match: (path) => path.startsWith('/settings'),
   },
 ]
@@ -68,6 +84,25 @@ function NavIcon({ name, className = 'h-4 w-4' }) {
     )
   }
 
+  if (name === 'week') {
+    return (
+      <svg {...props}>
+        <rect x="3" y="5" width="18" height="16" rx="2" />
+        <path d="M3 10h18M8 3v4M16 3v4" />
+      </svg>
+    )
+  }
+
+  if (name === 'month') {
+    return (
+      <svg {...props}>
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+        <path d="M8 7h8M8 11h8M8 15h5" />
+      </svg>
+    )
+  }
+
   if (name === 'settings') {
     return (
       <svg {...props}>
@@ -82,6 +117,8 @@ function NavIcon({ name, className = 'h-4 w-4' }) {
 
 const NAV_ICONS = {
   '/dashboard': 'dashboard',
+  '/weekly-review': 'week',
+  '/month-condition': 'month',
   '/expense-analyzer': 'expenses',
   '/history': 'history',
   '/settings': 'settings',
@@ -119,7 +156,7 @@ function BackArrowIcon() {
   )
 }
 
-function NavPill({ to, label, icon, active, onNavigate }) {
+function NavPill({ to, label, shortLabel, icon, active, onNavigate }) {
   return (
     <Link
       to={to}
@@ -133,7 +170,7 @@ function NavPill({ to, label, icon, active, onNavigate }) {
     >
       <NavIcon name={icon} className={`h-4 w-4 shrink-0 ${active ? 'text-brand-soft' : ''}`} />
       <span className="hidden xl:inline">{label}</span>
-      <span className="xl:hidden">{label.split(' ')[0]}</span>
+      <span className="xl:hidden">{shortLabel || label}</span>
     </Link>
   )
 }
@@ -224,6 +261,7 @@ function AppNavbar({ leftContent, onChatClick, backTo, backLabel, children }) {
               key={item.to}
               to={item.to}
               label={item.label}
+              shortLabel={item.shortLabel}
               icon={NAV_ICONS[item.to]}
               active={item.match(location.pathname)}
             />

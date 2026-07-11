@@ -62,14 +62,15 @@ router.post('/exchange-public-token', plaidRateLimiter, async (req, res) => {
     const bankName = item.institution_name ?? item.institution_id ?? null
 
     const itemResult = await db.query(
-      `INSERT INTO plaid_items (user_id, plaid_access_token, institution_name, last_synced_at)
-       VALUES ($1, $2, $3, NOW())
+      `INSERT INTO plaid_items (user_id, plaid_access_token, institution_name, last_synced_at, plaid_external_item_id)
+       VALUES ($1, $2, $3, NOW(), $4)
        ON CONFLICT (plaid_access_token) DO UPDATE
          SET institution_name = EXCLUDED.institution_name,
-             last_synced_at = NOW()
+             last_synced_at = NOW(),
+             plaid_external_item_id = COALESCE(EXCLUDED.plaid_external_item_id, plaid_items.plaid_external_item_id)
          WHERE plaid_items.user_id = EXCLUDED.user_id
        RETURNING id`,
-      [userId, access_token, bankName]
+      [userId, access_token, bankName, item.item_id ?? null]
     )
 
     if (itemResult.rows.length === 0) {
@@ -126,14 +127,20 @@ router.post('/exchange-public-token', plaidRateLimiter, async (req, res) => {
       }
     }
 
-    const { added, modified, removed } = await syncAllAccountsForUser(userId)
+    const syncResult = await syncAllAccountsForUser(userId)
     await evaluateAndCreateProactiveNotifications(userId)
     await scanAndStoreSavingsTransferDetections(userId)
 
     res.json({
-      success: true,
+      success: !syncResult.partial,
+      partial: Boolean(syncResult.partial),
       accountsConnected: accounts.length,
-      synced: { added, modified, removed },
+      synced: {
+        added: syncResult.added,
+        modified: syncResult.modified,
+        removed: syncResult.removed,
+        itemErrors: syncResult.itemErrors ?? 0,
+      },
     })
   } catch (err) {
     reportServerError('to exchange public token and save accounts', err, { userId, req })
@@ -148,10 +155,17 @@ router.post('/sync-transactions', syncRateLimiter, async (req, res) => {
   const { userId } = getAuth(req)
 
   try {
-    const { added, modified, removed } = await syncAllAccountsForUser(userId)
+    const syncResult = await syncAllAccountsForUser(userId)
     await evaluateAndCreateProactiveNotifications(userId)
     await scanAndStoreSavingsTransferDetections(userId)
-    res.json({ success: true, added, modified, removed })
+    res.json({
+      success: !syncResult.partial,
+      partial: Boolean(syncResult.partial),
+      added: syncResult.added,
+      modified: syncResult.modified,
+      removed: syncResult.removed,
+      itemErrors: syncResult.itemErrors ?? 0,
+    })
   } catch (err) {
     reportServerError('to sync transactions', err, { userId, req })
     res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
@@ -207,17 +221,15 @@ router.delete('/accounts/:accountId', async (req, res) => {
       isLastAccountOnItem = remainingResult.rows[0].count === 0
     }
 
-    // Tear down the Plaid Item before local rows — user intent is "stop showing this bank".
-    // If Plaid's API fails, still remove our copy of the data.
-    if (isLastAccountOnItem && accessToken) {
-      try {
-        await plaidClient.itemRemove({ access_token: accessToken })
-        console.info('Plaid itemRemove succeeded on disconnect')
-      } catch (removeErr) {
-        reportServerError('to remove Plaid item on disconnect', removeErr, { userId, req })
-      }
-    }
-
+    /*
+     * Commit local disconnect first, then revoke the Plaid Item.
+     *
+     * Why this order:
+     * - If we call itemRemove before BEGIN and the DB later rolls back, the
+     *   bank link is gone at Plaid but still looks connected in our app.
+     * - If DB succeeds and itemRemove fails, the user is already disconnected
+     *   locally; we log the Plaid failure and can retry revoke later.
+     */
     await client.query('BEGIN')
 
     await client.query(
@@ -238,6 +250,15 @@ router.delete('/accounts/:accountId', async (req, res) => {
     }
 
     await client.query('COMMIT')
+
+    if (isLastAccountOnItem && accessToken) {
+      try {
+        await plaidClient.itemRemove({ access_token: accessToken })
+        console.info('Plaid itemRemove succeeded on disconnect')
+      } catch (removeErr) {
+        reportServerError('to remove Plaid item on disconnect', removeErr, { userId, req })
+      }
+    }
 
     res.json({ success: true })
   } catch (err) {

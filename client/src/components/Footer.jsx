@@ -18,6 +18,8 @@ const PRODUCT_LINKS_PUBLIC = [
 
 const PRODUCT_LINKS_APP = [
   { to: '/dashboard', label: 'Dashboard' },
+  { to: '/weekly-review', label: 'Your week' },
+  { to: '/month-condition', label: 'Month letter' },
   { to: '/expense-analyzer', label: 'Expenses' },
   { to: '/history', label: 'History' },
   { to: '/settings', label: 'Settings' },
@@ -115,8 +117,8 @@ function Footer() {
           <div className="lg:col-span-4">
             <BrandMark to="/" className="inline-flex" />
             <p className="mt-3 max-w-xs text-sm leading-relaxed text-fg-muted">
-              Your personal accountant — accounting intelligence that monitors your
-              transactions and helps you put your money to better use.
+              Know what&apos;s left until payday — weekly check-in and month-end letter for
+              paycheck-to-paycheck life.
             </p>
             <SignedOut>
               <div className="mt-5">

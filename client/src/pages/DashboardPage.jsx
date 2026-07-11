@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '@clerk/clerk-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, Link } from 'react-router-dom'
 import AppNavbar from '../components/AppNavbar.jsx'
 import DashboardHero from '../components/DashboardHero.jsx'
 import DashboardSectionHeader from '../components/DashboardSectionHeader.jsx'
@@ -17,6 +17,7 @@ import FirstInsightCelebration from '../components/FirstInsightCelebration.jsx'
 import DashboardNeedsAttention from '../components/DashboardNeedsAttention.jsx'
 import DashboardQuickTools from '../components/quickTools/DashboardQuickTools.jsx'
 import DashboardSpendingSnapshot from '../components/DashboardSpendingSnapshot.jsx'
+import DashboardUpcomingBills from '../components/DashboardUpcomingBills.jsx'
 import ActionChecklist from '../components/ActionChecklist.jsx'
 import InsightGeneratingPanel from '../components/InsightGeneratingPanel.jsx'
 import InsightCard from '../components/InsightCard'
@@ -28,6 +29,7 @@ import { useToastContext } from '../context/ToastContext.jsx'
 import FirstConnectCelebration from '../components/FirstConnectCelebration.jsx'
 import ConfirmModal from '../components/ConfirmModal'
 import DashboardOnboarding from '../components/DashboardOnboarding.jsx'
+import ActivationChecklist from '../components/ActivationChecklist.jsx'
 import DashboardActionsSection from '../components/DashboardActionsSection.jsx'
 import {
   DASHBOARD_TABS,
@@ -36,7 +38,18 @@ import {
 } from '../components/DashboardTabs.jsx'
 import DashboardHeroSkeleton from '../components/DashboardHeroSkeleton.jsx'
 import Skeleton from '../components/Skeleton.jsx'
-import { dashboardQueryKey, trackerQueryKey, cashFlowForecastQueryKey, expenseAnalyzerQueryKey, expenseAnalyzerSummaryQueryKey, notificationsQueryKey, usageQueryKey } from '../lib/queryKeys.js'
+import {
+  dashboardSummaryQueryKey,
+  trackerQueryKey,
+  paydayQueryKey,
+  cashFlowForecastQueryKey,
+  expenseAnalyzerQueryKey,
+  expenseAnalyzerSummaryQueryKey,
+  invalidateAfterAccountChange,
+  notificationsQueryKey,
+  notificationsUnreadQueryKey,
+  usageQueryKey,
+} from '../lib/queryKeys.js'
 import { fetchExpenseAnalyzer, fetchExpenseAnalyzerSummary } from '../lib/fetchExpenseAnalyzer.js'
 import { fetchTrackers } from '../lib/fetchTrackers.js'
 import { fetchCashFlowForecast } from '../lib/fetchCashFlowForecast.js'
@@ -59,6 +72,10 @@ import { disconnectAccount, getDisconnectConfirmMessage } from '../lib/disconnec
 import { fetchUsage } from '../lib/fetchUsage.js'
 import { trackUpgradeProClick } from '../lib/analytics.js'
 import {
+  checkoutErrorToastMessage,
+  startProCheckout,
+} from '../lib/startProCheckout.js'
+import {
   getInitialOnboardingCollapsed,
   markDashboardVisited,
   setOnboardingCollapsedPreference,
@@ -79,7 +96,7 @@ function minutesSinceSync(lastSyncedAt) {
 }
 
 function DashboardPage() {
-  const { getToken } = useAuth()
+  const { getToken, userId } = useAuth()
   const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -88,14 +105,19 @@ function DashboardPage() {
   const [limitReached, setLimitReached] = useState(false)
   const [chatExpanded, setChatExpanded] = useState(false)
   const [floatingChatOpen, setFloatingChatOpen] = useState(false)
+  const [floatingChatDraft, setFloatingChatDraft] = useState('')
   const [pendingChatScroll, setPendingChatScroll] = useState(false)
   const [selectedRange, setSelectedRange] = useState('30d')
   const { showToast } = useToastContext()
   const [accountToDelete, setAccountToDelete] = useState(null)
   const [firstConnectCelebration, setFirstConnectCelebration] = useState(null)
   const [firstInsightCelebration, setFirstInsightCelebration] = useState(false)
+  /*
+   * Re-read onboarding preference when Clerk userId arrives / changes so we
+   * never show User A's collapsed state after signing in as User B.
+   */
   const [onboardingCollapsed, setOnboardingCollapsed] = useState(() =>
-    getInitialOnboardingCollapsed()
+    getInitialOnboardingCollapsed(userId)
   )
   const [activeTab, setActiveTab] = useState(DASHBOARD_TABS.OVERVIEW)
   const [quickToolsTab, setQuickToolsTab] = useState(QUICK_TOOL_TABS.TRACKER)
@@ -104,6 +126,10 @@ function DashboardPage() {
   const lastAutoSyncAttempt = useRef(0)
   const prevAccountCount = useRef(null)
   const celebrateFirstInsightRef = useRef(false)
+
+  useEffect(() => {
+    setOnboardingCollapsed(getInitialOnboardingCollapsed(userId))
+  }, [userId])
 
   const { data: usage } = useQuery({
     queryKey: usageQueryKey,
@@ -121,7 +147,7 @@ function DashboardPage() {
     refetch,
     dataUpdatedAt,
   } = useQuery({
-    queryKey: ['dashboard', selectedRange],
+    queryKey: dashboardSummaryQueryKey(selectedRange),
     queryFn: async () => {
       const token = await getToken()
       const res = await fetch(
@@ -140,6 +166,10 @@ function DashboardPage() {
 
   useEffect(() => {
     if (!dashboardData || syncInFlight.current) {
+      return
+    }
+
+    if ((dashboardData.accounts?.length ?? 0) === 0) {
       return
     }
 
@@ -162,11 +192,7 @@ function DashboardPage() {
         console.error('Background sync failed:', err.message)
       } finally {
         syncInFlight.current = false
-        await queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-        await queryClient.invalidateQueries({ queryKey: trackerQueryKey })
-        await queryClient.invalidateQueries({ queryKey: expenseAnalyzerQueryKey })
-        await queryClient.invalidateQueries({ queryKey: expenseAnalyzerSummaryQueryKey })
-        await queryClient.invalidateQueries({ queryKey: notificationsQueryKey })
+        await invalidateAfterAccountChange(queryClient)
       }
     }
 
@@ -174,20 +200,27 @@ function DashboardPage() {
   }, [dashboardData?.lastSyncedAt, dataUpdatedAt, getToken, queryClient])
 
   useEffect(() => {
-    markDashboardVisited()
-  }, [])
+    if (!userId) {
+      return
+    }
+    markDashboardVisited(userId)
+  }, [userId])
 
   useEffect(() => {
     if (searchParams.get('chat') !== 'open') {
       return
     }
 
-    setChatExpanded(true)
-    setPendingChatScroll(true)
-    setActiveTab(DASHBOARD_TABS.INSIGHT)
+    /*
+     * Deep link from navbar / Expense Analyzer: always open floating chat.
+     * ChatPanel uses the latest insight thread when available, otherwise general.
+     */
+    setFloatingChatDraft(searchParams.get('prompt') || '')
+    setFloatingChatOpen(true)
 
     const nextParams = new URLSearchParams(searchParams)
     nextParams.delete('chat')
+    nextParams.delete('prompt')
     setSearchParams(nextParams, { replace: true })
   }, [searchParams, setSearchParams])
 
@@ -214,15 +247,17 @@ function DashboardPage() {
     const tab = searchParams.get('tab')
     const quickTool = searchParams.get('quickTool')
 
-    if (tab !== DASHBOARD_TABS.TOOLS && quickTool !== QUICK_TOOL_TABS.TRACKER && quickTool !== QUICK_TOOL_TABS.FORECAST) {
+    const knownQuickTools = [
+      QUICK_TOOL_TABS.TRACKER,
+      QUICK_TOOL_TABS.FORECAST,
+      QUICK_TOOL_TABS.SPEND,
+    ]
+
+    if (tab !== DASHBOARD_TABS.TOOLS && !knownQuickTools.includes(quickTool)) {
       return
     }
 
-    if (
-      tab === DASHBOARD_TABS.TOOLS ||
-      quickTool === QUICK_TOOL_TABS.TRACKER ||
-      quickTool === QUICK_TOOL_TABS.FORECAST
-    ) {
+    if (tab === DASHBOARD_TABS.TOOLS || knownQuickTools.includes(quickTool)) {
       setActiveTab(DASHBOARD_TABS.TOOLS)
     }
 
@@ -232,6 +267,10 @@ function DashboardPage() {
 
     if (quickTool === QUICK_TOOL_TABS.FORECAST) {
       setQuickToolsTab(QUICK_TOOL_TABS.FORECAST)
+    }
+
+    if (quickTool === QUICK_TOOL_TABS.SPEND) {
+      setQuickToolsTab(QUICK_TOOL_TABS.SPEND)
     }
 
     requestAnimationFrame(() => {
@@ -288,8 +327,7 @@ function DashboardPage() {
     enabled: hasAccounts && activeTab === DASHBOARD_TABS.TOOLS,
   })
 
-  const forecastEnabled =
-    hasAccounts && activeTab === DASHBOARD_TABS.TOOLS && quickToolsTab === QUICK_TOOL_TABS.FORECAST
+  const forecastEnabled = hasAccounts
 
   const {
     data: forecastData,
@@ -304,11 +342,15 @@ function DashboardPage() {
   })
 
   const forecastLoading = forecastEnabled && forecastQueryPending && forecastData === undefined
+  const toolsForecastLoading =
+    activeTab === DASHBOARD_TABS.TOOLS &&
+    quickToolsTab === QUICK_TOOL_TABS.FORECAST &&
+    forecastLoading
 
   const quickToolsLoading = expenseAnalyzerLoading && expenseAnalyzerData === undefined
 
   const { data: notificationsData } = useQuery({
-    queryKey: notificationsQueryKey,
+    queryKey: notificationsUnreadQueryKey,
     queryFn: () => fetchNotifications(getToken, { unreadOnly: true }),
     enabled: hasAccounts,
   })
@@ -351,19 +393,32 @@ function DashboardPage() {
       lastSyncedAt: dashboardData?.lastSyncedAt ?? null,
       incompleteActionCount,
       trackerPeriodStart: trackerData?.periodStart ?? null,
+      percentUsed: trackerData?.percentUsed ?? trackerData?.spendingTracker?.progress?.percentUsed ?? 0,
+      isOverBudget: trackerData?.isOverBudget ?? trackerData?.spendingTracker?.progress?.isOver ?? false,
+      overBudgetBy: trackerData?.overBudgetBy ?? trackerData?.spendingTracker?.progress?.overBy ?? 0,
     }),
-    [dashboardData?.lastSyncedAt, incompleteActionCount, trackerData?.periodStart]
+    [
+      dashboardData?.lastSyncedAt,
+      incompleteActionCount,
+      trackerData?.periodStart,
+      trackerData?.percentUsed,
+      trackerData?.isOverBudget,
+      trackerData?.overBudgetBy,
+      trackerData?.spendingTracker?.progress?.percentUsed,
+      trackerData?.spendingTracker?.progress?.isOver,
+      trackerData?.spendingTracker?.progress?.overBy,
+    ]
   )
 
   const visibleAttentionItems = useMemo(
-    () => filterDismissedAttentionItems(attentionItems, attentionContext),
-    [attentionItems, attentionContext, attentionDismissalVersion]
+    () => filterDismissedAttentionItems(attentionItems, attentionContext, userId),
+    [attentionItems, attentionContext, attentionDismissalVersion, userId]
   )
 
   const showAttentionAllClear = hasAccounts && hasInsight && visibleAttentionItems.length === 0
 
   async function handleDismissAttentionItem(item) {
-    dismissAttentionItem(item, attentionContext)
+    dismissAttentionItem(item, attentionContext, userId)
 
     if (item.notificationId) {
       try {
@@ -457,19 +512,24 @@ function DashboardPage() {
   }
 
   function handleNavbarChat() {
-    if (!dashboardData?.latestInsight?.id) {
-      showToast('Generate an insight first to ask Soverm', 'error')
+    /*
+     * What this does: opens Ask Soverm from the navbar.
+     * Prefer scrolling to the insight thread when one exists; otherwise open
+     * the floating general chat (no insight required).
+     */
+    if (dashboardData?.latestInsight?.id) {
+      setChatExpanded(true)
+      setActiveTab(DASHBOARD_TABS.INSIGHT)
+      scrollToInsightChat()
       return
     }
 
-    setChatExpanded(true)
-    setActiveTab(DASHBOARD_TABS.INSIGHT)
-    scrollToInsightChat()
+    setFloatingChatOpen(true)
   }
 
   function handleOnboardingCollapsedChange(collapsed) {
     setOnboardingCollapsed(collapsed)
-    setOnboardingCollapsedPreference(collapsed)
+    setOnboardingCollapsedPreference(collapsed, userId)
   }
 
   function renderInsightSection() {
@@ -511,12 +571,13 @@ function DashboardPage() {
                 </p>
                 <PaywallCard
                   spent={dashboardData?.spent}
-                  onUpgrade={() => {
+                  onUpgrade={async () => {
                     trackUpgradeProClick('dashboard_paywall')
-                    showToast(
-                      'Soverm Pro checkout is coming soon — stay tuned!',
-                      'success'
-                    )
+                    try {
+                      await startProCheckout(getToken)
+                    } catch (err) {
+                      showToast(checkoutErrorToastMessage(err), 'error')
+                    }
                   }}
                 />
               </div>
@@ -621,7 +682,38 @@ function DashboardPage() {
                 spent={dashboardData?.spent ?? 0}
                 spendingSeries={dashboardData?.spendingSeries ?? []}
                 trackerSnapshot={trackerData}
+                trackerLoading={trackerLoading}
               />
+
+              {hasAccounts && (
+                <Link
+                  to="/weekly-review"
+                  className="flex items-center justify-between gap-3 rounded-xl border border-ai/30 bg-ai/10 px-4 py-3.5 transition hover:bg-ai/15"
+                >
+                  <div className="min-w-0 text-left">
+                    <p className="text-sm font-semibold text-fg">Check your week</p>
+                    <p className="mt-0.5 text-xs text-fg-muted">
+                      How you did, what’s left until payday, and one better move
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-xs font-semibold text-ai-soft">Open →</span>
+                </Link>
+              )}
+
+              {hasAccounts && (
+                <Link
+                  to="/month-condition"
+                  className="flex items-center justify-between gap-3 rounded-xl border border-border-default bg-surface px-4 py-3.5 transition hover:border-border-hover hover:bg-surface-elevated"
+                >
+                  <div className="min-w-0 text-left">
+                    <p className="text-sm font-semibold text-fg">Monthly accountant letter</p>
+                    <p className="mt-0.5 text-xs text-fg-muted">
+                      Your financial condition this month — and a plan for next
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-xs font-semibold text-fg-muted">Open →</span>
+                </Link>
+              )}
 
               <DashboardActionsSection
                 showToast={showToast}
@@ -641,17 +733,59 @@ function DashboardPage() {
               />
 
               {hasAccounts && (
+                <DashboardUpcomingBills
+                  forecast={forecastData}
+                  isLoading={forecastLoading}
+                  onOpenForecast={() => {
+                    setActiveTab(DASHBOARD_TABS.TOOLS)
+                    setQuickToolsTab(QUICK_TOOL_TABS.FORECAST)
+                    requestAnimationFrame(() => {
+                      document.getElementById('dashboard-quick-tools')?.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start',
+                      })
+                    })
+                  }}
+                />
+              )}
+
+              {hasAccounts && (
                 <DashboardSpendingSnapshot
                   summary={expenseTeaser}
                   isLoading={expenseTeaserLoading}
                 />
               )}
 
-              {!hasInsight && (
+              {hasAccounts && (
+                <div className="mx-auto max-w-xl space-y-4">
+                  <ActivationChecklist
+                    hasAccounts={hasAccounts}
+                    paydayConfigured={Boolean(trackerData?.payday?.configured)}
+                  />
+                  {!hasInsight &&
+                    Boolean(trackerData?.payday?.configured) &&
+                    Boolean(trackerData?.whatsLeftUntilPayday?.configured) && (
+                      <DashboardOnboarding
+                        hasAccounts={hasAccounts}
+                        hasSynced={hasSynced}
+                        hasPayday={Boolean(trackerData?.payday?.configured)}
+                        hasWhatsLeft={Boolean(trackerData?.whatsLeftUntilPayday?.configured)}
+                        hasInsight={hasInsight}
+                        collapsed={onboardingCollapsed}
+                        onCollapsedChange={handleOnboardingCollapsedChange}
+                      />
+                    )}
+                  {!hasInsight && <SecurityNote />}
+                </div>
+              )}
+
+              {!hasAccounts && !hasInsight && (
                 <div className="mx-auto max-w-xl space-y-4">
                   <DashboardOnboarding
                     hasAccounts={hasAccounts}
                     hasSynced={hasSynced}
+                    hasPayday={false}
+                    hasWhatsLeft={false}
                     hasInsight={hasInsight}
                     collapsed={onboardingCollapsed}
                     onCollapsedChange={handleOnboardingCollapsedChange}
@@ -744,7 +878,7 @@ function DashboardPage() {
                   forecast={forecastData}
                   trackerLoading={trackerLoading}
                   trackerError={trackerIsError ? trackerError?.message : null}
-                  forecastLoading={forecastLoading}
+                  forecastLoading={toolsForecastLoading}
                   forecastError={forecastIsError ? forecastError?.message : null}
                   onRetryTracker={() => refetchTrackers()}
                   onRetryForecast={() => refetchForecast()}
@@ -762,8 +896,17 @@ function DashboardPage() {
         isOpen={Boolean(firstConnectCelebration)}
         accountsConnected={firstConnectCelebration?.accountsConnected ?? 1}
         syncedAdded={firstConnectCelebration?.syncedAdded ?? 0}
+        getToken={getToken}
         onClose={handleFirstConnectClose}
         onGenerateInsight={handleFirstConnectGenerate}
+        onPaydaySaved={() => {
+          queryClient.invalidateQueries({ queryKey: paydayQueryKey })
+          queryClient.invalidateQueries({ queryKey: trackerQueryKey })
+        }}
+        onGoalCreated={() => {
+          queryClient.invalidateQueries({ queryKey: trackerQueryKey })
+          showToast('Cash buffer goal created', 'success')
+        }}
       />
       <ConfirmModal
         isOpen={!!accountToDelete}
@@ -784,9 +927,7 @@ function DashboardPage() {
             await disconnectAccount(getToken, accountToDelete.id)
             setAccountToDelete(null)
             showToast(`"${accountName}" disconnected`, 'success')
-            await queryClient.invalidateQueries({ queryKey: dashboardQueryKey })
-            await queryClient.invalidateQueries({ queryKey: trackerQueryKey })
-            await queryClient.invalidateQueries({ queryKey: expenseAnalyzerSummaryQueryKey })
+            await invalidateAfterAccountChange(queryClient)
           } catch (err) {
             console.error('Failed to disconnect account:', err.message)
             showToast('Failed to disconnect account — please try again', 'error')
@@ -801,8 +942,12 @@ function DashboardPage() {
           )}
           <FloatingCfoChatModal
             isOpen={floatingChatOpen}
-            onClose={() => setFloatingChatOpen(false)}
+            onClose={() => {
+              setFloatingChatOpen(false)
+              setFloatingChatDraft('')
+            }}
             insightId={dashboardData?.latestInsight?.id}
+            initialDraft={floatingChatDraft}
             onChatError={(message) => showToast(message, 'error')}
           />
         </>

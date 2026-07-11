@@ -6,16 +6,22 @@
  * trust better than a vague "secure" label alone.
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useAuth } from '@clerk/clerk-react'
 import { dismissSecurityNote, isSecurityNoteDismissed } from '../lib/dashboardUiPrefs.js'
 
 function SecurityNote() {
-  const [dismissed, setDismissed] = useState(() => isSecurityNoteDismissed())
+  const { userId } = useAuth()
+  const [dismissed, setDismissed] = useState(() => isSecurityNoteDismissed(userId))
+
+  useEffect(() => {
+    setDismissed(isSecurityNoteDismissed(userId))
+  }, [userId])
 
   if (dismissed) return null
 
   function handleDismiss() {
-    dismissSecurityNote()
+    dismissSecurityNote(userId)
     setDismissed(true)
   }
 

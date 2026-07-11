@@ -93,7 +93,7 @@ async function runMigrationScript(script) {
   const { spawn } = await import('child_process')
   const path = await import('path')
   const { fileURLToPath } = await import('url')
-  const serverDir = path.dirname(fileURLToPath(new URL('..', import.meta.url)))
+  const serverDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
   return new Promise((resolve, reject) => {
     const child = spawn('node', [script], {
@@ -119,6 +119,7 @@ async function main() {
   console.log(`015 unique active spending index:        ${m015 ? 'OK' : 'MISSING'}`)
   console.log(`016 spending alert thresholds:           ${m016 ? 'OK' : 'MISSING'}`)
   console.log(`017 savings transfer detections:         ${m017 ? 'OK' : 'MISSING'}`)
+  console.log('\nTip: prefer `npm run verify:all-migrations` for 006–018 in one pass.')
 
   if ((!m013 || !m014 || !m015 || !m016 || !m017) && apply) {
     if (!m013) {

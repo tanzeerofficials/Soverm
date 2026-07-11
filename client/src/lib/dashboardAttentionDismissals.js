@@ -4,29 +4,24 @@
  * Each dismissal is keyed by item id + a fingerprint of the current situation.
  * When the situation changes (sync refreshed, new month, fewer pending actions),
  * the item can appear again even if the user dismissed it before.
+ *
+ * Storage is scoped by Clerk userId when provided (see userScopedStorage.js).
  */
+
+import {
+  readUserScopedJson,
+  removeUserScopedKey,
+  writeUserScopedJson,
+} from './userScopedStorage.js'
 
 export const ATTENTION_DISMISSALS_KEY = 'soverm:attention-dismissals'
 
-function readDismissals() {
-  try {
-    const raw = localStorage.getItem(ATTENTION_DISMISSALS_KEY)
-    if (!raw) {
-      return {}
-    }
-    const parsed = JSON.parse(raw)
-    return parsed && typeof parsed === 'object' ? parsed : {}
-  } catch {
-    return {}
-  }
+function readDismissals(userId) {
+  return readUserScopedJson(ATTENTION_DISMISSALS_KEY, userId, {})
 }
 
-function writeDismissals(dismissals) {
-  try {
-    localStorage.setItem(ATTENTION_DISMISSALS_KEY, JSON.stringify(dismissals))
-  } catch {
-    // localStorage unavailable
-  }
+function writeDismissals(dismissals, userId) {
+  writeUserScopedJson(ATTENTION_DISMISSALS_KEY, userId, dismissals)
 }
 
 /**
@@ -40,8 +35,15 @@ export function getAttentionItemFingerprint(item, context = {}) {
 
   switch (item.id) {
     case 'spending-cap-over':
-    case 'spending-cap-warning':
-      return context.trackerPeriodStart ?? 'unknown-month'
+    case 'spending-cap-warning': {
+      // Include spend severity so dismissing at 83% still resurfaces at 95% / over.
+      const period = context.trackerPeriodStart ?? 'unknown-month'
+      const percent = Math.round(Number(context.percentUsed ?? 0))
+      const overBucket = context.isOverBudget
+        ? `over:${Math.round(Number(context.overBudgetBy ?? 0))}`
+        : 'under'
+      return `${period}:${percent}:${overBucket}`
+    }
     case 'stale-sync':
       return context.lastSyncedAt ?? 'never-synced'
     case 'pending-actions':
@@ -58,27 +60,26 @@ export function getAttentionItemFingerprint(item, context = {}) {
   }
 }
 
-export function isAttentionItemDismissed(item, context = {}) {
-  const dismissals = readDismissals()
+export function isAttentionItemDismissed(item, context = {}, userId) {
+  const dismissals = readDismissals(userId)
   const fingerprint = getAttentionItemFingerprint(item, context)
   return dismissals[item.id] === fingerprint
 }
 
-export function dismissAttentionItem(item, context = {}) {
-  const dismissals = readDismissals()
+export function dismissAttentionItem(item, context = {}, userId) {
+  const dismissals = readDismissals(userId)
   dismissals[item.id] = getAttentionItemFingerprint(item, context)
-  writeDismissals(dismissals)
+  writeDismissals(dismissals, userId)
 }
 
-export function filterDismissedAttentionItems(items, context = {}) {
-  return items.filter((item) => !isAttentionItemDismissed(item, context))
+export function filterDismissedAttentionItems(items, context = {}, userId) {
+  return items.filter((item) => !isAttentionItemDismissed(item, context, userId))
 }
 
 /** Test helper */
-export function clearAttentionDismissals() {
-  try {
-    localStorage.removeItem(ATTENTION_DISMISSALS_KEY)
-  } catch {
-    // ignore
+export function clearAttentionDismissals(userId) {
+  removeUserScopedKey(ATTENTION_DISMISSALS_KEY, userId)
+  if (userId) {
+    removeUserScopedKey(ATTENTION_DISMISSALS_KEY, null)
   }
 }

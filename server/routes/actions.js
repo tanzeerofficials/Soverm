@@ -1,15 +1,21 @@
 /*
  * ACTIONS ROUTES FILE
  *
- * Lists and updates user action items generated from AI insights.
+ * Lists and updates user action items (insight + weekly closed-loop).
  */
 
 import { Router } from 'express'
 import { getAuth, requireAuth } from '@clerk/express'
-import db from '../db/index.js'
 import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
 import { reportServerError } from '../utils/sentry.js'
 import { validateBooleanField, validateUuidParam } from '../utils/validation.js'
+import { ensureUserExists } from '../utils/ensureUser.js'
+import { getCalendarWeekWindow } from '../utils/calendarWeek.js'
+import {
+  createAction,
+  listRecentActions,
+  updateActionStatus,
+} from '../services/actionsService.js'
 
 const router = Router()
 
@@ -17,27 +23,13 @@ router.use(requireAuth())
 
 /*
  * GET /api/actions
- *
- * What it does:
- * - Returns the user's 10 most recent action items
- *
- * Why we need it:
- * - Dashboard todo list loads persisted actions from the database
  */
 router.get('/', async (req, res) => {
   const { userId } = getAuth(req)
 
   try {
-    const result = await db.query(
-      `SELECT id, description, completed, created_at
-       FROM actions
-       WHERE user_id = $1
-       ORDER BY created_at DESC
-       LIMIT 10`,
-      [userId]
-    )
-
-    res.json({ actions: result.rows })
+    const actions = await listRecentActions(userId, { limit: 20 })
+    res.json({ actions })
   } catch (err) {
     reportServerError('to fetch actions', err, { userId, req })
     res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
@@ -45,13 +37,36 @@ router.get('/', async (req, res) => {
 })
 
 /*
+ * POST /api/actions
+ * Accept a weekly (or other) action into the closed-loop.
+ */
+router.post('/', async (req, res) => {
+  const { userId } = getAuth(req)
+
+  try {
+    await ensureUserExists(userId)
+    const week = getCalendarWeekWindow()
+    const action = await createAction(userId, {
+      description: req.body?.description,
+      source: req.body?.source ?? 'weekly',
+      status: req.body?.status ?? 'accepted',
+      weekStartOn: req.body?.weekStartOn ?? week.weekStartIso,
+      metadata: req.body?.metadata ?? {},
+      insightId: req.body?.insightId ?? null,
+    })
+    res.status(201).json({ action })
+  } catch (err) {
+    if (err.statusCode === 400) {
+      return res.status(400).json({ error: err.message })
+    }
+    reportServerError('to create action', err, { userId, req })
+    res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
+  }
+})
+
+/*
  * PATCH /api/actions/:id
- *
- * What it does:
- * - Updates the completed flag on one action (e.g. checkbox toggle)
- *
- * Why PATCH not PUT:
- * - Only changes one field; client does not send the full action resource
+ * Supports legacy { completed } and closed-loop { status }.
  */
 router.patch('/:id', async (req, res) => {
   const { userId } = getAuth(req)
@@ -61,25 +76,35 @@ router.patch('/:id', async (req, res) => {
     return res.status(400).json({ error: idCheck.error })
   }
 
-  const completedCheck = validateBooleanField(req.body?.completed, 'completed')
-  if (completedCheck.error) {
-    return res.status(400).json({ error: completedCheck.error })
+  const hasStatus = req.body?.status != null
+  const hasCompleted = req.body?.completed != null
+
+  if (!hasStatus && !hasCompleted) {
+    return res.status(400).json({ error: 'status or completed is required' })
+  }
+
+  if (hasCompleted && !hasStatus) {
+    const completedCheck = validateBooleanField(req.body?.completed, 'completed')
+    if (completedCheck.error) {
+      return res.status(400).json({ error: completedCheck.error })
+    }
   }
 
   try {
-    const result = await db.query(
-      `UPDATE actions SET completed = $1
-       WHERE id = $2 AND user_id = $3
-       RETURNING id`,
-      [completedCheck.value, req.params.id, userId]
-    )
+    const action = await updateActionStatus(userId, req.params.id, {
+      status: hasStatus ? req.body.status : undefined,
+      completed: hasCompleted ? Boolean(req.body.completed) : undefined,
+    })
 
-    if (result.rows.length === 0) {
+    if (!action) {
       return res.status(404).json({ error: 'Action not found' })
     }
 
-    res.json({ success: true })
+    res.json({ success: true, action })
   } catch (err) {
+    if (err.statusCode === 400) {
+      return res.status(400).json({ error: err.message })
+    }
     reportServerError('to update action', err, { userId, req })
     res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
   }

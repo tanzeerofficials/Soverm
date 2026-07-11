@@ -14,6 +14,7 @@ import {
   FORECAST_HORIZON_DAYS,
   toneStyles,
 } from '../../lib/cashFlowForecast.js'
+import { buildBillCalendarDays } from '../../lib/billCalendar.js'
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-US', {
@@ -23,12 +24,34 @@ function formatCurrency(amount) {
   }).format(amount ?? 0)
 }
 
-function ForecastSparkline({ points, tone }) {
+function formatRiskDetail(risk) {
+  if (!risk?.detail) {
+    return ''
+  }
+
+  if (risk.tone === 'danger' && risk.lowestBalanceDate) {
+    return `${risk.detail} Around ${formatForecastDate(risk.lowestBalanceDate)}.`
+  }
+
+  return risk.detail
+}
+
+function ForecastSparkline({ points, tone, endingBalance, lowestBalance, lowestBalanceDate }) {
   const { path, areaPath } = buildForecastSparkline(points)
   const styles = toneStyles(tone)
+  const ariaLabel = `Projected balance ends near ${formatCurrency(endingBalance)}${
+    lowestBalance < endingBalance
+      ? `, with a low around ${formatCurrency(lowestBalance)} on ${formatForecastDate(lowestBalanceDate)}`
+      : ''
+  }`
 
   return (
-    <svg viewBox="0 0 280 72" className="h-20 w-full" role="img" aria-hidden="true">
+    <svg
+      viewBox="0 0 280 72"
+      className="h-20 w-full"
+      role="img"
+      aria-label={ariaLabel}
+    >
       <path d={areaPath} className={styles.chartFill} />
       <path
         d={path}
@@ -82,13 +105,21 @@ function ForecastToolPanel({ forecast, isLoading, loadError, onRetryLoad }) {
 
   const risk = forecast.risk
   const riskStyles = toneStyles(risk?.tone)
+  const hasBaseline = forecast.hasBaselineData !== false
 
   return (
     <div className="space-y-4">
       <div className={`rounded-lg border px-4 py-4 ${riskStyles.border}`}>
         <p className={`text-sm font-semibold ${riskStyles.text}`}>{risk?.title}</p>
-        <p className="mt-1 text-xs leading-relaxed text-fg-muted">{risk?.detail}</p>
+        <p className="mt-1 text-xs leading-relaxed text-fg-muted">{formatRiskDetail(risk)}</p>
       </div>
+
+      {!hasBaseline ? (
+        <p className="rounded-lg border border-border-default bg-app/40 px-4 py-3 text-xs text-fg-muted">
+          Not enough recent income or spending history yet — this chart mostly reflects your current
+          balance. It will get more useful after a few days of synced transactions.
+        </p>
+      ) : null}
 
       <div className="rounded-lg border border-border-default bg-app/40 px-4 py-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
@@ -106,7 +137,7 @@ function ForecastToolPanel({ forecast, isLoading, loadError, onRetryLoad }) {
                 : ''}
             </p>
           </div>
-          {forecast.runwayDays != null ? (
+          {hasBaseline && forecast.runwayDays != null ? (
             <p className="text-xs text-fg-subtle">
               Runway ~<span className="font-mono tabular-nums text-fg-muted">{forecast.runwayDays}</span> days
             </p>
@@ -114,28 +145,50 @@ function ForecastToolPanel({ forecast, isLoading, loadError, onRetryLoad }) {
         </div>
 
         <div className="mt-4">
-          <ForecastSparkline points={forecast.points} tone={risk?.tone} />
+          <ForecastSparkline
+            points={forecast.points}
+            tone={risk?.tone}
+            endingBalance={forecast.endingBalance}
+            lowestBalance={forecast.lowestBalance}
+            lowestBalanceDate={forecast.lowestBalanceDate}
+          />
         </div>
       </div>
 
       {forecast.scheduledOutflows?.length > 0 ? (
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">
-            Upcoming recurring charges
+            Bill calendar · next {FORECAST_HORIZON_DAYS} days
           </p>
-          <ul className="mt-2 divide-y divide-border-default/80 rounded-lg border border-border-default bg-app/30">
-            {forecast.scheduledOutflows.map((event) => (
+          <ul className="mt-2 space-y-2">
+            {buildBillCalendarDays(forecast.scheduledOutflows, {
+              withinDays: FORECAST_HORIZON_DAYS,
+            }).map((day) => (
               <li
-                key={`${event.date}-${event.merchant}`}
-                className="flex items-center justify-between gap-3 px-3 py-2.5"
+                key={day.date}
+                className="rounded-lg border border-border-default bg-app/30 px-3 py-2.5"
               >
-                <div className="min-w-0">
-                  <p className="truncate text-sm text-fg">{event.merchant}</p>
-                  <p className="text-xs text-fg-subtle">{formatForecastDate(event.date)}</p>
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+                    {day.relativeLabel}
+                  </p>
+                  <p className="font-mono text-sm font-semibold tabular-nums text-fg">
+                    {formatCurrency(day.total)}
+                  </p>
                 </div>
-                <span className="font-mono text-sm tabular-nums text-fg">
-                  {formatCurrency(event.amount)}
-                </span>
+                <ul className="mt-1.5 divide-y divide-border-default/60">
+                  {day.events.map((event, index) => (
+                    <li
+                      key={`${event.merchant}-${event.amount}-${index}`}
+                      className="flex items-center justify-between gap-3 py-1.5 first:pt-0 last:pb-0"
+                    >
+                      <p className="truncate text-sm text-fg">{event.merchant}</p>
+                      <span className="font-mono text-sm tabular-nums text-fg-muted">
+                        {formatCurrency(event.amount)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               </li>
             ))}
           </ul>
@@ -156,7 +209,7 @@ function ForecastToolPanel({ forecast, isLoading, loadError, onRetryLoad }) {
         title="How this forecast works"
         items={[
           `Starts from your connected account balances (${formatCurrency(forecast.startingBalance)}).`,
-          `Adds ~${formatCurrency(forecast.assumptions?.dailyIncome)}/day income based on the last 30 days.`,
+          `Adds ~${formatCurrency(forecast.assumptions?.dailyIncome)}/day income based on the last 30 days (transfers excluded).`,
           `Subtracts ~${formatCurrency(forecast.assumptions?.dailyDiscretionary)}/day discretionary spend plus confirmed recurring charges on their expected dates.`,
           'This is an estimate — paycheck timing and one-off purchases can shift the real outcome.',
         ]}

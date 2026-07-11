@@ -66,11 +66,10 @@ function LandingPage() {
           <section className="mx-auto mb-8 mt-24 max-w-2xl text-center">
             <div className="rounded-2xl border border-border-default bg-gradient-to-b from-surface to-app px-6 py-12 sm:px-10">
               <h2 className="text-2xl font-bold text-fg sm:text-3xl">
-                Ready to know where you actually stand?
+                Ready to know what&apos;s left this week?
               </h2>
               <p className="mx-auto mt-3 max-w-md text-sm text-fg-muted">
-                Accounting intelligence that watches your transactions and turns them into
-                clear insights — so you always know the smartest move for your money.
+                Connect a bank, confirm payday, and get your first weekly check-in — free.
               </p>
               <div className="mt-8">
                 <SignUpButton mode="modal">
@@ -78,7 +77,7 @@ function LandingPage() {
                     type="button"
                     className="rounded-lg bg-brand px-8 py-4 text-base font-semibold text-slate-950 transition hover:bg-brand-soft"
                   >
-                    Get started free
+                    Start free
                   </button>
                 </SignUpButton>
               </div>

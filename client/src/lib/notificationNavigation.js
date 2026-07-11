@@ -10,6 +10,8 @@ const TRIGGER_TYPES = {
   SPENDING_SPIKE: 'spending_spike',
   SPENDING_CAP_OVER: 'spending_cap_over',
   SPENDING_CAP_WARNING: 'spending_cap_warning',
+  WEEKLY_TRUTH_LETTER: 'weekly_truth_letter',
+  MONTH_CONDITION_READY: 'month_condition_ready',
 }
 
 export function parseNotificationRelatedData(relatedData) {
@@ -66,6 +68,13 @@ export function resolveNotificationTarget(notification) {
         pathname: '/dashboard',
         search: buildSearch({ tab: 'tools', quickTool: 'tracker' }),
       }
+    case TRIGGER_TYPES.WEEKLY_TRUTH_LETTER:
+      return { pathname: '/weekly-review', search: '' }
+    case TRIGGER_TYPES.MONTH_CONDITION_READY:
+      return {
+        pathname: '/month-condition',
+        search: buildSearch({ month: related.monthKey ?? '' }),
+      }
     default:
       break
   }
@@ -103,6 +112,10 @@ export function notificationActionLabel(notification) {
     case TRIGGER_TYPES.SPENDING_CAP_OVER:
     case TRIGGER_TYPES.SPENDING_CAP_WARNING:
       return 'View tracker'
+    case TRIGGER_TYPES.WEEKLY_TRUTH_LETTER:
+      return 'Open Your week'
+    case TRIGGER_TYPES.MONTH_CONDITION_READY:
+      return 'Read month letter'
     default:
       return 'View details'
   }

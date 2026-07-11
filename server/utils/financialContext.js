@@ -270,13 +270,19 @@ export async function loadMonthOverMonthComparison(userId) {
 }
 
 export async function loadFinancialContextForUser(userId) {
+  /*
+   * Insight generation must match chat / expense analyzer / dashboard:
+   * only transactions still linked to a connected Plaid Item.
+   * After disconnect, account_id is nulled — those rows stay in Postgres
+   * but must not feed AI advice the rest of the app no longer shows.
+   */
   const [transactionsResult, accountsResult] = await Promise.all([
     db.query(
       `SELECT t.*,
               a.bank_name,
-              COALESCE(a.account_name, 'Disconnected account') AS account_name
+              a.account_name
        FROM transactions t
-       LEFT JOIN accounts a ON t.account_id = a.id
+       ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
        WHERE t.user_id = $1
          AND (t.pending IS NOT TRUE)
          AND t.date >= NOW() - $2::interval

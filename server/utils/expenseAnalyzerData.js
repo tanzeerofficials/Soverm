@@ -35,6 +35,10 @@ import {
   mergeRecurringCharges,
 } from '../services/plaidRecurring.js'
 import { buildNarrativeMeta } from './expenseAnalyzerNarrativeBrief.js'
+import {
+  buildBillDefenseFindings,
+  buildCancelKeepWatchPrompt,
+} from './billDefense.js'
 
 export const NON_PENDING_FILTER = 'AND (pending IS NOT TRUE)'
 const RECURRING_LOOKBACK_INTERVAL = '3 months'
@@ -445,6 +449,9 @@ function buildRecurringChargeFromMatch({ chain, rule }) {
     merchant: resolveMerchantLabel(chain) || 'Unknown merchant',
     category,
     averageAmount,
+    firstAmount: Math.round(amounts[0] * 100) / 100,
+    lastAmount: Math.round(amounts[amounts.length - 1] * 100) / 100,
+    amountDelta: Math.round((amounts[amounts.length - 1] - amounts[0]) * 100) / 100,
     cadence: rule.cadence,
     lastChargedDate: formatDateOnly(parseDateOnly(lastChargedDate)),
     nextExpectedDate: addDays(lastChargedDate, gapDays || rule.averageGapDays),
@@ -555,6 +562,9 @@ function buildBorderlineChargeFromMatch({ chain, rule, identicalAmounts }) {
     merchant: merchantName || 'Unknown merchant',
     category: resolveCategoryFromChain(chain),
     averageAmount,
+    firstAmount: Math.round(amounts[0] * 100) / 100,
+    lastAmount: Math.round(amounts[amounts.length - 1] * 100) / 100,
+    amountDelta: Math.round((amounts[amounts.length - 1] - amounts[0]) * 100) / 100,
     cadence: rule.cadence,
     lastChargedDate: formatDateOnly(parseDateOnly(lastChargedDate)),
     nextExpectedDate: addDays(lastChargedDate, gapDays || rule.averageGapDays),
@@ -911,6 +921,28 @@ export function buildExpenseAnalyzerPayload(comparison, recurringLookbackRows, o
     oneTimeTotal: recurringOneTimeSplit.totalOneTime,
   }
 
+  const todayIso = new Date().toISOString().slice(0, 10)
+  const billDefense = buildBillDefenseFindings({
+    recurringCharges,
+    reviewCharges,
+    todayIso,
+    limit: 6,
+  }).map((finding) => ({
+    type: finding.type,
+    tone: finding.tone,
+    confidence: finding.confidence,
+    title: finding.title,
+    detail: finding.detail,
+    merchant: finding.merchant,
+    otherMerchant: finding.otherMerchant ?? null,
+    monthlyEquivalent: finding.monthlyEquivalent ?? null,
+    firstAmount: finding.firstAmount ?? null,
+    lastAmount: finding.lastAmount ?? null,
+    amountDelta: finding.amountDelta ?? null,
+    percentIncrease: finding.percentIncrease ?? null,
+    reviewPrompt: buildCancelKeepWatchPrompt(finding),
+  }))
+
   return {
     categoryBreakdown,
     recurringCharges,
@@ -920,6 +952,7 @@ export function buildExpenseAnalyzerPayload(comparison, recurringLookbackRows, o
     totalRecurringMonthly,
     totalReviewMonthly,
     overallSpending: overallSpendingWithSplit,
+    billDefense,
     narrativeSummary: buildTemplateNarrative({
       topMover,
       overallSpending,

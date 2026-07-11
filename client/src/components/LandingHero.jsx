@@ -1,13 +1,12 @@
 /*
  * LANDING HERO
  *
- * Full-bleed above-the-fold section with mesh background, grid texture,
- * floating orbs, and entrance animation on first paint.
+ * Brand-first ICP pitch: weekly check-in + make it to payday.
  */
 
 import { SignInButton, SignUpButton } from '@clerk/clerk-react'
 
-const HERO_TRUST_CHIPS = ['Free to start', 'No credit card', 'Read-only access']
+const HERO_TRUST_CHIPS = ['Free weekly loop', 'Read-only Plaid', 'No credit card']
 
 function LandingHero() {
   return (
@@ -33,23 +32,17 @@ function LandingHero() {
 
       <div className="relative mx-auto max-w-4xl px-6 pt-16 text-center sm:pt-24">
         <div className="landing-hero-stagger">
-          <p className="text-sm font-medium uppercase tracking-wide text-brand">
-            Your Personal Accountant
+          <p className="text-4xl font-bold tracking-[0.18em] text-fg sm:text-5xl lg:text-6xl">
+            SOVERM
           </p>
 
-          <h1 className="mt-3 text-4xl font-bold leading-tight tracking-tight text-fg sm:text-5xl lg:text-6xl">
-            Your personal accountant tells you the truth about your money.
+          <h1 className="mt-5 text-2xl font-semibold leading-snug tracking-tight text-fg sm:text-3xl lg:text-4xl">
+            Know what&apos;s left until payday — and what to do this week.
           </h1>
 
-          <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-fg-muted">
-            Accounting intelligence that monitors your transactions, analyzes where your money
-            actually goes, and delivers financial insights — so you can make smarter decisions with
-            every dollar.
-          </p>
-
-          <p className="mx-auto mt-4 max-w-2xl text-lg leading-relaxed text-fg">
-            And you know what&apos;s even more interesting? It gets sharper every single day you
-            use it.
+          <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-fg-muted sm:text-lg">
+            A weekly check-in and month-end accountant letter for paycheck-to-paycheck life —
+            not another chart dashboard.
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
@@ -58,7 +51,7 @@ function LandingHero() {
                 type="button"
                 className="w-full rounded-lg bg-brand px-8 py-3.5 text-sm font-semibold text-slate-950 transition hover:bg-brand-soft sm:w-auto"
               >
-                Get started free
+                Start free
               </button>
             </SignUpButton>
             <SignInButton mode="modal">

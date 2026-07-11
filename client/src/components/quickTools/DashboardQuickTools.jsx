@@ -9,6 +9,7 @@ import { Link } from 'react-router-dom'
 import Skeleton from '../Skeleton.jsx'
 import TrackerToolPanel from './TrackerToolPanel.jsx'
 import ForecastToolPanel from './ForecastToolPanel.jsx'
+import BeforeYouSpendPanel from './BeforeYouSpendPanel.jsx'
 import {
   assessAccountHealth,
   collectRecentTransactions,
@@ -30,6 +31,7 @@ function QuickToolsTabBar({ activeTab, onChange }) {
     { id: QUICK_TOOL_TABS.HEALTH, label: 'Health', shortLabel: 'Health' },
     { id: QUICK_TOOL_TABS.TRACKER, label: 'Tracker', shortLabel: 'Tracker' },
     { id: QUICK_TOOL_TABS.FORECAST, label: 'Forecast', shortLabel: 'Forecast' },
+    { id: QUICK_TOOL_TABS.SPEND, label: 'Can I afford it?', shortLabel: 'Afford' },
   ]
 
   return (
@@ -64,18 +66,29 @@ function QuickToolsTabBar({ activeTab, onChange }) {
   )
 }
 
+/*
+ * Keep every tab panel mounted, but hide inactive ones.
+ *
+ * Why: Tracker create/edit forms live in React state. Returning null on
+ * inactive tabs unmounted those forms and wiped half-finished drafts when
+ * people hopped to Forecast and back.
+ *
+ * Concept: "display:none" vs unmount — hidden DOM still keeps component state;
+ * null destroys it. Hidden inactive panels also stay out of the accessibility
+ * tree via hidden + inert-friendly attributes.
+ */
 function QuickToolPanel({ tabId, activeTab, children }) {
-  if (activeTab !== tabId) {
-    return null
-  }
+  const isActive = activeTab === tabId
 
   return (
     <div
       id={`quick-tool-panel-${tabId}`}
       role="tabpanel"
       aria-labelledby={`quick-tool-tab-${tabId}`}
-      tabIndex={0}
-      className="mt-4 outline-none"
+      aria-hidden={!isActive}
+      hidden={!isActive}
+      tabIndex={isActive ? 0 : -1}
+      className={isActive ? 'mt-4 outline-none' : 'hidden'}
     >
       {children}
     </div>
@@ -185,7 +198,9 @@ function DashboardQuickTools({
 
   return (
     <section id="dashboard-quick-tools" className="rounded-xl border border-border-default bg-surface p-4 sm:p-5">
-      <p className="text-sm text-fg-muted">Recent activity, account health, trackers, and cash flow forecast</p>
+      <p className="text-sm text-fg-muted">
+        Recent activity, trackers, forecast, and “Can I afford it?”
+      </p>
       <div className="mt-4">
         <QuickToolsTabBar activeTab={activeTab} onChange={handleTabChange} />
       </div>
@@ -214,6 +229,14 @@ function DashboardQuickTools({
           isLoading={forecastLoading}
           loadError={forecastError}
           onRetryLoad={onRetryForecast}
+        />
+      </QuickToolPanel>
+
+      <QuickToolPanel tabId={QUICK_TOOL_TABS.SPEND} activeTab={activeTab}>
+        <BeforeYouSpendPanel
+          getToken={getToken}
+          softLimits={trackerSnapshot?.categorySoftLimits ?? []}
+          paydayConfigured={Boolean(trackerSnapshot?.payday?.configured)}
         />
       </QuickToolPanel>
     </section>
