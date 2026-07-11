@@ -8,18 +8,19 @@
  * the shared "general" chat thread grounded in live synced data.
  */
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import ChatPanel from './ChatPanel.jsx'
 import ChatBubbleIcon from './ChatBubbleIcon.jsx'
 import { buildDashboardSuggestedPrompts } from '../lib/chatSuggestedPrompts.js'
 import { GENERAL_CHAT_KEY } from '../lib/queryKeys.js'
+import { useFocusTrap } from '../hooks/useFocusTrap.js'
 
 function FloatingCfoChatButton({ onClick }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="fixed bottom-6 right-6 z-40 flex h-14 items-center justify-center gap-2 rounded-full bg-warning px-4 font-semibold text-app shadow-lg transition hover:brightness-110 sm:px-5"
+      className="fixed bottom-[max(1.5rem,env(safe-area-inset-bottom))] right-[max(1.5rem,env(safe-area-inset-right))] z-40 flex h-14 items-center justify-center gap-2 rounded-full bg-warning px-4 font-semibold text-app shadow-lg transition hover:brightness-110 sm:px-5"
       aria-label="Ask Soverm"
     >
       <ChatBubbleIcon className="h-5 w-5 flex-shrink-0 text-app" />
@@ -34,10 +35,14 @@ function FloatingCfoChatModal({
   insightId,
   onChatError,
   initialDraft = '',
+  autoSendInitialDraft = false,
   suggestedPrompts,
 }) {
   const threadId = insightId || GENERAL_CHAT_KEY
   const prompts = suggestedPrompts ?? buildDashboardSuggestedPrompts()
+  const dialogRef = useRef(null)
+
+  useFocusTrap(isOpen, dialogRef)
 
   useEffect(() => {
     if (!isOpen) {
@@ -64,14 +69,21 @@ function FloatingCfoChatModal({
     return null
   }
 
+  /*
+   * Mobile shell: use dvh (dynamic viewport height) instead of h-screen/100vh.
+   * On iOS Safari, 100vh is taller than the visible area, so a full-screen
+   * chat can extend under the browser chrome and break nested scrolling.
+   * inset-0 + h-dvh keeps the dialog exactly on the visible viewport.
+   */
   return (
     <div
-      className="fixed inset-0 z-[60] flex h-screen w-screen items-center justify-center bg-black/60"
+      className="fixed inset-0 z-[60] flex h-dvh max-h-dvh w-screen items-center justify-center bg-black/60"
       onClick={onClose}
       role="presentation"
     >
       <div
-        className="flex h-full w-full flex-col overflow-hidden bg-app sm:h-[80vh] sm:max-h-[80vh] sm:w-full sm:max-w-3xl sm:rounded-xl sm:border sm:border-border-default sm:shadow-xl"
+        ref={dialogRef}
+        className="flex h-full max-h-full min-h-0 w-full flex-col overflow-hidden bg-app sm:h-[80vh] sm:max-h-[80vh] sm:w-full sm:max-w-3xl sm:rounded-xl sm:border sm:border-border-default sm:shadow-xl"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -98,12 +110,13 @@ function FloatingCfoChatModal({
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 sm:px-6">
           <ChatPanel
-            key={`${threadId}:${initialDraft}`}
+            key={`${threadId}:${initialDraft}:${autoSendInitialDraft ? 'autosend' : 'draft'}`}
             layout="modal"
             scrollMode="modal"
             threadId={threadId}
             insightId={insightId}
             initialDraft={initialDraft}
+            autoSendInitialDraft={autoSendInitialDraft}
             onError={onChatError}
             expanded
             suggestedPrompts={prompts}

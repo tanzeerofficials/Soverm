@@ -8,7 +8,7 @@ export function buildExpenseAnalyzerSuggestedPrompts({
   const prompts = [
     'What stands out most in my spending lately?',
     'Where could I realistically cut back?',
-    'How does my spending compare to the prior 30 days?',
+    'How can I maximize my savings from these expenses?',
   ]
 
   if (totalRecurringMonthly > 0) {
@@ -25,8 +25,17 @@ export function buildDashboardSuggestedPrompts() {
   return [
     'Will I make it to payday at this week’s pace?',
     'What’s left after known bills, and what’s my one move?',
-    'Summarize my financial situation in plain English',
-    'Can I afford a $40 purchase before payday?',
+    'Plan a night out with friends on what I can actually spend',
+    'How can I maximize my savings with what I’m spending now?',
+  ]
+}
+
+export function buildEverydayMoneySuggestedPrompts() {
+  return [
+    'How do I file my taxes online — walk me through it?',
+    'Plan a night out with friends on what I can actually spend',
+    'How can I maximize my savings with what I’m spending now?',
+    'What’s the simplest way to start an emergency fund?',
   ]
 }
 

@@ -34,6 +34,7 @@ export const cashFlowForecastQueryKey = ['dashboard', 'forecast']
 export const GENERAL_CHAT_KEY = 'general'
 
 export const chatQueryKey = (threadId) => ['chat', threadId ?? GENERAL_CHAT_KEY]
+export const chatLimitsQueryKey = ['chat', 'limits']
 
 /**
  * After connect, disconnect, or sync — refresh every surface that depends on

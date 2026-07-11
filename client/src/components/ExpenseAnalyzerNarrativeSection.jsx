@@ -15,6 +15,7 @@ function ExpenseAnalyzerNarrativeSection({
   narrativeMeta,
   totalRecurringMonthly,
   latestInsightId,
+  onChatError,
 }) {
   const [chatExpanded, setChatExpanded] = useState(false)
   const fingerprint = narrativeMeta?.fingerprint
@@ -154,6 +155,7 @@ function ExpenseAnalyzerNarrativeSection({
             insightId={latestInsightId}
             expanded={chatExpanded}
             onExpandedChange={setChatExpanded}
+            onError={onChatError}
             suggestedPrompts={suggestedPrompts}
             contextLabel="Uses your synced transactions, recurring charges, and category breakdown."
           />

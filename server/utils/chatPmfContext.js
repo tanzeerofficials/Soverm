@@ -20,6 +20,9 @@ function roundCurrency(amount) {
 
 /**
  * Pure: slim weekly review for the chat prompt (keeps tokens down).
+ *
+ * Keeps billDefense + itemized bills until payday so Ask Soverm can give
+ * concrete "cancel/keep" and "can I afford X before payday?" answers.
  */
 export function slimWeeklyReviewForChat(review) {
   if (!review) {
@@ -43,6 +46,12 @@ export function slimWeeklyReviewForChat(review) {
           daysUntilPayday: review.whatsLeft.daysUntilPayday ?? null,
           nextPaydayOn: review.whatsLeft.nextPaydayOn ?? null,
           billsUntilPaydayTotal: roundCurrency(review.whatsLeft.billsUntilPaydayTotal),
+          bills: (review.whatsLeft.bills ?? []).slice(0, 8).map((bill) => ({
+            date: bill.date ?? null,
+            merchant: bill.merchant ?? null,
+            amount: roundCurrency(bill.amount),
+            cadence: bill.cadence ?? null,
+          })),
         }
       : null,
     runwayCoach: review.runwayCoach
@@ -59,6 +68,16 @@ export function slimWeeklyReviewForChat(review) {
     move: review.move
       ? { title: review.move.title, detail: review.move.detail, id: review.move.id }
       : null,
+    billDefense: (review.billDefense ?? []).slice(0, 5).map((finding) => ({
+      type: finding.type ?? null,
+      tone: finding.tone ?? null,
+      merchant: finding.merchant ?? null,
+      title: finding.title ?? null,
+      detail: finding.detail ?? null,
+      monthlyEquivalent: roundCurrency(finding.monthlyEquivalent),
+      percentIncrease: finding.percentIncrease ?? null,
+      amountDelta: roundCurrency(finding.amountDelta),
+    })),
     followUps: (review.followUps ?? []).slice(0, 3).map((item) => ({
       summary: item.summary,
       status: item.status,
@@ -115,6 +134,7 @@ export function buildUserMemoryForChat({
   whatsLeft = null,
   categorySoftLimits = [],
   savingTrackers = [],
+  spendingCap = null,
   problemCategories = [],
   openActions = [],
   recentResolvedActions = [],
@@ -136,12 +156,26 @@ export function buildUserMemoryForChat({
           daysUntilPayday: whatsLeft.daysUntilPayday ?? null,
         }
       : { configured: false },
+    spendingCap: spendingCap
+      ? {
+          configured: Boolean(spendingCap.configured),
+          monthlyBudget: roundCurrency(spendingCap.monthlyBudget),
+          spentThisMonth: roundCurrency(spendingCap.spentThisMonth),
+          remaining: roundCurrency(spendingCap.remaining),
+          safeToSpend: roundCurrency(spendingCap.safeToSpend),
+          percentUsed: spendingCap.percentUsed ?? null,
+          isOverBudget: Boolean(spendingCap.isOverBudget),
+        }
+      : { configured: false },
     problemCategories: problemCategories.slice(0, 3),
     softLimits: (categorySoftLimits ?? []).slice(0, 5).map((limit) => ({
       category: limit.category,
       monthlyLimit: roundCurrency(limit.monthlyLimit ?? limit.monthly_limit),
       spentThisMonth: roundCurrency(limit.spentThisMonth ?? limit.spent_this_month),
-      status: limit.status ?? null,
+      remaining: roundCurrency(limit.remaining),
+      percentUsed: limit.percentUsed ?? null,
+      isOver: Boolean(limit.isOver),
+      isWarning: Boolean(limit.isWarning),
     })),
     goals: (savingTrackers ?? []).slice(0, 3).map((tracker) => ({
       name: tracker.name,
@@ -152,7 +186,7 @@ export function buildUserMemoryForChat({
     recentResolvedActions: recentResolvedActions.slice(0, 5),
     priorWeekFollowUps: followUps.slice(0, 3),
     coachingNote:
-      'When relevant, refer back to payday, open actions, soft limits, and prior follow-ups ("as we talked about…") instead of starting from scratch.',
+      'When relevant, refer back to payday, open actions, soft limits, spending caps, and prior follow-ups ("as we talked about…") instead of starting from scratch.',
   }
 }
 
@@ -209,6 +243,17 @@ export async function loadChatPmfContext(userId, { liveMonthOverMonth = null } =
     whatsLeft: tracker?.whatsLeftUntilPayday ?? weeklyRaw?.whatsLeft ?? null,
     categorySoftLimits: tracker?.categorySoftLimits ?? [],
     savingTrackers: tracker?.savingTrackers ?? [],
+    spendingCap: tracker
+      ? {
+          configured: Boolean(tracker.monthlyBudget != null),
+          monthlyBudget: tracker.monthlyBudget,
+          spentThisMonth: tracker.spentThisMonth,
+          remaining: tracker.remainingBudget,
+          safeToSpend: tracker.safeToSpend,
+          percentUsed: tracker.percentUsed,
+          isOverBudget: tracker.isOverBudget,
+        }
+      : null,
     problemCategories: problemCategoriesFromMom(liveMonthOverMonth),
     openActions,
     recentResolvedActions,

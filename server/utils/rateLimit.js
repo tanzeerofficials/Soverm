@@ -15,10 +15,18 @@ import { reportServerError } from './sentry.js'
 
 export { CHAT_HOURLY_LIMIT, PRO_DAILY_INSIGHT_CEILING }
 
-function rateLimitResponse(res, { message }) {
+function rateLimitResponse(res, { message, status = null }) {
   return res.status(429).json({
     error: 'rate_limit_exceeded',
     message,
+    ...(status
+      ? {
+          remaining: status.remaining,
+          limit: status.limit,
+          count: status.count,
+          retryAfterSeconds: status.retryAfterSeconds,
+        }
+      : {}),
   })
 }
 
@@ -89,6 +97,7 @@ export function chatRateLimitMiddleware() {
       if (!status.allowed) {
         return rateLimitResponse(res, {
           message: status.message,
+          status,
         })
       }
       next()

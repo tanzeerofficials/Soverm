@@ -490,6 +490,7 @@ function ExpenseAnalyzerPage() {
                   narrativeMeta={narrativeMeta}
                   totalRecurringMonthly={totalRecurringMonthly}
                   latestInsightId={latestInsightId}
+                  onChatError={(message) => showToast(message, 'error')}
                 />
               ) : (
                 <div className="rounded-xl border border-border-default bg-surface px-6 py-12 text-center">

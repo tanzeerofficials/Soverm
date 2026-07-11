@@ -4,14 +4,33 @@ import { useQueryClient } from '@tanstack/react-query'
 import { buildQuickQuestions } from '../lib/insightDisplay.js'
 import { sendChatMessageAndRefresh } from '../lib/sendChatMessage.js'
 
-function InsightQuickQuestions({ insightId, insight, onError, onExpandChat }) {
+/*
+ * Quick question chips under an insight.
+ *
+ * Two modes:
+ * - Floating chat: onAskQuestion(question) opens the modal and auto-sends
+ * - Inline chat: expand the panel, then send into the same thread
+ */
+function InsightQuickQuestions({
+  insightId,
+  insight,
+  onError,
+  onExpandChat,
+  onAskQuestion = null,
+}) {
   const { getToken } = useAuth()
   const queryClient = useQueryClient()
   const [sendingQuestion, setSendingQuestion] = useState(null)
   const questions = buildQuickQuestions(insight)
+  const handOffToFloating = typeof onAskQuestion === 'function'
 
   async function handleSend(question) {
     if (sendingQuestion) {
+      return
+    }
+
+    if (handOffToFloating) {
+      onAskQuestion(question)
       return
     }
 

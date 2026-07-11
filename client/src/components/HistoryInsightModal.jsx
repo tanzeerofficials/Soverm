@@ -5,10 +5,14 @@
  * so chat, actions, and summary behave exactly like the dashboard.
  */
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import InsightCard from './InsightCard.jsx'
+import { useFocusTrap } from '../hooks/useFocusTrap.js'
 
 function HistoryInsightModal({ isOpen, insight, onClose, onChatError }) {
+  const dialogRef = useRef(null)
+  useFocusTrap(isOpen && Boolean(insight), dialogRef)
+
   useEffect(() => {
     if (!isOpen) {
       return
@@ -41,7 +45,8 @@ function HistoryInsightModal({ isOpen, insight, onClose, onChatError }) {
       role="presentation"
     >
       <div
-        className="relative flex h-full w-full flex-col overflow-y-auto bg-app sm:h-auto sm:max-h-[90vh] sm:max-w-3xl sm:rounded-xl sm:border sm:border-border-default sm:shadow-xl"
+        ref={dialogRef}
+        className="relative flex h-dvh max-h-dvh w-full flex-col overflow-y-auto overscroll-y-contain bg-app sm:h-auto sm:max-h-[90vh] sm:w-full sm:max-w-3xl sm:rounded-xl sm:border sm:border-border-default sm:shadow-xl"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -53,6 +58,7 @@ function HistoryInsightModal({ isOpen, insight, onClose, onChatError }) {
             onClick={onClose}
             className="flex h-9 w-9 items-center justify-center rounded-lg text-fg-muted transition hover:bg-surface-elevated hover:text-fg"
             aria-label="Close insight"
+            data-autofocus="true"
           >
             <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />

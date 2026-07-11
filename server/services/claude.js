@@ -862,19 +862,83 @@ LIVE DATA RULES — use this block for spending, subscriptions, categories, acco
 - DEFAULT FRAME for general questions: start from weeklyReview (what's left until payday, runwayCoach, one risk, one move) and monthCondition.condition grade — not generic budgeting advice
 - Prefer weeklyReview.whatsLeft / runwayCoach over raw balances for "can I afford X?" and "how am I doing this week?"
 - Prefer monthCondition for "how is this month going?" / accountant-style condition questions
-- userMemory compounds payday, problem categories, soft limits, goals, and prior actions — say "as we talked about…" when referencing them
+- userMemory compounds payday, problem categories, soft limits, spendingCap, goals, and prior actions — say "as we talked about…" when referencing them
 - Prefer liveMonthOverMonth and expenseAnalyzer over the older insight snapshot for "right now" category/subscription questions
 - expenseAnalyzer.categoryBreakdown has per-category MoM deltas — use for "which category went up/down most"
 - expenseAnalyzer.topMover is the largest significant category change (≥5%)
 - expenseAnalyzer.confirmedRecurring = high-confidence subscriptions in totals; cite monthlyEquivalent, annualEquivalent, confidenceLabel, sourceLabel
 - expenseAnalyzer.reviewRecurring = uncertain patterns (Likely/Uncertain) — NOT in confirmed totals; explain why if asked
+- weeklyReview.billDefense and expenseAnalyzer.billDefense flag price hikes, trials, duplicates — check these first for subscription/bill questions
+- weeklyReview.whatsLeft.bills lists individual bills before payday — use them when explaining what's left
+- userMemory.softLimits include isOver / isWarning / remaining / percentUsed — cite these for category-cap questions
+- userMemory.spendingCap is the monthly spending tracker (safeToSpend) when configured
 - dataScope.disconnectedAccountPolicy explains why old charges from disconnected banks disappear from recurring/category views
 - If dataScope.disconnectedOrphanedTransactionCountLast90Days > 0, mention disconnected-account filtering when user asks why old merchants/subscriptions vanished
 - accounts.items: credit cards (isCredit true) show balance owed; checking/savings show available cash; netTotalBalance nets them
+- For discretionary purchases, prefer checking/savings cash — not netTotalBalance (which includes credit debt)
 - recentActivity is connected accounts only — use for merchant-specific purchase questions
 - openActions / insightActions are the user's to-dos — reference when they ask what to do next
-- Never say data is unavailable when this block contains it; only cite figures that appear here or in the insight snapshot`,
+- Name the time window when citing numbers: "this calendar week", "last 30 days", or the calendar month label — never conflate them
+- Never say data is unavailable when this block contains it; only cite figures that appear here or in the insight snapshot
+
+ANSWER SHAPE (paycheck-to-paycheck users — make advice usable today):
+- For "can I afford $X?": cite whatsLeft.amount, billsUntilPaydayTotal, daysUntilPayday; give yes / no / caution with dollars remaining after the purchase. If a soft limit isOver/isWarning for that category, say so.
+- For subscription/bill questions: check billDefense + confirmedRecurring first; when recommending cancel, cite monthly AND annual savings ($Y/mo, $Z/yr)
+- End actionable answers with ONE specific next step the user can do today (under 15 words), tied to an openAction when one exists
+- If weeklyReview.sparse is true or payday is not configured, say what setup unlocks better answers (set payday on Your week)
+- Do not recommend payday loans, cash advances, or skipping rent/mortgage/utilities. Prefer concrete cuts from their recurring charges and open actions.
+- Be direct but not shaming — tight budgets are often structural, not a moral failure
+- Tax, legal, investment, or insurance questions: share general knowledge, then one short line that this is not licensed advice`,
   }
+}
+
+export const COMMON_LIFE_QUESTIONS_PLAYBOOK = `
+COMMON LIFE QUESTIONS — answer these fully; do not deflect or only say "check your dashboard":
+You are also a practical money coach for everyday life. When the user asks how-to, planning, or general money questions, lead with a clear usable answer, then personalize with their live numbers when available.
+
+1) HOW-TO / PROCESS (taxes online, open a bank account, dispute a charge, build credit, set up autopay):
+- Give numbered steps a beginner can follow today (tools, order of operations, what to gather)
+- Call out common pitfalls and "skip this if…" notes
+- For US taxes online: walk through Free File / IRS Free File Fillable Forms vs paid software (TurboTax, H&R Block, Credit Karma Tax) based on complexity; list docs to gather (W-2, 1099s, last year's return); note deadlines and refunds vs payments; end with one short "not a tax preparer" line
+- Never invent jurisdiction-specific legal requirements — if state/country matters and unknown, ask once, then give the default US federal path plus how to check their state
+
+2) SPENDING PLANS (night out with friends, weekend trip, birthday gift, dinner date):
+- First check weeklyReview.whatsLeft / bills until payday / soft limits / spendingCap
+- Propose 2–3 budget tiers (lean / comfortable / stretch) with dollar caps grounded in what's left
+- Break the plan into: total budget, per-person or per-activity split, what to cut if they overspend, and a hard stop amount
+- If they can't afford it this week, say so plainly and offer a cheaper alternative or "wait until payday" option — never guilt-trip
+
+3) MAXIMIZE SAVINGS / GET AHEAD:
+- Use their data: confirmedRecurring (cancel/downgrade candidates with $/mo and $/yr), top categories and problemCategories, openActions, goals/spendingCap
+- Give a ranked plan: (a) quick wins this week, (b) recurring cuts, (c) automation (pay-yourself-first on payday), (d) one habit change
+- Quantify impact where possible ("canceling X frees ~$Y/mo")
+- If savings goals exist in userMemory.goals, tie the plan to those targets
+
+4) DEBT, BUDGETING METHODS, INVESTING BASICS (avalanche vs snowball, 50/30/20, emergency fund, Roth IRA basics):
+- Explain the method clearly in plain English
+- Then map it onto their situation with live numbers (balances, what's left, subscriptions)
+- Keep investing/tax talk educational; one-line disclaimer that you're not a licensed advisor
+
+5) CLARIFYING QUESTIONS:
+- Ask at most ONE clarifying question only when a key fact is missing (city/state for taxes, group size for night out, target savings amount)
+- Otherwise make a reasonable assumption, state it, and proceed with a complete answer`
+
+/*
+ * Shared conversation-style rules for both general and insight-scoped chat.
+ */
+function buildChatConversationStyleBlock({ insightScoped = false } = {}) {
+  const lengthRule = insightScoped
+    ? 'Match answer length to the question: quick questions get 2-4 sentences; complex ones can use paragraphs, bullets, or numbered steps — but for money decisions (afford, cancel, cut) and common life questions (taxes, night out, savings), always include usable steps or dollars and one next step'
+    : 'Match answer length to the question — but for money decisions (afford, cancel, cut) and common life questions (taxes, night out, savings), always include usable steps or dollars and one next step'
+
+  return `CONVERSATION STYLE:
+- Natural back-and-forth — ask a clarifying question when it would genuinely help
+- ${lengthRule}
+- Everyday / how-to / planning questions: answer completely first, then connect to their live numbers when relevant — never brush them off with "I only answer about your transactions"
+- Use markdown when it improves readability (bold key numbers, numbered steps, short lists)
+- Be honest but constructive — never shame
+- Not a licensed advisor — brief disclaimer when the question needs licensed advice (tax, legal, investments, insurance); still share clear general knowledge
+${COMMON_LIFE_QUESTIONS_PLAYBOOK}`
 }
 
 /*
@@ -909,6 +973,7 @@ export function buildInsightChatSystemPrompt({
   chatFinancialContext = null,
   expenseAnalyzerContext = null,
   insightActions = [],
+  beforeYouSpendVerdict = null,
 }) {
   const resolvedChatContext =
     chatFinancialContext ??
@@ -931,6 +996,18 @@ export function buildInsightChatSystemPrompt({
     ? formatInsightGeneratedAt(resolvedChatContext.capturedAt)
     : null
 
+  const beforeYouSpendBlock = beforeYouSpendVerdict
+    ? `
+
+BEFORE YOU SPEND VERDICT (deterministic — lead with this for affordability questions):
+${JSON.stringify(beforeYouSpendVerdict, null, 2)}
+
+BEFORE YOU SPEND RULES:
+- Lead your answer with this verdict (title + detail). Do not invent a conflicting yes/no.
+- Explain whatsLeftAfter and any categoryLimit / reasons in plain English
+- Then add one practical next step or cheaper alternative if the verdict is caution/risk`
+    : ''
+
   /*
    * General chat (no insight yet): still ground answers in live synced data.
    * Why: users should be able to ask Soverm before generating their first insight.
@@ -942,6 +1019,7 @@ DEFAULT JOB (unless they clearly ask something else):
 - Ground answers in this week's remaining money (weeklyReview.whatsLeft / runwayCoach), the one risk + one move, openActions, and this month's condition grade (monthCondition).
 - Prefer "what's left until payday" coaching over generic budgeting lectures.
 - When userMemory has prior actions, soft limits, or payday facts, refer back ("as we talked about…").
+- If they ask a how-to, planning, or general life-money question (taxes, night out, maximize savings, debt methods), follow the COMMON LIFE QUESTIONS playbook — answer fully, then personalize.
 
 DATA SOURCES:
 1. Live financial snapshot (below) — weekly review, month condition, user memory, balances, 30-day MoM, recent transactions, Expense Analyzer.
@@ -955,13 +1033,8 @@ TRUST AND ACCURACY:
 - If data is missing, say so plainly instead of guessing
 - When giving opinions, ground them in their actual numbers
 
-CONVERSATION STYLE:
-- Natural back-and-forth — ask a clarifying question when it would genuinely help
-- Match answer length to the question
-- General finance questions: answer fully and practically, then connect to their situation when relevant
-- Use markdown when it improves readability
-- Be honest but constructive
-- Not a licensed advisor — brief disclaimer only when the question needs licensed advice
+${buildChatConversationStyleBlock({ insightScoped: false })}
+${beforeYouSpendBlock}
 
 TIMING:
 ${liveCapturedLabel ? `- Live financial snapshot refreshed ${liveCapturedLabel}.` : '- Live financial snapshot timing is unknown.'}
@@ -974,7 +1047,12 @@ Prior messages in this thread are in the messages array — maintain continuity 
 FORMATTING:
 - Write conversationally, like a knowledgeable friend who knows their numbers
 - Dollar amounts written naturally ($1,072.80 not 1072.8 in prose)
-- Short paragraphs beat walls of text; structure longer answers clearly`
+- Short paragraphs beat walls of text; structure longer answers clearly
+- For ranked plans (night out budgets, savings steps, tax how-tos with 2+ steps), after your markdown answer append a fenced block:
+\`\`\`soverm-plan
+{"title":"short plan title","summary":"one line","cards":[{"title":"...","detail":"...","tone":"fine|warning|danger|neutral","amount":"$40","label":"lean"}]}
+\`\`\`
+  Use tone/amount/label when useful. Do not put the fence in the middle of prose.`
   }
 
   const generatedAtLabel = formatInsightGeneratedAt(generatedAt)
@@ -992,6 +1070,7 @@ DEFAULT JOB (unless they clearly ask something else):
 - Ground answers in this week's remaining money (weeklyReview.whatsLeft / runwayCoach), the one risk + one move, openActions, and this month's condition grade (monthCondition).
 - Prefer "what's left until payday" coaching over generic budgeting lectures.
 - When userMemory has prior actions, soft limits, or payday facts, refer back ("as we talked about…").
+- If they ask a how-to, planning, or general life-money question (taxes, night out, maximize savings, debt methods), follow the COMMON LIFE QUESTIONS playbook — answer fully, then personalize.
 
 DATA SOURCES — pick the right one for each question:
 1. Live financial snapshot (below) — weekly review, month condition, user memory, balances, live 30-day MoM, recent transactions, Expense Analyzer. Use this for "what's happening now", subscriptions, categories, recent purchases, and affordability questions.
@@ -1008,13 +1087,8 @@ TRUST AND ACCURACY:
 - If data is missing (e.g. no income synced), say so plainly instead of guessing
 - When giving opinions ("is this too high?"), ground them in their actual numbers and explain your reasoning
 
-CONVERSATION STYLE:
-- Natural back-and-forth — ask a clarifying question when it would genuinely help
-- Match answer length to the question: quick questions get 2-4 sentences; complex ones can use paragraphs, bullets, or numbered steps
-- General finance questions (Roth IRA, debt payoff, budgeting methods): answer fully and practically, then connect to their situation when relevant
-- Use markdown when it improves readability (bold key numbers, lists for options)
-- Be honest — don't sugarcoat bad habits, but stay constructive
-- Not a licensed advisor — brief disclaimer only when the question needs licensed advice (tax filing, legal contracts, investment management); still share general knowledge
+${buildChatConversationStyleBlock({ insightScoped: true })}
+${beforeYouSpendBlock}
 
 TIMING:
 - Insight snapshot reflects finances as of ${generatedAtLabel}. ${snapshotTimingNote}
@@ -1032,14 +1106,19 @@ Prior messages in this thread are in the messages array — maintain continuity 
 FORMATTING:
 - Write conversationally, like a knowledgeable friend who knows their numbers
 - Dollar amounts written naturally ($1,072.80 not 1072.8 in prose)
-- Short paragraphs beat walls of text; structure longer answers clearly`
+- Short paragraphs beat walls of text; structure longer answers clearly
+- For ranked plans (night out budgets, savings steps, tax how-tos with 2+ steps), after your markdown answer append a fenced block:
+\`\`\`soverm-plan
+{"title":"short plan title","summary":"one line","cards":[{"title":"...","detail":"...","tone":"fine|warning|danger|neutral","amount":"$40","label":"lean"}]}
+\`\`\`
+  Use tone/amount/label when useful. Do not put the fence in the middle of prose.`
 }
 
 export const CHAT_HISTORY_MESSAGE_LIMIT = 30
 export const CHAT_MAX_OUTPUT_TOKENS = 2048
 
 /*
- * askFinancialQuestion(originalInsight, chatHistory, newQuestion, { generatedAt, chatFinancialContext })
+ * askFinancialQuestion(originalInsight, chatHistory, newQuestion, options)
  *
  * Conversational follow-up — plain text, grounded in live financial data + insight snapshot.
  */
@@ -1047,7 +1126,113 @@ export async function askFinancialQuestion(
   originalInsight,
   chatHistory,
   newQuestion,
-  { generatedAt, chatFinancialContext = null, expenseAnalyzerContext = null, insightActions = [] } = {}
+  options = {}
+) {
+  const {
+    generatedAt,
+    chatFinancialContext = null,
+    expenseAnalyzerContext = null,
+    insightActions = [],
+    beforeYouSpendVerdict = null,
+  } = options
+
+  const { systemPrompt, messages } = buildChatCompletionPayload(
+    originalInsight,
+    chatHistory,
+    newQuestion,
+    {
+      generatedAt,
+      chatFinancialContext,
+      expenseAnalyzerContext,
+      insightActions,
+      beforeYouSpendVerdict,
+    }
+  )
+
+  try {
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: CHAT_MAX_OUTPUT_TOKENS,
+      temperature: 0.4,
+      system: systemPrompt,
+      messages,
+    })
+
+    return response.content[0].text
+  } catch (err) {
+    console.error('Failed to answer financial question:', err.message)
+    throw new Error(`Claude chat response failed: ${err.message}`)
+  }
+}
+
+/*
+ * What this does: streams Claude tokens for Ask Soverm.
+ * Why: long answers feel fast on mobile when text appears as it generates.
+ * How: yields text deltas via onDelta; returns the full reply when done.
+ */
+export async function askFinancialQuestionStream(
+  originalInsight,
+  chatHistory,
+  newQuestion,
+  options = {},
+  { onDelta } = {}
+) {
+  const {
+    generatedAt,
+    chatFinancialContext = null,
+    expenseAnalyzerContext = null,
+    insightActions = [],
+    beforeYouSpendVerdict = null,
+  } = options
+
+  const { systemPrompt, messages } = buildChatCompletionPayload(
+    originalInsight,
+    chatHistory,
+    newQuestion,
+    {
+      generatedAt,
+      chatFinancialContext,
+      expenseAnalyzerContext,
+      insightActions,
+      beforeYouSpendVerdict,
+    }
+  )
+
+  try {
+    const stream = anthropic.messages.stream({
+      model: 'claude-sonnet-4-6',
+      max_tokens: CHAT_MAX_OUTPUT_TOKENS,
+      temperature: 0.4,
+      system: systemPrompt,
+      messages,
+    })
+
+    let fullText = ''
+
+    stream.on('text', (_delta, snapshot) => {
+      fullText = snapshot
+      onDelta?.(snapshot, snapshot)
+    })
+
+    await stream.finalMessage()
+    return fullText
+  } catch (err) {
+    console.error('Failed to stream financial question:', err.message)
+    throw new Error(`Claude chat response failed: ${err.message}`)
+  }
+}
+
+function buildChatCompletionPayload(
+  originalInsight,
+  chatHistory,
+  newQuestion,
+  {
+    generatedAt,
+    chatFinancialContext = null,
+    expenseAnalyzerContext = null,
+    insightActions = [],
+    beforeYouSpendVerdict = null,
+  } = {}
 ) {
   const historyMessages = chatHistory.map(({ role, content }) => ({ role, content }))
 
@@ -1068,22 +1253,11 @@ export async function askFinancialQuestion(
     chatFinancialContext,
     expenseAnalyzerContext,
     insightActions,
+    beforeYouSpendVerdict,
   })
 
-  try {
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: CHAT_MAX_OUTPUT_TOKENS,
-      system: systemPrompt,
-      messages: [
-        ...historyMessages,
-        { role: 'user', content: newQuestion },
-      ],
-    })
-
-    return response.content[0].text
-  } catch (err) {
-    console.error('Failed to answer financial question:', err.message)
-    throw new Error(`Claude chat response failed: ${err.message}`)
+  return {
+    systemPrompt,
+    messages: [...historyMessages, { role: 'user', content: newQuestion }],
   }
 }

@@ -9,6 +9,7 @@ import { useState } from 'react'
 import HeadlineTypeBadge from './HeadlineTypeBadge.jsx'
 import ActionChecklist from './ActionChecklist.jsx'
 import ChatPanel from './ChatPanel.jsx'
+import ChatWithCfoButton from './ChatWithCfoButton.jsx'
 import InsightQuickQuestions from './InsightQuickQuestions.jsx'
 import StatDeltaBadge from './StatDeltaBadge.jsx'
 import { buildDashboardSuggestedPrompts } from '../lib/chatSuggestedPrompts.js'
@@ -56,12 +57,14 @@ function InsightCard({
   onChatError,
   chatExpanded: controlledChatExpanded,
   onChatExpandedChange,
+  onOpenFloatingChat = null,
   showActions = true,
 }) {
   const [expanded, setExpanded] = useState(false)
   const [internalChatExpanded, setInternalChatExpanded] = useState(false)
   const chatExpanded = controlledChatExpanded ?? internalChatExpanded
   const setChatExpanded = onChatExpandedChange ?? setInternalChatExpanded
+  const useFloatingChat = typeof onOpenFloatingChat === 'function'
 
   if (!insight) {
     return (
@@ -182,21 +185,35 @@ function InsightCard({
         <ActionChecklist actions={insight.actions} />
       )}
       {insight.id && (
-        <>
-          <ChatPanel
-            insightId={insight.id}
-            onError={onChatError}
-            expanded={chatExpanded}
-            onExpandedChange={setChatExpanded}
-            suggestedPrompts={buildDashboardSuggestedPrompts()}
-          />
-          <InsightQuickQuestions
-            insightId={insight.id}
-            insight={insight}
-            onError={onChatError}
-            onExpandChat={() => setChatExpanded(true)}
-          />
-        </>
+        useFloatingChat ? (
+          <>
+            <section id="insight-chat" className="mt-4 scroll-mt-28">
+              <ChatWithCfoButton onClick={() => onOpenFloatingChat()} />
+            </section>
+            <InsightQuickQuestions
+              insightId={insight.id}
+              insight={insight}
+              onError={onChatError}
+              onAskQuestion={(question) => onOpenFloatingChat(question)}
+            />
+          </>
+        ) : (
+          <>
+            <ChatPanel
+              insightId={insight.id}
+              onError={onChatError}
+              expanded={chatExpanded}
+              onExpandedChange={setChatExpanded}
+              suggestedPrompts={buildDashboardSuggestedPrompts()}
+            />
+            <InsightQuickQuestions
+              insightId={insight.id}
+              insight={insight}
+              onError={onChatError}
+              onExpandChat={() => setChatExpanded(true)}
+            />
+          </>
+        )
       )}
     </>
   )

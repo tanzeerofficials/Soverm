@@ -109,6 +109,16 @@ export function buildExpenseAnalyzerChatContextFromPayload(payload) {
     },
     topMover: payload.topMover ?? null,
     overallSpending: payload.overallSpending ?? null,
+    billDefense: (payload.billDefense ?? []).slice(0, 6).map((finding) => ({
+      type: finding.type ?? null,
+      tone: finding.tone ?? null,
+      merchant: finding.merchant ?? null,
+      title: finding.title ?? null,
+      detail: finding.detail ?? null,
+      monthlyEquivalent: roundChatCurrency(finding.monthlyEquivalent ?? 0),
+      percentIncrease: finding.percentIncrease ?? null,
+      amountDelta: finding.amountDelta != null ? roundChatCurrency(finding.amountDelta) : null,
+    })),
   }
 }
 

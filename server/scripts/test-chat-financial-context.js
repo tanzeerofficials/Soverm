@@ -35,6 +35,14 @@ try {
     'chat.js must load unified chat financial context'
   )
   assert(
+    chatRouteSource.includes("router.get('/limits'"),
+    'chat.js must expose GET /limits for remaining hourly messages'
+  )
+  assert(
+    chatRouteSource.includes('getChatRateLimitStatus'),
+    'chat.js must report chatLimit after sends'
+  )
+  assert(
     chatRouteSource.includes('chatFinancialContext'),
     'chat.js must pass chatFinancialContext to askFinancialQuestion'
   )

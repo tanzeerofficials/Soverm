@@ -65,7 +65,6 @@ import {
   filterDismissedAttentionItems,
 } from '../lib/dashboardAttentionDismissals.js'
 import { markNotificationRead } from '../lib/fetchNotifications.js'
-import { scrollToInsightChat } from '../lib/scrollToInsightChat.js'
 import { syncTransactions } from '../lib/syncTransactions.js'
 import { consumeFirstConnectCelebration } from '../lib/firstConnectCelebration.js'
 import { disconnectAccount, getDisconnectConfirmMessage } from '../lib/disconnectAccount.js'
@@ -103,10 +102,9 @@ function DashboardPage() {
   const [insightError, setInsightError] = useState(null)
   const [insightLoading, setInsightLoading] = useState(false)
   const [limitReached, setLimitReached] = useState(false)
-  const [chatExpanded, setChatExpanded] = useState(false)
   const [floatingChatOpen, setFloatingChatOpen] = useState(false)
   const [floatingChatDraft, setFloatingChatDraft] = useState('')
-  const [pendingChatScroll, setPendingChatScroll] = useState(false)
+  const [floatingChatAutoSend, setFloatingChatAutoSend] = useState(false)
   const [selectedRange, setSelectedRange] = useState('30d')
   const { showToast } = useToastContext()
   const [accountToDelete, setAccountToDelete] = useState(null)
@@ -212,17 +210,31 @@ function DashboardPage() {
     }
 
     /*
-     * Deep link from navbar / Expense Analyzer: always open floating chat.
-     * ChatPanel uses the latest insight thread when available, otherwise general.
+     * Wait until dashboard data has settled so FloatingCfoChat picks the
+     * correct thread (insight vs general) on first open — otherwise the
+     * modal remounts mid-conversation when latestInsight arrives.
+     *
+     * When a prompt is present (Ask Soverm from a subscription / bill),
+     * auto-send it so the user doesn't have to tap Send again.
      */
-    setFloatingChatDraft(searchParams.get('prompt') || '')
+    if (isPending && dashboardData === undefined) {
+      return
+    }
+
+    const prompt = searchParams.get('prompt') || ''
+    const shouldAutoSend =
+      Boolean(prompt) && searchParams.get('send') !== '0'
+
+    setFloatingChatDraft(prompt)
+    setFloatingChatAutoSend(shouldAutoSend)
     setFloatingChatOpen(true)
 
     const nextParams = new URLSearchParams(searchParams)
     nextParams.delete('chat')
     nextParams.delete('prompt')
+    nextParams.delete('send')
     setSearchParams(nextParams, { replace: true })
-  }, [searchParams, setSearchParams])
+  }, [searchParams, setSearchParams, isPending, dashboardData])
 
   useEffect(() => {
     if (searchParams.get('focus') !== 'balance') {
@@ -285,15 +297,6 @@ function DashboardPage() {
     nextParams.delete('quickTool')
     setSearchParams(nextParams, { replace: true })
   }, [searchParams, setSearchParams])
-
-  useEffect(() => {
-    if (!pendingChatScroll || !dashboardData?.latestInsight?.id) {
-      return
-    }
-
-    scrollToInsightChat()
-    setPendingChatScroll(false)
-  }, [pendingChatScroll, dashboardData?.latestInsight?.id])
 
   const accountCount = dashboardData?.accounts?.length ?? 0
   const hasAccounts = accountCount > 0
@@ -513,17 +516,11 @@ function DashboardPage() {
 
   function handleNavbarChat() {
     /*
-     * What this does: opens Ask Soverm from the navbar.
-     * Prefer scrolling to the insight thread when one exists; otherwise open
-     * the floating general chat (no insight required).
+     * Always open the floating Ask Soverm modal — one chat surface on the
+     * dashboard (same as deep links from Expense Analyzer / Weekly Review).
      */
-    if (dashboardData?.latestInsight?.id) {
-      setChatExpanded(true)
-      setActiveTab(DASHBOARD_TABS.INSIGHT)
-      scrollToInsightChat()
-      return
-    }
-
+    setFloatingChatDraft('')
+    setFloatingChatAutoSend(false)
     setFloatingChatOpen(true)
   }
 
@@ -554,8 +551,11 @@ function DashboardPage() {
             <InsightCard
               insight={dashboardData?.latestInsight}
               onChatError={(message) => showToast(message, 'error')}
-              chatExpanded={chatExpanded}
-              onChatExpandedChange={setChatExpanded}
+              onOpenFloatingChat={(prompt = '') => {
+                setFloatingChatDraft(prompt || '')
+                setFloatingChatAutoSend(Boolean(prompt))
+                setFloatingChatOpen(true)
+              }}
               showActions={false}
             />
             {(dashboardData?.latestInsight?.actions?.length ?? 0) > 0 && (
@@ -945,9 +945,11 @@ function DashboardPage() {
             onClose={() => {
               setFloatingChatOpen(false)
               setFloatingChatDraft('')
+              setFloatingChatAutoSend(false)
             }}
             insightId={dashboardData?.latestInsight?.id}
             initialDraft={floatingChatDraft}
+            autoSendInitialDraft={floatingChatAutoSend}
             onChatError={(message) => showToast(message, 'error')}
           />
         </>
