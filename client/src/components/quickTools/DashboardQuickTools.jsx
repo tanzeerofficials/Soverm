@@ -25,6 +25,15 @@ function formatCurrency(amount) {
   }).format(amount)
 }
 
+/*
+ * Tab switcher for Quick tools.
+ *
+ * Why a grid on small screens:
+ * Five equal tabs in one row need horizontal scroll on phones.
+ * A 3-column wrap shows every tool at once (3 on the first row, 2 on the
+ * second) with short labels. From sm and up we switch back to a single
+ * equal-width row with the fuller labels.
+ */
 function QuickToolsTabBar({ activeTab, onChange }) {
   const tabs = [
     { id: QUICK_TOOL_TABS.RECENT, label: 'Recent', shortLabel: 'Recent' },
@@ -36,7 +45,7 @@ function QuickToolsTabBar({ activeTab, onChange }) {
 
   return (
     <div
-      className="flex gap-1 overflow-x-auto rounded-xl border border-border-default bg-app/60 p-1"
+      className="grid grid-cols-3 gap-1 rounded-xl border border-border-default bg-app/60 p-1 sm:flex"
       role="tablist"
       aria-label="Quick tools"
     >
@@ -51,7 +60,7 @@ function QuickToolsTabBar({ activeTab, onChange }) {
             aria-selected={isActive}
             aria-controls={`quick-tool-panel-${tab.id}`}
             onClick={() => onChange(tab.id)}
-            className={`min-h-10 min-w-[5.25rem] flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition sm:text-sm ${
+            className={`min-h-10 rounded-lg px-2 py-2 text-center text-xs font-semibold transition sm:min-w-0 sm:flex-1 sm:px-3 sm:text-sm ${
               isActive
                 ? 'bg-surface-elevated text-fg shadow-sm ring-1 ring-brand/30'
                 : 'text-fg-muted hover:bg-surface-elevated/60 hover:text-fg'

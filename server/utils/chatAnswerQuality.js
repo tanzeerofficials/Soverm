@@ -76,6 +76,48 @@ export function replyHasNextStep(reply) {
   return NEXT_STEP_RE.test(String(reply || ''))
 }
 
+const GENERIC_CLOSING_QUESTION_RE =
+  /\b(what do you think|does that help|let me know if you (have any )?questions|want me to explain further|anything else I can help|hope that helps)\b/i
+
+/**
+ * Last non-empty line of a reply — used to inspect engagement hooks.
+ */
+export function getReplyClosingLine(reply) {
+  const lines = String(reply || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+  return lines[lines.length - 1] ?? ''
+}
+
+/**
+ * True when the reply ends with a question mark (engagement hook or clarifying Q).
+ */
+export function replyEndsWithQuestion(reply) {
+  return /\?\s*$/.test(getReplyClosingLine(reply))
+}
+
+/**
+ * True when the closing line looks like a banned generic filler CTA.
+ */
+export function replyHasGenericClosingQuestion(reply) {
+  if (!replyEndsWithQuestion(reply)) {
+    return false
+  }
+  return GENERIC_CLOSING_QUESTION_RE.test(getReplyClosingLine(reply))
+}
+
+/**
+ * Normalize a closing question for "same hook twice" comparisons.
+ */
+export function normalizeClosingQuestion(reply) {
+  return getReplyClosingLine(reply)
+    .toLowerCase()
+    .replace(/[^a-z0-9\s?]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 /**
  * Find banned merchants that appear in the reply (case-insensitive whole word).
  */

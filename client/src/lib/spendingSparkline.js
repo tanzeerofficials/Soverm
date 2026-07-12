@@ -5,9 +5,18 @@ const RANGE_DAY_COUNTS = {
   '1y': 365,
 }
 
-function toDateKey(value) {
+/*
+ * Format a Date as YYYY-MM-DD in local calendar time.
+ * Avoids toISOString() which shifts the day near UTC midnight for US timezones
+ * and can make the sparkline total disagree with Cash Flow Spend.
+ */
+function toLocalDateKey(value) {
   if (!value) {
     return null
+  }
+
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+    return value.slice(0, 10)
   }
 
   const date = value instanceof Date ? value : new Date(value)
@@ -16,7 +25,10 @@ function toDateKey(value) {
     return null
   }
 
-  return date.toISOString().slice(0, 10)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 /*
@@ -30,7 +42,7 @@ export function fillSpendingSeries(sparseSeries = [], range = '30d') {
   const byDate = new Map()
 
   for (const row of sparseSeries) {
-    const key = toDateKey(row.date)
+    const key = toLocalDateKey(row.date)
 
     if (key) {
       byDate.set(key, Number(row.amount) || 0)
@@ -45,7 +57,7 @@ export function fillSpendingSeries(sparseSeries = [], range = '30d') {
   for (let offset = dayCount - 1; offset >= 0; offset -= 1) {
     const day = new Date(end)
     day.setDate(day.getDate() - offset)
-    const key = day.toISOString().slice(0, 10)
+    const key = toLocalDateKey(day)
 
     result.push({
       date: key,

@@ -1,11 +1,17 @@
 import {
   buildDeltaAriaLabel,
   DELTA_VS_LABEL,
+  getDeltaDisplayParts,
   toneForChange,
 } from '../lib/insightDisplay.js'
 
 function StatDeltaBadge({ delta, statType = 'spending', inline = false }) {
   if (!delta || typeof delta !== 'object' || !delta.direction) {
+    return null
+  }
+
+  const parts = getDeltaDisplayParts(delta)
+  if (!parts) {
     return null
   }
 
@@ -42,7 +48,7 @@ function StatDeltaBadge({ delta, statType = 'spending', inline = false }) {
     )
   }
 
-  if (delta.direction === 'flat') {
+  if (parts.direction === 'flat') {
     return renderPill(
       <>
         <span className="text-sm font-bold leading-none">steady</span>
@@ -54,46 +60,49 @@ function StatDeltaBadge({ delta, statType = 'spending', inline = false }) {
     )
   }
 
-  if (delta.direction === 'down') {
+  if (parts.isNew) {
     return renderPill(
       <>
-        <span aria-hidden="true">↓</span>
-        <span className="text-sm font-bold leading-none">{delta.percent}%</span>
+        <span className="text-sm font-bold leading-none">new</span>
         <span className="text-[11px] font-semibold leading-none opacity-90">
           {DELTA_VS_LABEL}
         </span>
       </>,
-      'down'
+      'up',
+      true
     )
   }
 
-  if (delta.direction === 'up') {
-    if (delta.percent === null || delta.percent === undefined) {
-      return renderPill(
-        <>
-          <span className="text-sm font-bold leading-none">new</span>
-          <span className="text-[11px] font-semibold leading-none opacity-90">
-            {DELTA_VS_LABEL}
-          </span>
-        </>,
-        'up',
-        true
-      )
-    }
+  const arrow = parts.direction === 'down' ? '↓' : '↑'
+  const magnitude = parts.timesLabel
+    ? parts.timesLabel
+    : parts.legacyPercent != null
+      ? `${parts.legacyPercent}%`
+      : null
 
-    return renderPill(
-      <>
-        <span aria-hidden="true">↑</span>
-        <span className="text-sm font-bold leading-none">{delta.percent}%</span>
+  if (!magnitude) {
+    return null
+  }
+
+  const moneyHint =
+    parts.changeLabel != null
+      ? `${parts.direction === 'down' ? '−' : '+'}${parts.changeLabel}`
+      : null
+
+  return renderPill(
+    <>
+      <span aria-hidden="true">{arrow}</span>
+      <span className="text-sm font-bold leading-none">{magnitude}</span>
+      {moneyHint ? (
+        <span className="text-[11px] font-semibold leading-none opacity-90">{moneyHint}</span>
+      ) : (
         <span className="text-[11px] font-semibold leading-none opacity-90">
           {DELTA_VS_LABEL}
         </span>
-      </>,
-      'up'
-    )
-  }
-
-  return null
+      )}
+    </>,
+    parts.direction
+  )
 }
 
 export default StatDeltaBadge

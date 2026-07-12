@@ -14,11 +14,7 @@ import {
   isValidIsoDate,
   isValidPayCadence,
 } from '../utils/paydayInference.js'
-
-const EXCLUDE_TRANSFER_FILTER = `
-  AND COALESCE(t.category, '') !~* 'transfer'
-  AND COALESCE(t.name, '') !~* '\\btransfer\\b'
-`
+import { EXCLUDE_INTERNAL_MOVES_FILTER } from '../utils/transactionFilters.js'
 
 function mapProfile(row, referenceDate = new Date()) {
   if (!row) {
@@ -85,7 +81,7 @@ export async function loadIncomeDeposits(userId, { lookbackDays = 120 } = {}) {
      WHERE t.user_id = $1
        AND (t.pending IS NOT TRUE)
        AND t.amount < 0
-       ${EXCLUDE_TRANSFER_FILTER}
+       ${EXCLUDE_INTERNAL_MOVES_FILTER}
        AND t.date >= (CURRENT_DATE - ($2::int || ' days')::interval)
      ORDER BY t.date ASC`,
     [userId, lookbackDays]

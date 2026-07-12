@@ -124,7 +124,7 @@ export function buildAnswerQualityFixture() {
     accounts: {
       netTotalBalance: 266,
       balanceNote:
-        'Net total subtracts credit card balances owed from cash/checking available balances',
+        'Net total subtracts credit card, loan, and mortgage balances owed from cash/checking available balances',
       items: [
         {
           bankName: 'Chase',
@@ -132,7 +132,7 @@ export function buildAnswerQualityFixture() {
           type: 'depository',
           balance: 66,
           isCredit: false,
-          balanceMeaning: 'available cash (checking/savings)',
+          balanceMeaning: 'available cash (checking/savings) or investment value',
         },
         {
           bankName: 'Chase',
@@ -140,7 +140,7 @@ export function buildAnswerQualityFixture() {
           type: 'depository',
           balance: 200,
           isCredit: false,
-          balanceMeaning: 'available cash (checking/savings)',
+          balanceMeaning: 'available cash (checking/savings) or investment value',
         },
       ],
     },

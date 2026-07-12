@@ -8,6 +8,10 @@ import db from '../db/index.js'
 import { CONNECTED_ACCOUNT_TRANSACTION_JOINS } from '../utils/connectedAccountTransactions.js'
 import { calendarMonthSqlBounds } from '../utils/calendarMonth.js'
 import { roundCurrency } from '../utils/safeToSpend.js'
+import {
+  EXCLUDE_INTERNAL_MOVES_FILTER,
+  NON_PENDING_FILTER,
+} from '../utils/transactionFilters.js'
 
 const MAX_LIMITS_PER_USER = 5
 
@@ -61,7 +65,8 @@ async function loadSpentByCategory(userId, categories) {
      FROM transactions t
      ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
      WHERE t.user_id = $1
-       AND (t.pending IS NOT TRUE)
+       ${NON_PENDING_FILTER}
+       ${EXCLUDE_INTERNAL_MOVES_FILTER}
        AND t.date >= $2::date
        AND t.date < $3::date
        AND COALESCE(t.category, 'Uncategorized') = ANY($4::text[])

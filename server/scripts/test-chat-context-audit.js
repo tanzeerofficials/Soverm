@@ -96,7 +96,7 @@ function buildFullChatContext() {
     capturedAt: '2026-07-06T12:00:00.000Z',
     accounts: {
       netTotalBalance: 5020,
-      balanceNote: 'Net total subtracts credit card balances owed from cash/checking available balances',
+      balanceNote: 'Net total subtracts credit card, loan, and mortgage balances owed from cash/checking available balances',
       items: [
         {
           bankName: 'Chase',
@@ -104,7 +104,7 @@ function buildFullChatContext() {
           type: 'depository',
           balance: 5200,
           isCredit: false,
-          balanceMeaning: 'available cash (checking/savings)',
+          balanceMeaning: 'available cash (checking/savings) or investment value',
         },
         {
           bankName: 'Chase',
@@ -112,7 +112,7 @@ function buildFullChatContext() {
           type: 'credit',
           balance: 180,
           isCredit: true,
-          balanceMeaning: 'credit card balance owed (higher = more debt)',
+          balanceMeaning: 'liability balance owed (higher = more debt)',
         },
       ],
     },
@@ -175,7 +175,7 @@ const AUDIT_QUESTIONS = [
   {
     id: 'credit-vs-cash',
     question: 'How much cash do I have vs credit card debt?',
-    mustInclude: ['5020', 'credit card balance owed'],
+    mustInclude: ['5020', 'liability balance owed'],
     dataPath: 'accounts.netTotalBalance',
   },
   {

@@ -48,8 +48,17 @@ try {
   console.log('  pass: legacy insights still show generated date footnote')
 
   assert(
-    buildDeltaAriaLabel({ direction: 'up', percent: 18 }, 'income') ===
-      'Income up 18% vs prior 30 days',
+    buildDeltaAriaLabel(
+      {
+        direction: 'up',
+        percent: 18,
+        times: 1.18,
+        absoluteChange: 142,
+        currentTotal: 842,
+        priorTotal: 700,
+      },
+      'income'
+    ) === 'Income about 1.2× vs prior 30 days — $842 vs $700',
     'income aria-label incorrect'
   )
   assert(
@@ -64,18 +73,32 @@ try {
       {
         label: 'Dining',
         value: '$842',
-        delta: { direction: 'up', percent: 18 },
+        delta: {
+          direction: 'up',
+          percent: 18,
+          times: 1.18,
+          absoluteChange: 142,
+          currentTotal: 842,
+          priorTotal: 700,
+        },
       },
       {
         label: 'Monthly Income',
         value: '$5,200',
-        delta: { direction: 'down', percent: 8 },
+        delta: {
+          direction: 'down',
+          percent: 8,
+          times: 0.92,
+          absoluteChange: 450,
+          currentTotal: 5200,
+          priorTotal: 5650,
+        },
       },
     ],
   })
 
   assert(
-    momQuestions[0] === 'Why did dining go up 18%?',
+    momQuestions[0] === 'Why did dining jump by about $142 (1.2×)?',
     `expected MoM question first, got: ${momQuestions[0]}`
   )
   assert(momQuestions.length === 3, 'quick questions should cap at 3')
@@ -87,13 +110,33 @@ try {
 
   const preview = selectHistoryPreviewStats([
     { label: 'Liquid Cash', value: '$9,100', delta: null },
-    { label: 'Dining', value: '$842', delta: { direction: 'up', percent: 18 } },
-    { label: 'Income', value: '$5,200', delta: { direction: 'down', percent: 8 } },
+    {
+      label: 'Dining',
+      value: '$842',
+      delta: { direction: 'up', percent: 18, times: 1.18, absoluteChange: 142 },
+    },
+    {
+      label: 'Income',
+      value: '$5,200',
+      delta: { direction: 'down', percent: 8, times: 0.92, absoluteChange: 450 },
+    },
   ])
 
   assert(preview[0].label === 'Dining', 'stats with deltas should preview first')
   assert(preview.length === 2, 'history preview should cap at two stats')
-  assert(formatCompactDelta({ direction: 'up', percent: 18 }) === '↑ 18%', 'compact delta format')
+  assert(
+    formatCompactDelta({
+      direction: 'up',
+      percent: 18,
+      times: 1.18,
+      absoluteChange: 142,
+    }) === '↑ 1.2× · +$142',
+    'compact delta format'
+  )
+  assert(
+    formatCompactDelta({ direction: 'up', percent: 18 }) === '↑ 1.2×',
+    'legacy percent-only delta should convert to times'
+  )
   assert(compactDeltaToneClass('income', { direction: 'down', percent: 8 }) === 'text-red-400', 'income down tone')
   console.log('  pass: history timeline stat preview helpers')
 

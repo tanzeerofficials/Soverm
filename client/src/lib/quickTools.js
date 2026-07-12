@@ -5,7 +5,7 @@
  * recent transactions, period comparison inputs, and account health signals.
  */
 
-import { getDisplayBalance, isCreditAccount } from './balanceHelpers.js'
+import { getDisplayBalance, isLiabilityAccount } from './balanceHelpers.js'
 import { hoursSinceSync, SYNC_STALE_HOURS } from './dashboardAttention.js'
 
 export const QUICK_TOOL_TABS = {
@@ -86,15 +86,19 @@ export function assessAccountHealth(accounts, lastSyncedAt) {
 
   const accountStatuses = (accounts ?? []).map((account) => {
     const balance = getDisplayBalance(account)
-    const credit = isCreditAccount(account)
-    const warning = credit ? balance > 0 : balance < 0
+    const liability = isLiabilityAccount(account)
+    const warning = liability ? balance > 0 : balance < 0
 
     return {
       account,
       balance,
-      credit,
+      credit: liability,
       status: warning ? 'warning' : 'healthy',
-      message: warning ? (credit ? 'Balance owed' : 'Low or negative balance') : 'Looks good',
+      message: warning
+        ? liability
+          ? 'Balance owed'
+          : 'Low or negative balance'
+        : 'Looks good',
     }
   })
 

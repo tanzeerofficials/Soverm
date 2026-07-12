@@ -230,11 +230,29 @@ function formatOverallSpendingLine(overallSpending) {
     return `You spent ${formatCurrency(currentTotal)} in the last 30 days — flat vs the prior 30 days (${formatCurrency(priorTotal)}).`
   }
 
-  if (delta.percent == null) {
+  if (delta.percent == null && delta.times == null) {
     return `You spent ${formatCurrency(currentTotal)} in the last 30 days.`
   }
 
-  return `You spent ${formatCurrency(currentTotal)} in the last 30 days, ${delta.direction} ${delta.percent}% vs the prior 30 days (${formatCurrency(priorTotal)}).`
+  const times =
+    delta.times ??
+    (priorTotal > 0 ? currentTotal / priorTotal : null)
+  const timesLabel =
+    times == null
+      ? null
+      : times >= 10
+        ? `${Math.round(times)}×`
+        : `${(Math.round(times * 10) / 10).toFixed(1).replace(/\.0$/, '')}×`
+  const signedChange =
+    delta.absoluteChange != null
+      ? `${delta.direction === 'down' ? '−' : '+'}${formatCurrency(delta.absoluteChange)}`
+      : null
+
+  if (timesLabel) {
+    return `You spent ${formatCurrency(currentTotal)} in the last 30 days — about ${timesLabel} the prior 30 days (${formatCurrency(priorTotal)}${signedChange ? `, ${signedChange}` : ''}).`
+  }
+
+  return `You spent ${formatCurrency(currentTotal)} in the last 30 days vs ${formatCurrency(priorTotal)} in the prior 30 days.`
 }
 
 function ExpenseAnalyzerPage() {

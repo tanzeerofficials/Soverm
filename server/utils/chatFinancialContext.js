@@ -1,5 +1,5 @@
 import db from '../db/index.js'
-import { calculateTotalBalance, getDisplayBalance, isCreditAccount } from './balanceHelpers.js'
+import { calculateTotalBalance, getDisplayBalance, isLiabilityAccount } from './balanceHelpers.js'
 import {
   buildCategoryBreakdownFromComparison,
   COMPARISON_PERIOD_INTERVAL,
@@ -129,24 +129,24 @@ function buildLiveMonthOverMonthSnapshot(comparison) {
 
 function buildAccountsSnapshot(rows) {
   const items = rows.map((account) => {
-    const isCredit = isCreditAccount(account)
+    const isLiability = isLiabilityAccount(account)
 
     return {
       bankName: account.bank_name,
       name: account.account_name,
       type: account.account_type,
       balance: roundCurrency(getDisplayBalance(account)),
-      isCredit,
-      balanceMeaning: isCredit
-        ? 'credit card balance owed (higher = more debt)'
-        : 'available cash (checking/savings)',
+      isCredit: isLiability,
+      balanceMeaning: isLiability
+        ? 'liability balance owed (higher = more debt)'
+        : 'available cash (checking/savings) or investment value',
     }
   })
 
   return {
     netTotalBalance: roundCurrency(calculateTotalBalance(rows)),
     balanceNote:
-      'Net total subtracts credit card balances owed from cash/checking available balances',
+      'Net total subtracts credit card, loan, and mortgage balances owed from cash/checking available balances',
     items,
   }
 }

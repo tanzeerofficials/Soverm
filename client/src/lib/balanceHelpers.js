@@ -6,8 +6,15 @@
  * when present, so account cards match totalBalance without re-deriving.
  */
 
+const LIABILITY_TYPE_PATTERN = /credit|loan|mortgage|student|line of credit|heloc/
+
 export function isCreditAccount(account) {
   return account.account_type?.toLowerCase().includes('credit') ?? false
+}
+
+export function isLiabilityAccount(account) {
+  const type = account?.account_type?.toLowerCase() ?? ''
+  return LIABILITY_TYPE_PATTERN.test(type)
 }
 
 export function getDisplayBalance(account) {
@@ -15,7 +22,7 @@ export function getDisplayBalance(account) {
     return Number(account.displayBalance) || 0
   }
 
-  if (isCreditAccount(account)) {
+  if (isLiabilityAccount(account)) {
     return Number(account.balance_current) || 0
   }
 
@@ -24,4 +31,14 @@ export function getDisplayBalance(account) {
   }
 
   return Number(account.balance_current) || 0
+}
+
+export function calculateTotalBalance(accounts) {
+  return accounts.reduce((total, account) => {
+    const balance = getDisplayBalance(account)
+    if (isLiabilityAccount(account)) {
+      return total - balance
+    }
+    return total + balance
+  }, 0)
 }

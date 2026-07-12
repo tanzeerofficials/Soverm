@@ -337,7 +337,18 @@ export function buildTemplateNotificationCopy(trigger) {
     case TRIGGER_TYPES.SPENDING_SPIKE:
       return {
         title: 'Spending spike in a category',
-        body: `${trigger.facts.category} is up ${trigger.facts.percent}% vs the prior 30 days ($${trigger.facts.currentTotal} vs $${trigger.facts.priorTotal}).`,
+        body: (() => {
+          const current = trigger.facts.currentTotal
+          const prior = trigger.facts.priorTotal
+          const times =
+            prior > 0 ? Math.round((current / prior) * 10) / 10 : null
+          const timesLabel =
+            times >= 10 ? `${Math.round(times)}×` : times != null ? `${times}×` : null
+          if (timesLabel) {
+            return `${trigger.facts.category} is about ${timesLabel} the prior 30 days ($${current} vs $${prior}).`
+          }
+          return `${trigger.facts.category} jumped vs the prior 30 days ($${current} vs $${prior}).`
+        })(),
       }
     case TRIGGER_TYPES.SPENDING_CAP_OVER:
       return {

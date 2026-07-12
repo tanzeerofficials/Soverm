@@ -1,4 +1,4 @@
-import { getDisplayBalance, isCreditAccount } from '../lib/balanceHelpers.js'
+import { getDisplayBalance, isLiabilityAccount } from '../lib/balanceHelpers.js'
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-US', {
@@ -9,7 +9,7 @@ function formatCurrency(amount) {
 
 function isBalanceWarning(account) {
   const balance = getDisplayBalance(account)
-  if (isCreditAccount(account)) {
+  if (isLiabilityAccount(account)) {
     return balance > 0
   }
   return balance < 0

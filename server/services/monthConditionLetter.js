@@ -23,12 +23,10 @@ import {
 import { calculateTotalBalance, getDisplayBalance } from '../utils/balanceHelpers.js'
 import { loadExpenseAnalyzerData } from '../utils/expenseAnalyzerData.js'
 import { buildTrackerSnapshotWithFallback } from './trackerSnapshot.js'
-
-const NON_PENDING_FILTER = 'AND (t.pending IS NOT TRUE)'
-const EXCLUDE_TRANSFER_FILTER = `
-  AND COALESCE(t.category, '') !~* 'transfer'
-  AND COALESCE(t.name, '') !~* '\\btransfer\\b'
-`
+import {
+  EXCLUDE_INTERNAL_MOVES_FILTER,
+  NON_PENDING_FILTER,
+} from '../utils/transactionFilters.js'
 
 async function loadMonthCashFlow(userId, startIso, endExclusiveIso) {
   const result = await db.query(
@@ -39,7 +37,7 @@ async function loadMonthCashFlow(userId, startIso, endExclusiveIso) {
      ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
      WHERE t.user_id = $1
        ${NON_PENDING_FILTER}
-       ${EXCLUDE_TRANSFER_FILTER}
+       ${EXCLUDE_INTERNAL_MOVES_FILTER}
        AND t.date >= $2::date
        AND t.date < $3::date`,
     [userId, startIso, endExclusiveIso]
@@ -60,7 +58,7 @@ async function loadTopCategories(userId, startIso, endExclusiveIso, limit = 3) {
      WHERE t.user_id = $1
        AND t.amount > 0
        ${NON_PENDING_FILTER}
-       ${EXCLUDE_TRANSFER_FILTER}
+       ${EXCLUDE_INTERNAL_MOVES_FILTER}
        AND t.date >= $2::date
        AND t.date < $3::date
      GROUP BY 1

@@ -28,6 +28,9 @@ function CashFlowSummary({ income = 0, spent = 0, rangeLabel }) {
         </p>
         <p className="text-[11px] text-fg-subtle">{rangeLabel}</p>
       </div>
+      <p className="mt-1 text-[11px] text-fg-subtle">
+        Real income and spending only — transfers and credit card payments are excluded.
+      </p>
 
       <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-4">
         <div className="min-w-0 rounded-lg border border-brand/20 bg-brand/5 px-2 py-2.5 text-center sm:px-4 sm:py-3">
@@ -87,7 +90,7 @@ function CashFlowSummary({ income = 0, spent = 0, rangeLabel }) {
           <p className="mt-2 text-center text-xs text-fg-muted">
             {spendPercent}% of income spent
             {netIsPositive
-              ? ` · ${formatCurrency(net)} remaining`
+              ? ` · ${formatCurrency(net)} surplus this period`
               : ` · ${formatCurrency(Math.abs(net))} over income`}
           </p>
         </div>

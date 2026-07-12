@@ -10,6 +10,7 @@ import {
 import {
   buildCategoryBreakdownFromComparison,
   computeSpendingDelta,
+  formatComparisonPhrase,
   isSignificantCategoryDelta,
 } from './financialContext.js'
 import { formatAccountLabel } from './accountLabel.js'
@@ -39,6 +40,11 @@ import {
   buildBillDefenseFindings,
   buildCancelKeepWatchPrompt,
 } from './billDefense.js'
+import {
+  EXCLUDE_INTERNAL_MOVES_FILTER,
+  isCashFlowIncomeRow,
+  isCashFlowSpendingRow,
+} from './transactionFilters.js'
 
 export const NON_PENDING_FILTER = 'AND (pending IS NOT TRUE)'
 const RECURRING_LOOKBACK_INTERVAL = '3 months'
@@ -107,8 +113,7 @@ function amountsWithinTolerance(amounts, tolerance = RECURRING_AMOUNT_TOLERANCE)
 }
 
 function isPostedSpendingRow(row) {
-  const amount = Number(row.amount)
-  return Number.isFinite(amount) && amount > 0 && row.date && row.pending !== true
+  return isCashFlowSpendingRow(row)
 }
 
 function resolveAccountSnapshot(row) {
@@ -704,10 +709,10 @@ export function buildComparisonFromTransactions(transactions) {
     (row) => isPostedSpendingRow(row) && isWithinPriorPeriod(row.date)
   )
   const currentIncomeRows = transactions.filter(
-    (row) => Number(row.amount) < 0 && isWithinDaysAgo(row.date, 30)
+    (row) => isCashFlowIncomeRow(row) && isWithinDaysAgo(row.date, 30)
   )
   const priorIncomeRows = transactions.filter(
-    (row) => Number(row.amount) < 0 && isWithinPriorPeriod(row.date)
+    (row) => isCashFlowIncomeRow(row) && isWithinPriorPeriod(row.date)
   )
   const priorAnyRows = transactions.filter((row) => isWithinPriorPeriod(row.date))
 
@@ -751,6 +756,8 @@ function toPublicCategoryDelta(spendingDelta) {
   return {
     direction: spendingDelta.direction,
     percent: spendingDelta.percent,
+    times: spendingDelta.times ?? null,
+    absoluteChange: spendingDelta.absoluteChange ?? null,
   }
 }
 
@@ -766,6 +773,10 @@ function deriveTopMover(categoryBreakdown) {
     category: topEntry.category,
     direction: topEntry.delta.direction,
     percent: topEntry.delta.percent,
+    times: topEntry.delta.times ?? null,
+    absoluteChange: topEntry.delta.absoluteChange ?? null,
+    currentTotal: topEntry.currentTotal,
+    priorTotal: topEntry.priorTotal,
   }
 }
 
@@ -800,23 +811,31 @@ export function buildTemplateNarrative({
   const parts = []
 
   if (overallSpending?.delta && overallSpending.hasComparisonData) {
-    const { direction, percent } = overallSpending.delta
+    const { direction } = overallSpending.delta
     const hasNotableMover = isSignificantCategoryDelta(topMover)
 
     if (direction === 'flat' && !hasNotableMover) {
       parts.push('Spending was steady across all categories vs the prior 30 days.')
     } else if (direction === 'flat') {
       parts.push('Overall spending held steady vs the prior 30 days.')
-    } else if (percent != null) {
+    } else {
       parts.push(
-        `Overall spending is ${direction} ${percent}% vs the prior 30 days ($${overallSpending.currentTotal} vs $${overallSpending.priorTotal}).`
+        `Overall spending is ${formatComparisonPhrase(
+          overallSpending.currentTotal,
+          overallSpending.priorTotal,
+          overallSpending.delta
+        )}.`
       )
     }
   }
 
   if (isSignificantCategoryDelta(topMover) && topMover.percent != null) {
     parts.push(
-      `${topMover.category} is your biggest mover, ${topMover.direction} ${topMover.percent}% vs the prior 30 days.`
+      `${topMover.category} is your biggest mover — ${formatComparisonPhrase(
+        topMover.currentTotal,
+        topMover.priorTotal,
+        topMover
+      )}.`
     )
   }
 
@@ -994,6 +1013,7 @@ export async function loadExpenseAnalyzerData(userId) {
        WHERE t.user_id = $1
          AND t.date >= NOW() - $2::interval
          ${NON_PENDING_FILTER}
+         ${EXCLUDE_INTERNAL_MOVES_FILTER}
        ORDER BY t.date ASC`,
       [userId, RECURRING_LOOKBACK_INTERVAL]
     ),

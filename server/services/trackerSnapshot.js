@@ -22,8 +22,10 @@ import {
   roundCurrency,
 } from '../utils/safeToSpend.js'
 import { calendarMonthSqlBounds } from '../utils/calendarMonth.js'
-
-const NON_PENDING_FILTER = 'AND (t.pending IS NOT TRUE)'
+import {
+  EXCLUDE_INTERNAL_MOVES_FILTER,
+  NON_PENDING_FILTER,
+} from '../utils/transactionFilters.js'
 
 export async function loadCalendarMonthCashFlow(userId) {
   const { startIso, endExclusiveIso } = calendarMonthSqlBounds()
@@ -36,6 +38,7 @@ export async function loadCalendarMonthCashFlow(userId) {
      ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
      WHERE t.user_id = $1
        ${NON_PENDING_FILTER}
+       ${EXCLUDE_INTERNAL_MOVES_FILTER}
        AND t.date >= $2::date
        AND t.date < $3::date`,
     [userId, startIso, endExclusiveIso]
@@ -60,6 +63,7 @@ export async function loadSuggestedSpendingLimit(userId) {
      WHERE t.user_id = $1
        AND t.amount > 0
        ${NON_PENDING_FILTER}
+       ${EXCLUDE_INTERNAL_MOVES_FILTER}
        AND t.date >= NOW() - INTERVAL '30 days'`,
     [userId]
   )

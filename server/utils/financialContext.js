@@ -1,14 +1,16 @@
 import db from '../db/index.js'
 import { getDisplayBalance } from './balanceHelpers.js'
 import { CONNECTED_ACCOUNT_TRANSACTION_JOINS } from './connectedAccountTransactions.js'
+import {
+  EXCLUDE_INTERNAL_MOVES_FILTER,
+  NON_PENDING_FILTER,
+} from './transactionFilters.js'
 
 export { normalizeMerchantName } from './merchantNormalize.js'
 
 // Shared rolling window for insight transaction context and month-over-month comparison.
 export const COMPARISON_PERIOD_INTERVAL = '30 days'
 export const RECURRING_CHARGE_LOOKBACK_INTERVAL = '3 months'
-
-const NON_PENDING_FILTER = 'AND (pending IS NOT TRUE)'
 
 function buildCategoryTotals(rows) {
   const byCategory = {}
@@ -24,29 +26,119 @@ function buildCategoryTotals(rows) {
 // Minimum absolute MoM percent change before a category counts as a "top mover" in UI copy.
 export const SIGNIFICANT_CATEGORY_CHANGE_PERCENT = 5
 
-/**
- * Computes month-over-month direction and percent for a spending (or income) pair.
- * Shared by insight delta enforcement and the Expense Analyzer category breakdown.
- */
-export function computeSpendingDelta(current, prior) {
-  if (prior === 0) {
-    if (current === 0) {
-      return { direction: 'flat', percent: 0, isNewCategory: false }
-    }
-    return { direction: 'up', percent: null, isNewCategory: true }
+function roundMoney(amount) {
+  return Math.round((Number(amount) || 0) * 100) / 100
+}
+
+function roundTimes(times) {
+  if (!Number.isFinite(times)) {
+    return null
   }
 
-  const rawPercent = Math.round(((current - prior) / prior) * 100)
+  return Math.round(times * 100) / 100
+}
+
+/**
+ * Formats a multiplier for people, not spreadsheets.
+ * 8.87 → "8.9×", 1.5 → "1.5×", 12.3 → "12×"
+ */
+export function formatTimesMultiplier(times) {
+  const value = roundTimes(times)
+  if (value == null || value <= 0) {
+    return null
+  }
+
+  if (value >= 10) {
+    return `${Math.round(value)}×`
+  }
+
+  const oneDecimal = Math.round(value * 10) / 10
+  return Number.isInteger(oneDecimal) ? `${oneDecimal}×` : `${oneDecimal.toFixed(1)}×`
+}
+
+export function formatMoneyAmount(amount) {
+  return `$${roundMoney(amount).toLocaleString('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })}`
+}
+
+/**
+ * Computes month-over-month direction plus percent, times, and dollar change.
+ * Prefer times + absoluteChange in user-facing copy; percent stays for significance thresholds.
+ */
+export function computeSpendingDelta(current, prior) {
+  const currentTotal = roundMoney(current)
+  const priorTotal = roundMoney(prior)
+
+  if (priorTotal === 0) {
+    if (currentTotal === 0) {
+      return {
+        direction: 'flat',
+        percent: 0,
+        times: null,
+        absoluteChange: 0,
+        isNewCategory: false,
+      }
+    }
+    return {
+      direction: 'up',
+      percent: null,
+      times: null,
+      absoluteChange: currentTotal,
+      isNewCategory: true,
+    }
+  }
+
+  const rawPercent = Math.round(((currentTotal - priorTotal) / priorTotal) * 100)
+  const times = roundTimes(currentTotal / priorTotal)
+  const absoluteChange = roundMoney(Math.abs(currentTotal - priorTotal))
 
   if (rawPercent === 0) {
-    return { direction: 'flat', percent: 0, isNewCategory: false }
+    return {
+      direction: 'flat',
+      percent: 0,
+      times: 1,
+      absoluteChange: 0,
+      isNewCategory: false,
+    }
   }
 
   return {
     direction: rawPercent > 0 ? 'up' : 'down',
     percent: Math.abs(rawPercent),
+    times,
+    absoluteChange,
     isNewCategory: false,
   }
+}
+
+/**
+ * Human comparison line for prompts and narrative: times + dollars, not "787%".
+ */
+export function formatComparisonPhrase(current, prior, delta, { vsLabel = 'vs prior 30 days' } = {}) {
+  const currentTotal = roundMoney(current)
+  const priorTotal = roundMoney(prior)
+
+  if (!delta || delta.direction === 'flat') {
+    return `flat ${vsLabel} (${formatMoneyAmount(currentTotal)} vs ${formatMoneyAmount(priorTotal)})`
+  }
+
+  if (delta.isNewCategory) {
+    return `new this period (${formatMoneyAmount(currentTotal)} now, $0 in the prior period)`
+  }
+
+  const timesLabel = formatTimesMultiplier(delta.times ?? currentTotal / priorTotal)
+  const signedChange =
+    delta.direction === 'up'
+      ? `+${formatMoneyAmount(delta.absoluteChange ?? Math.abs(currentTotal - priorTotal))}`
+      : `−${formatMoneyAmount(delta.absoluteChange ?? Math.abs(currentTotal - priorTotal))}`
+
+  if (timesLabel) {
+    return `about ${timesLabel} ${vsLabel} — ${formatMoneyAmount(currentTotal)} vs ${formatMoneyAmount(priorTotal)} (${signedChange})`
+  }
+
+  return `${formatMoneyAmount(currentTotal)} vs ${formatMoneyAmount(priorTotal)} (${signedChange}) ${vsLabel}`
 }
 
 export function isSignificantCategoryDelta(delta) {
@@ -81,6 +173,8 @@ function toPublicCategoryDelta(spendingDelta) {
   return {
     direction: spendingDelta.direction,
     percent: spendingDelta.percent,
+    times: spendingDelta.times ?? null,
+    absoluteChange: spendingDelta.absoluteChange ?? null,
   }
 }
 
@@ -174,6 +268,7 @@ export async function loadMonthOverMonthComparison(userId) {
        WHERE t.user_id = $1
          AND t.amount > 0
          ${NON_PENDING_FILTER}
+         ${EXCLUDE_INTERNAL_MOVES_FILTER}
          AND t.date >= NOW() - $2::interval`,
       [userId, COMPARISON_PERIOD_INTERVAL]
     ),
@@ -184,6 +279,8 @@ export async function loadMonthOverMonthComparison(userId) {
        ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
        WHERE t.user_id = $1
          AND t.amount > 0
+         ${NON_PENDING_FILTER}
+         ${EXCLUDE_INTERNAL_MOVES_FILTER}
          AND t.date >= NOW() - $2::interval
        GROUP BY t.category`,
       [userId, COMPARISON_PERIOD_INTERVAL]
@@ -195,6 +292,7 @@ export async function loadMonthOverMonthComparison(userId) {
        WHERE t.user_id = $1
          AND t.amount > 0
          ${NON_PENDING_FILTER}
+         ${EXCLUDE_INTERNAL_MOVES_FILTER}
          AND t.date >= NOW() - $3::interval
          AND t.date < NOW() - $2::interval`,
       [userId, COMPARISON_PERIOD_INTERVAL, '60 days']
@@ -206,6 +304,8 @@ export async function loadMonthOverMonthComparison(userId) {
        ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
        WHERE t.user_id = $1
          AND t.amount > 0
+         ${NON_PENDING_FILTER}
+         ${EXCLUDE_INTERNAL_MOVES_FILTER}
          AND t.date >= NOW() - $3::interval
          AND t.date < NOW() - $2::interval
        GROUP BY t.category`,
@@ -218,6 +318,7 @@ export async function loadMonthOverMonthComparison(userId) {
        WHERE t.user_id = $1
          AND t.amount < 0
          ${NON_PENDING_FILTER}
+         ${EXCLUDE_INTERNAL_MOVES_FILTER}
          AND t.date >= NOW() - $2::interval`,
       [userId, COMPARISON_PERIOD_INTERVAL]
     ),
@@ -228,6 +329,7 @@ export async function loadMonthOverMonthComparison(userId) {
        WHERE t.user_id = $1
          AND t.amount < 0
          ${NON_PENDING_FILTER}
+         ${EXCLUDE_INTERNAL_MOVES_FILTER}
          AND t.date >= NOW() - $3::interval
          AND t.date < NOW() - $2::interval`,
       [userId, COMPARISON_PERIOD_INTERVAL, '60 days']
@@ -238,6 +340,7 @@ export async function loadMonthOverMonthComparison(userId) {
        ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
        WHERE t.user_id = $1
          ${NON_PENDING_FILTER}
+         ${EXCLUDE_INTERNAL_MOVES_FILTER}
          AND t.date >= NOW() - $3::interval
          AND t.date < NOW() - $2::interval`,
       [userId, COMPARISON_PERIOD_INTERVAL, '60 days']

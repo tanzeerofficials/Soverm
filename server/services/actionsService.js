@@ -13,12 +13,10 @@ import {
   mapStatusToCompleted,
   verifyActionOutcome,
 } from '../utils/actionOutcomes.js'
-
-const NON_PENDING_FILTER = 'AND (t.pending IS NOT TRUE)'
-const EXCLUDE_TRANSFER_FILTER = `
-  AND COALESCE(t.category, '') !~* 'transfer'
-  AND COALESCE(t.name, '') !~* '\\btransfer\\b'
-`
+import {
+  EXCLUDE_INTERNAL_MOVES_FILTER,
+  NON_PENDING_FILTER,
+} from '../utils/transactionFilters.js'
 
 let lifecycleCache = null
 let lifecycleCheckedAt = 0
@@ -210,7 +208,7 @@ async function sumCategorySpend(userId, category, startIso, endExclusiveIso) {
      WHERE t.user_id = $1
        AND t.amount > 0
        ${NON_PENDING_FILTER}
-       ${EXCLUDE_TRANSFER_FILTER}
+       ${EXCLUDE_INTERNAL_MOVES_FILTER}
        AND COALESCE(t.category, 'Uncategorized') = $2
        AND t.date >= $3::date
        AND t.date < $4::date`,
@@ -227,7 +225,7 @@ async function sumSpend(userId, startIso, endExclusiveIso) {
      WHERE t.user_id = $1
        AND t.amount > 0
        ${NON_PENDING_FILTER}
-       ${EXCLUDE_TRANSFER_FILTER}
+       ${EXCLUDE_INTERNAL_MOVES_FILTER}
        AND t.date >= $2::date
        AND t.date < $3::date`,
     [userId, startIso, endExclusiveIso]

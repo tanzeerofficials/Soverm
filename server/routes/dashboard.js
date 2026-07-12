@@ -10,11 +10,13 @@ import { getAuth, requireAuth } from '@clerk/express'
 import db from '../db/index.js'
 import { calculateTotalBalance, getDisplayBalance } from '../utils/balanceHelpers.js'
 import { CONNECTED_ACCOUNT_TRANSACTION_JOINS } from '../utils/connectedAccountTransactions.js'
+import {
+  EXCLUDE_INTERNAL_MOVES_FILTER,
+  NON_PENDING_FILTER,
+} from '../utils/transactionFilters.js'
 import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
 import { reportServerError } from '../utils/sentry.js'
 import { buildCashFlowForecastForUser } from '../services/cashFlowForecast.js'
-
-const NON_PENDING_FILTER = 'AND (t.pending IS NOT TRUE)'
 
 const router = Router()
 
@@ -38,11 +40,15 @@ function parseLatestInsight(row) {
 
 const DEFAULT_RANGE = '30d'
 
+/*
+ * Fixed day counts (not calendar months/years) so SQL totals match the
+ * client sparkline, which always fills exactly 7 / 30 / 90 / 365 days.
+ */
 const RANGE_INTERVALS = {
   '7d': '7 days',
   '30d': '30 days',
-  '3m': '3 months',
-  '1y': '1 year',
+  '3m': '90 days',
+  '1y': '365 days',
 }
 
 function resolveRange(rangeParam) {
@@ -58,6 +64,8 @@ function resolveRange(rangeParam) {
  * What it does:
  * - Loads accounts, income/spend totals for a time range, and latest insight
  * - Accepts ?range=7d|30d|3m|1y (defaults to 30d)
+ * - Excludes transfers and credit-card/loan payments so internal moves
+ *   do not inflate both income and spending
  * - Returns everything the dashboard needs in one JSON payload
  *
  * Why one route:
@@ -87,6 +95,7 @@ router.get('/summary', async (req, res) => {
        WHERE t.user_id = $1
          AND t.amount < 0
          ${NON_PENDING_FILTER}
+         ${EXCLUDE_INTERNAL_MOVES_FILTER}
          AND t.date >= NOW() - $2::interval`,
       [userId, interval]
     ),
@@ -97,6 +106,7 @@ router.get('/summary', async (req, res) => {
        WHERE t.user_id = $1
          AND t.amount > 0
          ${NON_PENDING_FILTER}
+         ${EXCLUDE_INTERNAL_MOVES_FILTER}
          AND t.date >= NOW() - $2::interval`,
       [userId, interval]
     ),
@@ -107,6 +117,7 @@ router.get('/summary', async (req, res) => {
        WHERE t.user_id = $1
          AND t.amount > 0
          ${NON_PENDING_FILTER}
+         ${EXCLUDE_INTERNAL_MOVES_FILTER}
          AND t.date >= NOW() - $2::interval
        GROUP BY t.date::date
        ORDER BY t.date::date ASC`,

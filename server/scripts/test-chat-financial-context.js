@@ -76,7 +76,7 @@ try {
     capturedAt: '2026-07-06T12:00:00.000Z',
     accounts: {
       netTotalBalance: 4200,
-      balanceNote: 'Net total subtracts credit card balances owed from cash/checking available balances',
+      balanceNote: 'Net total subtracts credit card, loan, and mortgage balances owed from cash/checking available balances',
       items: [{ name: 'Chase Checking', type: 'depository', balance: 4200, isCredit: false }],
     },
     liveMonthOverMonth: {
@@ -115,10 +115,35 @@ try {
   })
 
   assert(prompt.includes('Live financial snapshot'), 'system prompt must include live data section')
-  assert(prompt.includes('capable advisor'), 'system prompt should encourage capable answers')
+  assert(prompt.includes('genuinely cares'), 'system prompt should set caring advisor tone')
+  assert(
+    prompt.includes('Warmth doesn\'t mean vagueness') ||
+      prompt.includes("Warmth doesn't mean vagueness"),
+    'system prompt should keep accuracy alongside warmth'
+  )
+  assert(prompt.includes('ENGAGEMENT HOOK'), 'system prompt should include engagement hook rules')
+  assert(
+    prompt.includes('Never use the same closing question twice'),
+    'engagement hook must ban repeated closing questions'
+  )
+  assert(
+    prompt.includes("what's my balance") || prompt.includes('whats my balance'),
+    'engagement hook must allow skipping on simple factual questions'
+  )
   assert(
     !prompt.includes('You do not have access to live bank data'),
     'system prompt must not deny live data access'
+  )
+
+  const generalPrompt = buildInsightChatSystemPrompt({
+    insightBody: null,
+    monthOverMonthComparison: null,
+    generatedAt: null,
+    chatFinancialContext: chatContext,
+  })
+  assert(
+    generalPrompt.includes('ENGAGEMENT HOOK'),
+    'general chat prompt should also include engagement hook rules'
   )
   console.log('  pass: upgraded chat system prompt')
   passed++

@@ -4,8 +4,8 @@
  * Loads live account balances, recent cash flow, and confirmed recurring
  * charges, then returns a 30-day projection for the dashboard.
  *
- * Income/spend baselines exclude transfer-like transactions so moving money
- * between your own accounts does not inflate both income and spending.
+ * Income/spend baselines exclude transfers and credit-card/loan payments so
+ * internal moves do not inflate both income and spending.
  */
 
 import db from '../db/index.js'
@@ -18,13 +18,10 @@ import {
   summarizeForecastRisk,
 } from '../utils/cashFlowForecast.js'
 import { roundCurrency } from '../utils/safeToSpend.js'
-
-const NON_PENDING_FILTER = 'AND (t.pending IS NOT TRUE)'
-/** Drop internal moves that would otherwise count as both spend and income. */
-const EXCLUDE_TRANSFER_FILTER = `
-  AND COALESCE(t.category, '') !~* 'transfer'
-  AND COALESCE(t.name, '') !~* '\\btransfer\\b'
-`
+import {
+  EXCLUDE_INTERNAL_MOVES_FILTER,
+  NON_PENDING_FILTER,
+} from '../utils/transactionFilters.js'
 
 function sumRecurringMonthly(recurringCharges = []) {
   return roundCurrency(
@@ -41,7 +38,7 @@ async function loadForecastBaselines(userId) {
      ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
      WHERE t.user_id = $1
        ${NON_PENDING_FILTER}
-       ${EXCLUDE_TRANSFER_FILTER}
+       ${EXCLUDE_INTERNAL_MOVES_FILTER}
        AND t.date >= NOW() - INTERVAL '30 days'`,
     [userId]
   )

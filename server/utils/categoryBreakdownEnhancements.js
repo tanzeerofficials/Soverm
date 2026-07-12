@@ -1,5 +1,6 @@
 import { formatAccountLabel } from './accountLabel.js'
 import { normalizeMerchantName } from './merchantNormalize.js'
+import { isCashFlowSpendingRow } from './transactionFilters.js'
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 const TOP_MERCHANTS_LIMIT = 5
@@ -23,8 +24,7 @@ function isWithinDaysAgo(dateInput, days) {
 }
 
 function isPostedSpendingRow(row) {
-  const amount = Number(row.amount)
-  return Number.isFinite(amount) && amount > 0 && row.date && row.pending !== true
+  return isCashFlowSpendingRow(row)
 }
 
 function accountSnapshotFromRow(row) {
