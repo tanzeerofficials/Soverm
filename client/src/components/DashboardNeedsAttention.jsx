@@ -48,10 +48,10 @@ function DashboardNeedsAttention({
 
     return (
       <section className="rounded-xl border border-brand/25 bg-brand/5 px-4 py-4 sm:px-5">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-warning">
-          Needs your attention
+        <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-brand-soft">
+          You’re clear
         </p>
-        <p className="mt-2 text-sm font-semibold text-brand-soft">You&apos;re all caught up</p>
+        <p className="mt-2 text-sm font-semibold text-fg">All caught up</p>
         <p className="mt-1 text-xs text-fg-muted">
           No pending items right now — check back after your next sync or insight.
         </p>

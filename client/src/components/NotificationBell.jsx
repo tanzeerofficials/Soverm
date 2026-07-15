@@ -124,29 +124,29 @@ function NotificationBell() {
       {open && (
         <div
           id={panelId}
-          className="absolute right-0 top-full z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border-default bg-surface shadow-2xl"
+          className="absolute right-0 top-full z-50 mt-2 w-[min(18rem,calc(100vw-2.5rem))] overflow-hidden rounded-xl border border-border-default bg-surface/95 shadow-[0_16px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:w-72"
           role="dialog"
           aria-label="Notifications"
         >
-          <div className="flex items-center justify-between border-b border-border-default px-4 py-3">
+          <div className="flex items-center justify-between gap-3 border-b border-border-default/80 px-3.5 py-2.5">
             <p className="text-sm font-semibold text-fg">Notifications</p>
             {unreadCount > 0 && (
               <button
                 type="button"
                 onClick={() => markAllReadMutation.mutate()}
-                className="text-xs text-ai transition hover:text-ai-soft"
+                className="shrink-0 text-[11px] font-medium text-ai transition hover:text-ai-soft"
               >
                 Mark all read
               </button>
             )}
           </div>
 
-          <div className="max-h-80 overflow-y-auto">
+          <div className="notification-scroll max-h-64 overflow-y-auto overscroll-y-contain sm:max-h-72">
             {isPending && (
-              <p className="px-4 py-6 text-center text-xs text-fg-muted">Loading…</p>
+              <p className="px-3.5 py-5 text-center text-xs text-fg-muted">Loading…</p>
             )}
             {!isPending && notifications.length === 0 && (
-              <p className="px-4 py-6 text-center text-xs text-fg-muted">
+              <p className="px-3.5 py-5 text-center text-xs leading-relaxed text-fg-muted">
                 No notifications yet — Soverm will flag anything worth a look.
               </p>
             )}
@@ -155,18 +155,22 @@ function NotificationBell() {
                 key={notification.id}
                 type="button"
                 onClick={() => handleNotificationClick(notification)}
-                className={`flex w-full flex-col gap-1 border-b border-border-default px-4 py-3 text-left transition hover:bg-surface-elevated ${
-                  notification.read ? 'opacity-75' : ''
+                className={`flex w-full flex-col gap-0.5 border-b border-border-default/60 px-3.5 py-2.5 text-left transition last:border-b-0 hover:bg-surface-elevated/80 ${
+                  notification.read ? 'opacity-70' : ''
                 }`}
               >
                 <div className="flex items-start justify-between gap-2">
-                  <p className="text-sm font-medium text-fg">{notification.title}</p>
+                  <p className="text-[13px] font-medium leading-snug text-fg">
+                    {notification.title}
+                  </p>
                   {!notification.read && (
-                    <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-ai" />
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-ai" />
                   )}
                 </div>
-                <p className="text-xs leading-relaxed text-fg-muted">{notification.body}</p>
-                <p className="text-[11px] text-fg-subtle">
+                <p className="line-clamp-2 text-[11px] leading-relaxed text-fg-muted">
+                  {notification.body}
+                </p>
+                <p className="text-[10px] text-fg-subtle">
                   {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
                   {' · '}
                   {notificationActionLabel(notification)}
@@ -175,7 +179,7 @@ function NotificationBell() {
             ))}
           </div>
           {!proactiveEnabled && (
-            <p className="border-t border-border-default px-4 py-3 text-[11px] leading-relaxed text-fg-subtle">
+            <p className="border-t border-border-default/80 px-3.5 py-2.5 text-[10px] leading-relaxed text-fg-subtle">
               New alerts are paused. Turn them back on in{' '}
               <Link to="/settings" className="text-ai hover:underline">
                 Settings

@@ -79,10 +79,8 @@ import {
   markDashboardVisited,
   setOnboardingCollapsedPreference,
 } from '../lib/dashboardUiPrefs.js'
-import {
-  FloatingCfoChatButton,
-  FloatingCfoChatModal,
-} from '../components/FloatingCfoChat.jsx'
+import { useAskSoverm } from '../context/AskSovermContext.jsx'
+import { buildActivationChecklist } from '../lib/activationChecklist.js'
 
 const AUTO_SYNC_STALE_MINUTES = 5
 const AUTO_SYNC_RETRY_MS = AUTO_SYNC_STALE_MINUTES * 60 * 1000
@@ -98,13 +96,11 @@ function DashboardPage() {
   const { getToken, userId } = useAuth()
   const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
+  const { openChat } = useAskSoverm()
 
   const [insightError, setInsightError] = useState(null)
   const [insightLoading, setInsightLoading] = useState(false)
   const [limitReached, setLimitReached] = useState(false)
-  const [floatingChatOpen, setFloatingChatOpen] = useState(false)
-  const [floatingChatDraft, setFloatingChatDraft] = useState('')
-  const [floatingChatAutoSend, setFloatingChatAutoSend] = useState(false)
   const [selectedRange, setSelectedRange] = useState('30d')
   const { showToast } = useToastContext()
   const [accountToDelete, setAccountToDelete] = useState(null)
@@ -205,38 +201,6 @@ function DashboardPage() {
   }, [userId])
 
   useEffect(() => {
-    if (searchParams.get('chat') !== 'open') {
-      return
-    }
-
-    /*
-     * Wait until dashboard data has settled so FloatingCfoChat picks the
-     * correct thread (insight vs general) on first open — otherwise the
-     * modal remounts mid-conversation when latestInsight arrives.
-     *
-     * When a prompt is present (Ask Soverm from a subscription / bill),
-     * auto-send it so the user doesn't have to tap Send again.
-     */
-    if (isPending && dashboardData === undefined) {
-      return
-    }
-
-    const prompt = searchParams.get('prompt') || ''
-    const shouldAutoSend =
-      Boolean(prompt) && searchParams.get('send') !== '0'
-
-    setFloatingChatDraft(prompt)
-    setFloatingChatAutoSend(shouldAutoSend)
-    setFloatingChatOpen(true)
-
-    const nextParams = new URLSearchParams(searchParams)
-    nextParams.delete('chat')
-    nextParams.delete('prompt')
-    nextParams.delete('send')
-    setSearchParams(nextParams, { replace: true })
-  }, [searchParams, setSearchParams, isPending, dashboardData])
-
-  useEffect(() => {
     if (searchParams.get('focus') !== 'balance') {
       return
     }
@@ -307,7 +271,7 @@ function DashboardPage() {
   const { data: expenseTeaser, isPending: expenseTeaserLoading } = useQuery({
     queryKey: expenseAnalyzerSummaryQueryKey,
     queryFn: () => fetchExpenseAnalyzerSummary(getToken),
-    enabled: hasAccounts,
+    enabled: hasAccounts && activeTab === DASHBOARD_TABS.TOOLS,
   })
 
   const {
@@ -323,6 +287,11 @@ function DashboardPage() {
   })
 
   const trackerLoading = trackerQueryPending && trackerData === undefined
+  const activationComplete = buildActivationChecklist({
+    userId,
+    hasAccounts,
+    paydayConfigured: Boolean(trackerData?.payday?.configured),
+  }).isComplete
 
   const { data: expenseAnalyzerData, isPending: expenseAnalyzerLoading } = useQuery({
     queryKey: expenseAnalyzerQueryKey,
@@ -514,16 +483,6 @@ function DashboardPage() {
     triggerGenerateInsight()
   }
 
-  function handleNavbarChat() {
-    /*
-     * Always open the floating Ask Soverm modal — one chat surface on the
-     * dashboard (same as deep links from Expense Analyzer / Weekly Review).
-     */
-    setFloatingChatDraft('')
-    setFloatingChatAutoSend(false)
-    setFloatingChatOpen(true)
-  }
-
   function handleOnboardingCollapsedChange(collapsed) {
     setOnboardingCollapsed(collapsed)
     setOnboardingCollapsedPreference(collapsed, userId)
@@ -552,9 +511,7 @@ function DashboardPage() {
               insight={dashboardData?.latestInsight}
               onChatError={(message) => showToast(message, 'error')}
               onOpenFloatingChat={(prompt = '') => {
-                setFloatingChatDraft(prompt || '')
-                setFloatingChatAutoSend(Boolean(prompt))
-                setFloatingChatOpen(true)
+                openChat({ prompt, autoSend: Boolean(prompt) })
               }}
               showActions={false}
             />
@@ -623,7 +580,7 @@ function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-app text-fg">
-      <AppNavbar onChatClick={handleNavbarChat} />
+      <AppNavbar />
 
       <main className="mx-auto max-w-6xl px-4 pb-16 pt-24 sm:px-6 sm:pt-28">
         {isError && isFetching && dashboardData && (
@@ -637,13 +594,6 @@ function DashboardPage() {
             <Skeleton className="mt-6 h-[3.25rem] w-full rounded-2xl" />
             <DashboardHeroSkeleton />
             <Skeleton className="mt-8 h-12 w-full max-w-3xl rounded-lg" />
-            <section className="mt-6">
-              <DashboardSectionHeader title="Connected accounts" />
-              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <Skeleton className="h-32 rounded-xl" />
-                <Skeleton className="h-32 rounded-xl" />
-              </div>
-            </section>
           </>
         ) : showFailedState ? (
           <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center">
@@ -680,48 +630,17 @@ function DashboardPage() {
                 onRangeChange={setSelectedRange}
                 income={dashboardData?.income ?? 0}
                 spent={dashboardData?.spent ?? 0}
+                cashFlow={dashboardData?.cashFlow ?? null}
                 spendingSeries={dashboardData?.spendingSeries ?? []}
                 trackerSnapshot={trackerData}
                 trackerLoading={trackerLoading}
               />
-
-              {hasAccounts && (
-                <Link
-                  to="/weekly-review"
-                  className="flex items-center justify-between gap-3 rounded-xl border border-ai/30 bg-ai/10 px-4 py-3.5 transition hover:bg-ai/15"
-                >
-                  <div className="min-w-0 text-left">
-                    <p className="text-sm font-semibold text-fg">Check your week</p>
-                    <p className="mt-0.5 text-xs text-fg-muted">
-                      How you did, what’s left until payday, and one better move
-                    </p>
-                  </div>
-                  <span className="shrink-0 text-xs font-semibold text-ai-soft">Open →</span>
-                </Link>
-              )}
-
-              {hasAccounts && (
-                <Link
-                  to="/month-condition"
-                  className="flex items-center justify-between gap-3 rounded-xl border border-border-default bg-surface px-4 py-3.5 transition hover:border-border-hover hover:bg-surface-elevated"
-                >
-                  <div className="min-w-0 text-left">
-                    <p className="text-sm font-semibold text-fg">Monthly accountant letter</p>
-                    <p className="mt-0.5 text-xs text-fg-muted">
-                      Your financial condition this month — and a plan for next
-                    </p>
-                  </div>
-                  <span className="shrink-0 text-xs font-semibold text-fg-muted">Open →</span>
-                </Link>
-              )}
 
               <DashboardActionsSection
                 showToast={showToast}
                 highlightedConnect={!hasAccounts}
                 showGenerateInsight={false}
               />
-
-              {renderAccountsSection()}
 
               <DashboardNeedsAttention
                 items={visibleAttentionItems}
@@ -733,27 +652,18 @@ function DashboardPage() {
               />
 
               {hasAccounts && (
-                <DashboardUpcomingBills
-                  forecast={forecastData}
-                  isLoading={forecastLoading}
-                  onOpenForecast={() => {
-                    setActiveTab(DASHBOARD_TABS.TOOLS)
-                    setQuickToolsTab(QUICK_TOOL_TABS.FORECAST)
-                    requestAnimationFrame(() => {
-                      document.getElementById('dashboard-quick-tools')?.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start',
-                      })
-                    })
-                  }}
-                />
-              )}
-
-              {hasAccounts && (
-                <DashboardSpendingSnapshot
-                  summary={expenseTeaser}
-                  isLoading={expenseTeaserLoading}
-                />
+                <Link
+                  to="/weekly-review"
+                  className="flex items-center justify-between gap-3 rounded-xl border border-ai/30 bg-ai/10 px-4 py-3.5 transition hover:bg-ai/15"
+                >
+                  <div className="min-w-0 text-left">
+                    <p className="text-sm font-semibold text-fg">Open your week</p>
+                    <p className="mt-0.5 text-xs text-fg-muted">
+                      What’s left until payday, and one better move
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-xs font-semibold text-ai-soft">Open →</span>
+                </Link>
               )}
 
               {hasAccounts && (
@@ -762,7 +672,9 @@ function DashboardPage() {
                     hasAccounts={hasAccounts}
                     paydayConfigured={Boolean(trackerData?.payday?.configured)}
                   />
-                  {!hasInsight &&
+                  {/* One setup surface: onboarding only after activation checklist is done */}
+                  {activationComplete &&
+                    !hasInsight &&
                     Boolean(trackerData?.payday?.configured) &&
                     Boolean(trackerData?.whatsLeftUntilPayday?.configured) && (
                       <DashboardOnboarding
@@ -870,23 +782,46 @@ function DashboardPage() {
               )}
 
               {hasAccounts && (
-                <DashboardQuickTools
-                  accounts={dashboardData?.accounts ?? []}
-                  lastSyncedAt={dashboardData?.lastSyncedAt}
-                  expenseData={expenseAnalyzerData}
-                  trackerSnapshot={trackerData}
-                  forecast={forecastData}
-                  trackerLoading={trackerLoading}
-                  trackerError={trackerIsError ? trackerError?.message : null}
-                  forecastLoading={toolsForecastLoading}
-                  forecastError={forecastIsError ? forecastError?.message : null}
-                  onRetryTracker={() => refetchTrackers()}
-                  onRetryForecast={() => refetchForecast()}
-                  getToken={getToken}
-                  activeTab={quickToolsTab}
-                  onTabChange={setQuickToolsTab}
-                  isLoading={quickToolsLoading}
-                />
+                <>
+                  {renderAccountsSection()}
+
+                  <DashboardUpcomingBills
+                    forecast={forecastData}
+                    isLoading={forecastLoading}
+                    onOpenForecast={() => {
+                      setQuickToolsTab(QUICK_TOOL_TABS.FORECAST)
+                      requestAnimationFrame(() => {
+                        document.getElementById('dashboard-quick-tools')?.scrollIntoView({
+                          behavior: 'smooth',
+                          block: 'start',
+                        })
+                      })
+                    }}
+                  />
+
+                  <DashboardSpendingSnapshot
+                    summary={expenseTeaser}
+                    isLoading={expenseTeaserLoading}
+                  />
+
+                  <DashboardQuickTools
+                    accounts={dashboardData?.accounts ?? []}
+                    lastSyncedAt={dashboardData?.lastSyncedAt}
+                    expenseData={expenseAnalyzerData}
+                    trackerSnapshot={trackerData}
+                    forecast={forecastData}
+                    trackerLoading={trackerLoading}
+                    trackerError={trackerIsError ? trackerError?.message : null}
+                    forecastLoading={toolsForecastLoading}
+                    forecastError={forecastIsError ? forecastError?.message : null}
+                    onRetryTracker={() => refetchTrackers()}
+                    onRetryForecast={() => refetchForecast()}
+                    getToken={getToken}
+                    activeTab={quickToolsTab}
+                    onTabChange={setQuickToolsTab}
+                    isLoading={quickToolsLoading}
+                  />
+                </>
               )}
             </DashboardTabPanel>
           </>
@@ -935,25 +870,6 @@ function DashboardPage() {
         }}
       />
 
-      {!showFailedState && (
-        <>
-          {!floatingChatOpen && (
-            <FloatingCfoChatButton onClick={() => setFloatingChatOpen(true)} />
-          )}
-          <FloatingCfoChatModal
-            isOpen={floatingChatOpen}
-            onClose={() => {
-              setFloatingChatOpen(false)
-              setFloatingChatDraft('')
-              setFloatingChatAutoSend(false)
-            }}
-            insightId={dashboardData?.latestInsight?.id}
-            initialDraft={floatingChatDraft}
-            autoSendInitialDraft={floatingChatAutoSend}
-            onChatError={(message) => showToast(message, 'error')}
-          />
-        </>
-      )}
     </div>
   )
 }

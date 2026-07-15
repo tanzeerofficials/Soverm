@@ -1,5 +1,5 @@
 import { formatDistanceToNow } from 'date-fns'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAnimatedNumber } from '../hooks/useAnimatedNumber.js'
 import { fillSpendingSeries } from '../lib/spendingSparkline.js'
@@ -44,6 +44,7 @@ function DashboardHero({
   onRangeChange,
   income = 0,
   spent = 0,
+  cashFlow = null,
   spendingSeries = [],
   trackerSnapshot = null,
   trackerLoading = false,
@@ -62,6 +63,7 @@ function DashboardHero({
   const spendingProgress = trackerSnapshot?.spendingTracker?.progress ?? null
   const primarySaving = trackerSnapshot?.savingTrackers?.[0]
   const hasSavingOnly = !hasSpendingTracker && Boolean(primarySaving)
+  const [showCashFlow, setShowCashFlow] = useState(false)
 
   if (!hasAccounts) {
     return (
@@ -127,22 +129,6 @@ function DashboardHero({
                 ? ` · ${formatCurrency(whatsLeft.billsUntilPaydayTotal)} in bills before then`
                 : ' · no known bills before payday'}
             </p>
-            {whatsLeft.bills?.length > 0 && (
-              <p className="mx-auto mt-2 max-w-md text-xs text-fg-subtle">
-                Next bills:{' '}
-                {whatsLeft.bills
-                  .slice(0, 3)
-                  .map((bill) => `${bill.merchant} (${formatCurrency(bill.amount)})`)
-                  .join(' · ')}
-                {whatsLeft.bills.length > 3 ? ` · +${whatsLeft.bills.length - 3} more` : ''}
-              </p>
-            )}
-            {hasSpendingTracker && trackerSnapshot?.safeToSpend != null && (
-              <p className="mt-2 text-xs text-fg-subtle">
-                Spending-cap safe to spend: {formatCurrency(trackerSnapshot.safeToSpend)} (separate
-                from payday remaining)
-              </p>
-            )}
             <p className="mt-4 text-xs text-fg-subtle">
               Total balance {formatCurrency(totalBalance)}
               {trackerSnapshot?.accountCount > 0
@@ -315,32 +301,48 @@ function DashboardHero({
           </>
         )}
 
-        <div className="mt-6 inline-flex rounded-full border border-border-default bg-app/50 p-1">
-          {RANGE_OPTIONS.map(({ value, label }) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => onRangeChange(value)}
-              className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
-                selectedRange === value
-                  ? 'bg-brand text-slate-950 shadow-sm'
-                  : 'text-fg-muted hover:text-fg'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <div className="mx-auto mt-6 max-w-xl">
+          <button
+            type="button"
+            onClick={() => setShowCashFlow((open) => !open)}
+            className="text-xs font-semibold text-fg-muted transition hover:text-fg"
+            aria-expanded={showCashFlow}
+          >
+            {showCashFlow ? 'Hide period cash flow' : 'Show period cash flow'}
+          </button>
 
-        <div className="mx-auto mt-6 max-w-sm">
-          <SpendingSparkline series={filledSpendingSeries} />
-        </div>
+          {showCashFlow && (
+            <div className="mt-4">
+              <div className="inline-flex rounded-full border border-border-default bg-app/50 p-1">
+                {RANGE_OPTIONS.map(({ value, label }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => onRangeChange(value)}
+                    className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
+                      selectedRange === value
+                        ? 'bg-brand text-slate-950 shadow-sm'
+                        : 'text-fg-muted hover:text-fg'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
 
-        <CashFlowSummary
-          income={income}
-          spent={spent}
-          rangeLabel={RANGE_LABELS[selectedRange]}
-        />
+              <div className="mx-auto mt-6 max-w-sm">
+                <SpendingSparkline series={filledSpendingSeries} />
+              </div>
+
+              <CashFlowSummary
+                income={income}
+                spent={spent}
+                cashFlow={cashFlow}
+                rangeLabel={RANGE_LABELS[selectedRange]}
+              />
+            </div>
+          )}
+        </div>
       </div>
     </section>
   )

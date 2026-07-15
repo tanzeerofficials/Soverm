@@ -12,6 +12,7 @@ import {
   resolveClerkUserIdFromStripeObject,
   setUserFreeFromStripe,
   setUserProFromStripe,
+  tierFromSubscriptionStatus,
 } from '../services/stripeBilling.js'
 import { reportServerError } from '../utils/sentry.js'
 
@@ -69,18 +70,15 @@ router.post('/', async (req, res) => {
             ? subscription.customer
             : subscription.customer?.id
         const status = subscription.status
+        const tier = tierFromSubscriptionStatus(status)
 
-        if (status === 'active' || status === 'trialing') {
+        if (tier === 'pro') {
           await setUserProFromStripe({
             userId,
             customerId,
             subscriptionId: subscription.id,
           })
-        } else if (
-          status === 'canceled' ||
-          status === 'unpaid' ||
-          status === 'incomplete_expired'
-        ) {
+        } else if (tier === 'free') {
           await setUserFreeFromStripe({
             userId,
             customerId,

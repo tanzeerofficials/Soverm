@@ -8,17 +8,18 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@clerk/clerk-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import AppNavbar from '../components/AppNavbar.jsx'
 import BillDefenseSection from '../components/BillDefenseSection.jsx'
 import HowCalculatedDisclosure from '../components/HowCalculatedDisclosure.jsx'
 import PageHeader from '../components/PageHeader.jsx'
 import Skeleton from '../components/Skeleton.jsx'
 import { useToastContext } from '../context/ToastContext.jsx'
+import { useAskSoverm } from '../context/AskSovermContext.jsx'
 import { savePayday } from '../lib/fetchPayday.js'
 import { createClosedLoopAction, updateActionLifecycle } from '../lib/fetchActions.js'
 import { fetchWeeklyReview } from '../lib/fetchWeeklyReview.js'
-import { buildCancelKeepWatchPrompt } from '../lib/chatSuggestedPrompts.js'
+import { buildCancelKeepWatchPrompt, buildWeeklyReviewSuggestedPrompts } from '../lib/chatSuggestedPrompts.js'
 import { markActivationStep } from '../lib/activationChecklist.js'
 import { trackWeeklyReviewView } from '../lib/analytics.js'
 import { formatActionStatus, formatPayCadence, PAY_CADENCE_OPTIONS } from '../lib/payCadenceLabels.js'
@@ -68,7 +69,7 @@ function verdictBadge(verdict) {
 
 function WeeklyReviewPage() {
   const { getToken, userId } = useAuth()
-  const navigate = useNavigate()
+  const { openChat } = useAskSoverm()
   const queryClient = useQueryClient()
   const { showToast } = useToastContext()
 
@@ -430,8 +431,12 @@ function WeeklyReviewPage() {
               onAskSoverm={(finding) => {
                 const prompt =
                   finding.reviewPrompt || buildCancelKeepWatchPrompt(finding)
-                const params = new URLSearchParams({ chat: 'open', prompt })
-                navigate(`/dashboard?${params.toString()}`)
+                openChat({
+                  prompt,
+                  suggestedPrompts: buildWeeklyReviewSuggestedPrompts(),
+                  contextLabel:
+                    'Using this week’s review, what’s left until payday, and your connected accounts.',
+                })
               }}
             />
 

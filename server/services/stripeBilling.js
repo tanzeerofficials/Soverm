@@ -1,8 +1,9 @@
 /*
  * STRIPE BILLING HELPERS
  *
- * Creates Checkout sessions for Soverm Pro and applies webhook events
- * to users.subscription_tier.
+ * Creates Checkout / Customer Portal sessions for Soverm Pro and applies
+ * webhook events to users.subscription_tier. Also cancels Stripe
+ * subscriptions when a user deletes their account.
  */
 
 import Stripe from 'stripe'
@@ -31,9 +32,40 @@ export function getStripeClient() {
   return stripeClient
 }
 
+/**
+ * Maps a Stripe subscription status to our app tier.
+ *
+ * What it does: returns 'pro' for billable statuses, 'free' for ended/failed,
+ * and null when we should leave the DB tier unchanged (e.g. past_due).
+ *
+ * Why: webhooks and unit tests need one shared rule so cancel / unpaid
+ * always demote consistently.
+ */
+export function tierFromSubscriptionStatus(status) {
+  if (status === 'active' || status === 'trialing') {
+    return 'pro'
+  }
+
+  if (
+    status === 'canceled' ||
+    status === 'unpaid' ||
+    status === 'incomplete_expired'
+  ) {
+    return 'free'
+  }
+
+  return null
+}
+
 function appBaseUrl() {
   const raw = process.env.APP_BASE_URL || process.env.CLIENT_URL || 'http://localhost:5173'
   return raw.replace(/\/$/, '')
+}
+
+function billingNotConfiguredError() {
+  const error = new Error('Stripe billing is not configured')
+  error.statusCode = 503
+  return error
 }
 
 /**
@@ -49,9 +81,7 @@ function appBaseUrl() {
 export async function createProCheckoutSession({ userId, email }) {
   const stripe = getStripeClient()
   if (!stripe) {
-    const error = new Error('Stripe billing is not configured')
-    error.statusCode = 503
-    throw error
+    throw billingNotConfiguredError()
   }
 
   const userResult = await db.query(
@@ -108,6 +138,133 @@ export async function createProCheckoutSession({ userId, email }) {
     sessionId: session.id,
     monthlyPrice: PRO_MONTHLY_PRICE,
   }
+}
+
+/**
+ * Opens Stripe's Customer Portal so Pro users can update payment methods
+ * or cancel — matches "cancel anytime" in Terms.
+ *
+ * What it does: creates a short-lived portal session URL for the user's
+ * Stripe customer and returns them to /settings when done.
+ *
+ * Why: Checkout only handles upgrade; manage/cancel must go through Portal.
+ */
+export async function createBillingPortalSession({ userId }) {
+  const stripe = getStripeClient()
+  if (!stripe) {
+    throw billingNotConfiguredError()
+  }
+
+  const userResult = await db.query(
+    `SELECT id, subscription_tier, stripe_customer_id
+     FROM users
+     WHERE id = $1`,
+    [userId]
+  )
+
+  const user = userResult.rows[0]
+  if (!user) {
+    const error = new Error('User not found')
+    error.statusCode = 404
+    throw error
+  }
+
+  if (user.subscription_tier !== 'pro') {
+    const error = new Error('Soverm Pro is required to manage billing')
+    error.statusCode = 400
+    throw error
+  }
+
+  if (!user.stripe_customer_id) {
+    const error = new Error('No Stripe customer on file for this account')
+    error.statusCode = 400
+    throw error
+  }
+
+  const session = await stripe.billingPortal.sessions.create({
+    customer: user.stripe_customer_id,
+    return_url: `${appBaseUrl()}/settings`,
+  })
+
+  return {
+    url: session.url,
+  }
+}
+
+/**
+ * Cancels active Stripe subscriptions for a user who is deleting their account.
+ *
+ * What it does: looks up stripe_subscription_id / stripe_customer_id, cancels
+ * immediately so Stripe stops charging after the account is gone.
+ *
+ * Why: deleting app rows alone leaves a live Stripe subscription.
+ * Errors are logged and swallowed so a Stripe outage never blocks deletion.
+ *
+ * @param {string} userId
+ * @param {{ stripe?: import('stripe').Stripe | null, db?: { query: Function } }} [deps]
+ */
+export async function cancelStripeSubscriptionsForUser(userId, deps = {}) {
+  const stripe = deps.stripe !== undefined ? deps.stripe : getStripeClient()
+  const database = deps.db ?? db
+  if (!stripe || !userId) {
+    return { canceled: 0, skipped: true }
+  }
+
+  const userResult = await database.query(
+    `SELECT stripe_customer_id, stripe_subscription_id
+     FROM users
+     WHERE id = $1`,
+    [userId]
+  )
+  const user = userResult.rows[0]
+  if (!user) {
+    return { canceled: 0, skipped: true }
+  }
+
+  const subscriptionIds = new Set()
+  if (user.stripe_subscription_id) {
+    subscriptionIds.add(user.stripe_subscription_id)
+  }
+
+  if (user.stripe_customer_id) {
+    try {
+      const list = await stripe.subscriptions.list({
+        customer: user.stripe_customer_id,
+        status: 'all',
+        limit: 20,
+      })
+      for (const subscription of list.data ?? []) {
+        if (
+          subscription.status === 'active' ||
+          subscription.status === 'trialing' ||
+          subscription.status === 'past_due' ||
+          subscription.status === 'unpaid'
+        ) {
+          subscriptionIds.add(subscription.id)
+        }
+      }
+    } catch (err) {
+      console.error(
+        'Stripe subscriptions.list failed during account deletion:',
+        err.message
+      )
+    }
+  }
+
+  let canceled = 0
+  for (const subscriptionId of subscriptionIds) {
+    try {
+      await stripe.subscriptions.cancel(subscriptionId)
+      canceled += 1
+    } catch (err) {
+      console.error(
+        `Stripe subscriptions.cancel failed for ${subscriptionId}:`,
+        err.message
+      )
+    }
+  }
+
+  return { canceled, skipped: false }
 }
 
 export async function setUserProFromStripe({

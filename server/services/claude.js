@@ -40,7 +40,7 @@ TONE — caring advisor, still honest:
 Critical cash-flow rules:
 - Overall income and spending totals are pre-computed. Never re-sum them from the transaction list.
 - Rows marked INTERNAL_MOVE (transfers between own accounts, credit-card/loan payments) must not be treated as income or discretionary spending.
-- Peer payments (Zelle, Venmo, TapTap Send, remittances to other people) may be called out as cash leaving the account when relevant, but do not invent overall income/spend totals from them.`
+- Peer payments (Zelle, Venmo, TapTap Send, remittances) count as real income when received and real spend when sent — even if Plaid labels them Transfer. Own-account transfers and credit-card payments do not.`
 
 function extractJsonObject(text) {
   const start = text.indexOf('{')

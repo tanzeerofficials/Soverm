@@ -8,6 +8,7 @@
  * removes" section in sync if tables or behavior here change.
  *
  * What it does:
+ * - Cancels any active Stripe subscription (best-effort) before wiping rows
  * - Collects access tokens from both plaid_items and legacy accounts rows
  * - Deletes the user row (CASCADE clears related tables where configured)
  * - Calls Plaid itemRemove for every unique token after the DB commit
@@ -19,8 +20,20 @@
 
 import db from '../db/index.js'
 import { plaidClient } from '../services/plaid.js'
+import { cancelStripeSubscriptionsForUser } from '../services/stripeBilling.js'
 
 export async function deleteAllUserData(userId) {
+  /*
+   * Cancel Stripe first so deleting the users row does not leave a live
+   * subscription charging a deleted account. Failures are swallowed inside
+   * the helper — account deletion must still proceed.
+   */
+  try {
+    await cancelStripeSubscriptionsForUser(userId)
+  } catch (err) {
+    console.error('Stripe cancel during account deletion failed:', err.message)
+  }
+
   const client = await db.connect()
   const accessTokens = new Set()
 

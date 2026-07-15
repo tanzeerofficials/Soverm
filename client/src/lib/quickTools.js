@@ -58,8 +58,13 @@ export function formatRelativeSync(lastSyncedAt) {
 
 /**
  * Flattens per-category recentTransactions into one list, newest first.
+ * Prefers recentCashFlowActivity when present (includes Zelle/income inflows).
  */
-export function collectRecentTransactions(categoryBreakdown, limit = 8) {
+export function collectRecentTransactions(categoryBreakdown, limit = 8, recentCashFlowActivity = null) {
+  if (Array.isArray(recentCashFlowActivity) && recentCashFlowActivity.length > 0) {
+    return recentCashFlowActivity.slice(0, limit)
+  }
+
   const combined = []
 
   for (const entry of categoryBreakdown ?? []) {
@@ -69,6 +74,7 @@ export function collectRecentTransactions(categoryBreakdown, limit = 8) {
       combined.push({
         ...transaction,
         category: categoryLabel,
+        direction: 'out',
       })
     }
   }

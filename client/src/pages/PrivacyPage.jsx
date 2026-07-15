@@ -83,8 +83,8 @@ function PrivacyPage() {
           When you delete your account from Settings, we permanently remove your Soverm data,
           including: chat messages, insight action items, insights, transactions, connected
           accounts, Plaid item records, and your user profile. We also attempt to revoke linked
-          Plaid Items. Some records may remain briefly in encrypted backups until those backups
-          rotate.
+          Plaid Items and cancel any active Soverm Pro Stripe subscription so billing stops.
+          Some records may remain briefly in encrypted backups until those backups rotate.
         </p>
       </Section>
 

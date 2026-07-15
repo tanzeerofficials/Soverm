@@ -60,6 +60,33 @@ body {
   background-color: #4b5563;
 }
 
+/* Notification dropdown — thinner gutter, thumb only on hover */
+.notification-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.notification-scroll:hover {
+  scrollbar-color: rgb(55 65 81 / 0.7) transparent;
+}
+
+.notification-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.notification-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.notification-scroll::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 9999px;
+}
+
+.notification-scroll:hover::-webkit-scrollbar-thumb {
+  background-color: rgb(55 65 81 / 0.7);
+}
+
 @media (prefers-reduced-motion: no-preference) {
   @keyframes landing-hero-in {
     from {

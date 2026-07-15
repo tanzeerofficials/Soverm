@@ -24,53 +24,70 @@ import { calculateTotalBalance, getDisplayBalance } from '../utils/balanceHelper
 import { loadExpenseAnalyzerData } from '../utils/expenseAnalyzerData.js'
 import { buildTrackerSnapshotWithFallback } from './trackerSnapshot.js'
 import {
-  EXCLUDE_INTERNAL_MOVES_FILTER,
   NON_PENDING_FILTER,
+  summarizeCashFlow,
 } from '../utils/transactionFilters.js'
+import {
+  classifyCashFlowTransaction,
+  MONEY_OUT_KINDS,
+} from '../utils/cashFlowClassification.js'
+import { EXPENSE_ANALYZER_TRANSACTION_SELECT } from '../utils/connectedAccountTransactions.js'
 
 async function loadMonthCashFlow(userId, startIso, endExclusiveIso) {
   const result = await db.query(
-    `SELECT
-       COALESCE(SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END), 0) AS spent,
-       COALESCE(SUM(CASE WHEN t.amount < 0 THEN ABS(t.amount) ELSE 0 END), 0) AS income
+    `SELECT ${EXPENSE_ANALYZER_TRANSACTION_SELECT}
      FROM transactions t
      ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
      WHERE t.user_id = $1
        ${NON_PENDING_FILTER}
-       ${EXCLUDE_INTERNAL_MOVES_FILTER}
        AND t.date >= $2::date
-       AND t.date < $3::date`,
+       AND t.date < $3::date
+     ORDER BY t.date DESC`,
     [userId, startIso, endExclusiveIso]
   )
 
+  const summary = summarizeCashFlow(result.rows, { activityLimit: 40 })
+
   return {
-    spent: roundCurrency(result.rows[0].spent),
-    income: roundCurrency(result.rows[0].income),
+    income: summary.moneyIn,
+    spent: summary.moneyOut,
+    moneyIn: summary.moneyIn,
+    moneyOut: summary.moneyOut,
+    net: summary.net,
+    byKind: summary.byKind,
+    internalMoved: summary.internalMoved,
+    liabilityPayments: summary.liabilityPayments,
+    activity: summary.activity,
   }
 }
 
 async function loadTopCategories(userId, startIso, endExclusiveIso, limit = 3) {
   const result = await db.query(
-    `SELECT COALESCE(t.category, 'Uncategorized') AS category,
-            COALESCE(SUM(t.amount), 0) AS amount
+    `SELECT ${EXPENSE_ANALYZER_TRANSACTION_SELECT}
      FROM transactions t
      ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
      WHERE t.user_id = $1
-       AND t.amount > 0
        ${NON_PENDING_FILTER}
-       ${EXCLUDE_INTERNAL_MOVES_FILTER}
        AND t.date >= $2::date
-       AND t.date < $3::date
-     GROUP BY 1
-     ORDER BY amount DESC
-     LIMIT $4`,
-    [userId, startIso, endExclusiveIso, limit]
+       AND t.date < $3::date`,
+    [userId, startIso, endExclusiveIso]
   )
 
-  const rows = result.rows.map((row) => ({
-    category: row.category,
-    amount: roundCurrency(row.amount),
-  }))
+  const byCategory = new Map()
+  for (const row of result.rows) {
+    const kind = classifyCashFlowTransaction(row)
+    if (!MONEY_OUT_KINDS.has(kind)) {
+      continue
+    }
+    const category = row.category || 'Uncategorized'
+    byCategory.set(category, (byCategory.get(category) ?? 0) + Math.abs(Number(row.amount) || 0))
+  }
+
+  const rows = [...byCategory.entries()]
+    .map(([category, amount]) => ({ category, amount: roundCurrency(amount) }))
+    .sort((left, right) => right.amount - left.amount)
+    .slice(0, limit)
+
   const total = rows.reduce((sum, row) => sum + row.amount, 0)
   return rows.map((row) => ({
     ...row,
@@ -154,6 +171,9 @@ export async function buildMonthConditionLetterForUser(
     isComplete,
     income: cashFlow.income,
     spent: cashFlow.spent,
+    byKind: cashFlow.byKind,
+    internalMoved: cashFlow.internalMoved,
+    liabilityPayments: cashFlow.liabilityPayments,
     netBalance,
     topCategories,
     recurringMonthly: expensePayload.totalRecurringMonthly ?? 0,

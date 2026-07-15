@@ -30,6 +30,57 @@ export function buildDashboardSuggestedPrompts() {
   ]
 }
 
+export function buildWeeklyReviewSuggestedPrompts() {
+  return [
+    'Will I make it to payday at this week’s pace?',
+    'What’s my one better money move this week?',
+    'Which bill or subscription should I tackle first?',
+    'How tight is my runway until payday?',
+  ]
+}
+
+export function buildMonthLetterSuggestedPrompts() {
+  return [
+    'Summarize my financial condition this month in plain English',
+    'What’s driving my spending this month?',
+    'What should I change next month?',
+    'Any subscriptions that look expensive for my situation?',
+  ]
+}
+
+/** Route-aware defaults when opening Ask Soverm from the FAB. */
+export function resolveAskSovermPageContext(pathname = '') {
+  if (pathname.startsWith('/weekly-review')) {
+    return {
+      suggestedPrompts: buildWeeklyReviewSuggestedPrompts(),
+      contextLabel:
+        'Using this week’s review, what’s left until payday, and your connected accounts.',
+    }
+  }
+
+  if (pathname.startsWith('/month-condition')) {
+    return {
+      suggestedPrompts: buildMonthLetterSuggestedPrompts(),
+      contextLabel:
+        'Using this month’s condition letter and your connected accounts.',
+    }
+  }
+
+  if (pathname.startsWith('/expense-analyzer')) {
+    return {
+      suggestedPrompts: buildExpenseAnalyzerSuggestedPrompts(),
+      contextLabel:
+        'Using Expense Analyzer categories, recurring charges, and your connected accounts.',
+    }
+  }
+
+  return {
+    suggestedPrompts: buildDashboardSuggestedPrompts(),
+    contextLabel:
+      'Using your accounts and spending — plus this week’s check-in and what’s left when available.',
+  }
+}
+
 export function buildEverydayMoneySuggestedPrompts() {
   return [
     'How do I file my taxes online — walk me through it?',

@@ -14,6 +14,7 @@ import AppLoadingScreen from './components/AppLoadingScreen.jsx'
 import Footer from './components/Footer.jsx'
 import AnalyticsPageView from './components/AnalyticsPageView.jsx'
 import PageTransitionLayout from './components/PageTransitionLayout.jsx'
+import { AskSovermProvider } from './context/AskSovermContext.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
 import HistoryPage from './pages/HistoryPage.jsx'
@@ -29,7 +30,9 @@ function PrivateRoutes() {
   return (
     <>
       <SignedIn>
-        <Outlet />
+        <AskSovermProvider>
+          <Outlet />
+        </AskSovermProvider>
       </SignedIn>
       <SignedOut>
         <AppLoadingScreen message="Signing you out…" />
@@ -45,8 +48,8 @@ function PrivateRoutes() {
  * What it does:
  * - Sets up all app routes and login guards.
  *
- * PrivateRoutes wraps /dashboard and /history so only signed-in users
- * can reach them — including /dashboard?chat=open from the navbar.
+ * PrivateRoutes wraps authenticated pages so only signed-in users
+ * can reach them. AskSovermProvider mounts the global chat modal.
  */
 function App() {
   return (

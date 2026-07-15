@@ -51,4 +51,22 @@ const pace = verifyActionOutcome(
 )
 assert(pace.result === 'improved', `pace improved ${pace.result}`)
 
+const billCancel = verifyActionOutcome(
+  {
+    description: 'Reminder: cancel Netflix yourself',
+    status: 'accepted',
+    metadata: { kind: 'bill_defense', decision: 'cancel', merchant: 'Netflix' },
+  },
+  {}
+)
+assert(billCancel.result === 'in_progress', 'bill cancel in progress')
+assert(
+  billCancel.summary.includes('cancel Netflix yourself'),
+  'bill cancel summary is honest'
+)
+assert(
+  billCancel.summary.includes("can’t cancel with the company"),
+  'bill cancel clarifies no merchant cancel'
+)
+
 console.log('All actionOutcomes tests passed.')

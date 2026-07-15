@@ -1,7 +1,7 @@
 /*
  * DASHBOARD UPCOMING BILLS
  *
- * Overview teaser for confirmed recurring charges due in the next 14 days.
+ * Tools teaser for confirmed recurring charges due in the next 14 days.
  * Data comes from the same cash-flow forecast scheduledOutflows list.
  */
 

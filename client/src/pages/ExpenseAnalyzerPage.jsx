@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@clerk/clerk-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import AppNavbar from '../components/AppNavbar.jsx'
 import PageHeader from '../components/PageHeader.jsx'
 import ProactiveNoticeBanner from '../components/ProactiveNoticeBanner.jsx'
@@ -44,8 +44,10 @@ import CategorySoftLimitControl, {
   CategorySoftLimitsIntro,
 } from '../components/CategorySoftLimitControl.jsx'
 import { useToastContext } from '../context/ToastContext.jsx'
+import { useAskSoverm } from '../context/AskSovermContext.jsx'
 import {
   buildCancelKeepWatchPrompt,
+  buildExpenseAnalyzerSuggestedPrompts,
   buildRecurringPortfolioPrompt,
   buildRecurringReviewPrompt,
 } from '../lib/chatSuggestedPrompts.js'
@@ -257,9 +259,9 @@ function formatOverallSpendingLine(overallSpending) {
 
 function ExpenseAnalyzerPage() {
   const { getToken } = useAuth()
-  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { showToast } = useToastContext()
+  const { openChat } = useAskSoverm()
   const [searchParams, setSearchParams] = useSearchParams()
   const [expandedCategory, setExpandedCategory] = useState(null)
   const [activeTab, setActiveTab] = useState(EXPENSE_ANALYZER_TABS.OVERVIEW)
@@ -269,16 +271,18 @@ function ExpenseAnalyzerPage() {
   const highlightCategory = searchParams.get('highlight')
 
   /*
-   * What this does: opens dashboard Ask Soverm with a starter prompt.
-   * Why: subscription review should jump from RECURRING cards into chat
-   * without forcing the user to invent the question.
+   * What this does: opens Ask Soverm in place with a starter prompt.
+   * Why: subscription review should jump into chat without leaving Expenses.
    */
   function openChatWithPrompt(prompt) {
-    const params = new URLSearchParams({ chat: 'open' })
-    if (prompt) {
-      params.set('prompt', prompt)
-    }
-    navigate(`/dashboard?${params.toString()}`)
+    openChat({
+      prompt,
+      suggestedPrompts: buildExpenseAnalyzerSuggestedPrompts({
+        totalRecurringMonthly: data?.totalRecurringMonthly,
+      }),
+      contextLabel:
+        'Using Expense Analyzer categories, recurring charges, and your connected accounts.',
+    })
   }
 
   function handleAskAboutCharge(charge) {
@@ -418,7 +422,6 @@ function ExpenseAnalyzerPage() {
       <AppNavbar
         backTo="/dashboard"
         backLabel="Dashboard"
-        onChatClick={() => navigate('/dashboard?chat=open')}
       />
 
       <main className="mx-auto max-w-3xl px-4 pb-16 pt-24 sm:px-6 sm:pt-28">
@@ -518,7 +521,7 @@ function ExpenseAnalyzerPage() {
                   </p>
                   <Link
                     to="/dashboard"
-                    className="mt-4 inline-flex rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-600"
+                    className="mt-4 inline-flex rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-brand-soft"
                   >
                     Go to Dashboard
                   </Link>
@@ -538,7 +541,7 @@ function ExpenseAnalyzerPage() {
                     </p>
                     <Link
                       to="/dashboard"
-                      className="mt-4 inline-flex rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-600"
+                      className="mt-4 inline-flex rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-brand-soft"
                     >
                       Go to Dashboard
                     </Link>

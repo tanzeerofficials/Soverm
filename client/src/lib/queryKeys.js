@@ -17,6 +17,7 @@ export const expenseAnalyzerQueryKey = ['expense-analyzer']
 export const expenseAnalyzerSummaryQueryKey = ['expense-analyzer', 'summary']
 export const expenseAnalyzerNarrativeQueryKey = ['expense-analyzer', 'narrative']
 export const usageQueryKey = ['usage']
+export const billingStatusQueryKey = ['billing', 'status']
 
 /** Prefix — invalidate this to refresh all / unread notification caches. */
 export const notificationsQueryKey = ['notifications']

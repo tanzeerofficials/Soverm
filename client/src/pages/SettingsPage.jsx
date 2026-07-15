@@ -19,8 +19,10 @@ import { useToastContext } from '../context/ToastContext.jsx'
 import { disconnectAccount, getDisconnectConfirmMessage } from '../lib/disconnectAccount.js'
 import { deleteAccount } from '../lib/deleteAccount.js'
 import { fetchUsage } from '../lib/fetchUsage.js'
+import { fetchBillingStatus, waitForProUnlock } from '../lib/fetchBillingStatus.js'
 import { fetchNotifications, updateNotificationPreferences } from '../lib/fetchNotifications.js'
 import {
+  billingStatusQueryKey,
   dashboardSummaryQueryKey,
   invalidateAfterAccountChange,
   notificationsAllQueryKey,
@@ -31,6 +33,8 @@ import { getDisplayBalance } from '../lib/balanceHelpers.js'
 import { trackUpgradeProClick } from '../lib/analytics.js'
 import {
   checkoutErrorToastMessage,
+  openBillingPortal,
+  portalErrorToastMessage,
   startProCheckout,
 } from '../lib/startProCheckout.js'
 
@@ -73,11 +77,34 @@ function SettingsPage() {
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false)
   const [isDeletingAccount, setIsDeletingAccount] = useState(false)
   const [checkoutLoading, setCheckoutLoading] = useState(false)
+  const [portalLoading, setPortalLoading] = useState(false)
+
+  /*
+   * Stripe redirects leave this page; browser Back can restore a cached copy
+   * with checkoutLoading/portalLoading still true ("Opening…" stuck). Reset
+   * whenever the page is shown again from bfcache.
+   */
+  useEffect(() => {
+    function resetBillingButtonState() {
+      setCheckoutLoading(false)
+      setPortalLoading(false)
+    }
+
+    function onPageShow(event) {
+      if (event.persisted) {
+        resetBillingButtonState()
+      }
+    }
+
+    window.addEventListener('pageshow', onPageShow)
+    return () => window.removeEventListener('pageshow', onPageShow)
+  }, [])
 
   /*
    * What this does: reads ?billing=success|canceled after Stripe Checkout redirect.
    * Why: Stripe sends users back here; we toast and clear the query so refresh
-   * does not repeat the message. Pro status still comes from the Stripe webhook.
+   * does not repeat the message. Pro status still comes from the Stripe webhook —
+   * we poll briefly so the UI can confirm unlock when the webhook lands.
    */
   useEffect(() => {
     const billing = searchParams.get('billing')
@@ -85,22 +112,62 @@ function SettingsPage() {
       return
     }
 
-    if (billing === 'success') {
-      showToast('Payment received — Pro unlocks once Stripe confirms (usually seconds)', 'success')
-      queryClient.invalidateQueries({ queryKey: usageQueryKey })
-    } else if (billing === 'canceled') {
-      showToast('Checkout canceled — you can upgrade anytime', 'success')
+    let cancelled = false
+
+    async function handleBillingReturn() {
+      if (billing === 'success') {
+        showToast('Payment received — confirming Pro…', 'success')
+        queryClient.invalidateQueries({ queryKey: usageQueryKey })
+        queryClient.invalidateQueries({ queryKey: billingStatusQueryKey })
+
+        const { unlocked } = await waitForProUnlock(getToken)
+        if (cancelled) {
+          return
+        }
+
+        await queryClient.invalidateQueries({ queryKey: usageQueryKey })
+        await queryClient.invalidateQueries({ queryKey: billingStatusQueryKey })
+
+        if (unlocked) {
+          showToast('You’re on Soverm Pro — unlimited insights unlocked', 'success')
+        } else {
+          showToast(
+            'Payment received — Pro unlocks once Stripe confirms (usually seconds)',
+            'success'
+          )
+        }
+      } else if (billing === 'canceled') {
+        showToast('Checkout canceled — you can upgrade anytime', 'success')
+      }
+
+      if (cancelled) {
+        return
+      }
+
+      const next = new URLSearchParams(searchParams)
+      next.delete('billing')
+      setSearchParams(next, { replace: true })
     }
 
-    const next = new URLSearchParams(searchParams)
-    next.delete('billing')
-    setSearchParams(next, { replace: true })
-  }, [searchParams, setSearchParams, showToast, queryClient])
+    handleBillingReturn()
+
+    return () => {
+      cancelled = true
+    }
+  }, [searchParams, setSearchParams, showToast, queryClient, getToken])
 
   const { data: usage } = useQuery({
     queryKey: usageQueryKey,
     queryFn: () => fetchUsage(getToken),
   })
+
+  const { data: billingStatus } = useQuery({
+    queryKey: billingStatusQueryKey,
+    queryFn: () => fetchBillingStatus(getToken),
+  })
+
+  const billingConfigured = billingStatus?.configured !== false
+  const isPro = usage?.isPro ?? billingStatus?.isPro ?? false
 
   const { data: notificationData } = useQuery({
     queryKey: notificationsAllQueryKey,
@@ -142,13 +209,36 @@ function SettingsPage() {
    * free-tier limits; success/cancel return to /settings?billing=...
    */
   async function handleUpgrade() {
+    if (!billingConfigured) {
+      showToast('Soverm Pro checkout is not available yet — please try again later', 'error')
+      return
+    }
+
     trackUpgradeProClick('settings')
     setCheckoutLoading(true)
     try {
       await startProCheckout(getToken)
     } catch (err) {
       showToast(checkoutErrorToastMessage(err), 'error')
-      setCheckoutLoading(false)
+    } finally {
+      // Redirect usually unloads the page; clear if we stay put (Back / failed nav).
+      window.setTimeout(() => setCheckoutLoading(false), 2500)
+    }
+  }
+
+  /*
+   * What this does: opens Stripe Customer Portal for Pro users.
+   * Why: update card / cancel must happen in Stripe's hosted portal —
+   * Checkout only covers the initial upgrade.
+   */
+  async function handleManageBilling() {
+    setPortalLoading(true)
+    try {
+      await openBillingPortal(getToken)
+    } catch (err) {
+      showToast(portalErrorToastMessage(err), 'error')
+    } finally {
+      window.setTimeout(() => setPortalLoading(false), 2500)
     }
   }
 
@@ -201,22 +291,43 @@ function SettingsPage() {
           <SettingsSection title="Your plan">
             <div className="flex flex-col gap-3">
               <p className="text-lg font-semibold text-fg">
-                {usage?.isPro ? 'Soverm Pro' : 'Free'}
+                {isPro ? 'Soverm Pro' : 'Free'}
               </p>
               <UsageBadge usage={usage} />
-              {usage && !usage.isPro && (
+              {isPro ? (
                 <>
                   <p className="text-xs text-fg-subtle">
-                    {usage.generatedToday ?? 0} insight
-                    {(usage.generatedToday ?? 0) === 1 ? '' : 's'} generated today
+                    Update your payment method or cancel anytime in the Stripe billing portal.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleManageBilling}
+                    disabled={portalLoading || !billingConfigured}
+                    className="mt-1 w-full rounded-lg border border-border-default bg-surface px-4 py-2.5 text-sm font-semibold text-fg transition hover:bg-surface-elevated disabled:opacity-60 sm:w-auto"
+                  >
+                    {portalLoading ? 'Opening…' : 'Manage billing'}
+                  </button>
+                  {!billingConfigured && (
+                    <p className="text-xs text-fg-subtle">Billing management is unavailable right now.</p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <p className="text-xs text-fg-subtle">
+                    {usage?.generatedToday ?? 0} insight
+                    {(usage?.generatedToday ?? 0) === 1 ? '' : 's'} generated today
                   </p>
                   <button
                     type="button"
                     onClick={handleUpgrade}
-                    disabled={checkoutLoading}
+                    disabled={checkoutLoading || !billingConfigured}
                     className="mt-1 w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-brand-soft disabled:opacity-60 sm:w-auto"
                   >
-                    {checkoutLoading ? 'Redirecting…' : 'Upgrade to Soverm Pro'}
+                    {checkoutLoading
+                      ? 'Redirecting…'
+                      : billingConfigured
+                        ? 'Upgrade to Soverm Pro'
+                        : 'Checkout unavailable'}
                   </button>
                 </>
               )}

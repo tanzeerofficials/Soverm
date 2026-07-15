@@ -1,8 +1,6 @@
 import { useEffect, useId, useState } from 'react'
 import { SignOutButton, useUser } from '@clerk/clerk-react'
 import { Link, useLocation } from 'react-router-dom'
-import ChatWithCfoButton from './ChatWithCfoButton.jsx'
-import ChatBubbleIcon from './ChatBubbleIcon.jsx'
 import NotificationBell from './NotificationBell.jsx'
 import BrandMark from './BrandMark.jsx'
 
@@ -31,6 +29,10 @@ const PRIMARY_NAV = [
     shortLabel: 'Expenses',
     match: (path) => path.startsWith('/expense-analyzer'),
   },
+]
+
+/** Account destinations — not in the center pill (weekly-loop IA). */
+const ACCOUNT_NAV = [
   {
     to: '/history',
     label: 'History',
@@ -44,6 +46,8 @@ const PRIMARY_NAV = [
     match: (path) => path.startsWith('/settings'),
   },
 ]
+
+const SETTINGS_NAV = ACCOUNT_NAV.find((item) => item.to === '/settings')
 
 function NavIcon({ name, className = 'h-4 w-4' }) {
   const props = {
@@ -175,7 +179,7 @@ function NavPill({ to, label, shortLabel, icon, active, onNavigate }) {
   )
 }
 
-function AppNavbar({ leftContent, onChatClick, backTo, backLabel, children }) {
+function AppNavbar({ leftContent, backTo, backLabel, children }) {
   const menuId = useId()
   const location = useLocation()
   const { user } = useUser()
@@ -209,11 +213,6 @@ function AppNavbar({ leftContent, onChatClick, backTo, backLabel, children }) {
       document.removeEventListener('keydown', handleKeyDown)
     }
   }, [menuOpen])
-
-  function handleChatClick() {
-    onChatClick?.()
-    setMenuOpen(false)
-  }
 
   function closeMenu() {
     setMenuOpen(false)
@@ -271,23 +270,42 @@ function AppNavbar({ leftContent, onChatClick, backTo, backLabel, children }) {
         {/* Desktop actions */}
         <div className="hidden shrink-0 items-center gap-2 lg:flex lg:gap-3">
           {children}
-          {onChatClick && <ChatWithCfoButton variant="compact" onClick={onChatClick} />}
 
           <span className="mx-0.5 h-6 w-px bg-border-default" aria-hidden="true" />
 
           <NotificationBell />
 
-          <div className="flex items-center gap-2.5 rounded-full border border-border-default bg-surface/80 py-1 pl-1 pr-2">
+          <Link
+            to="/history"
+            className={`hidden rounded-full border px-3 py-2 text-sm font-medium transition xl:inline-flex ${
+              ACCOUNT_NAV[0].match(location.pathname)
+                ? 'border-brand/40 bg-brand/10 text-fg'
+                : 'border-border-default bg-surface/80 text-fg-muted hover:bg-surface-elevated hover:text-fg'
+            }`}
+          >
+            History
+          </Link>
+
+          <Link
+            to="/settings"
+            className={`flex items-center gap-2.5 rounded-full border py-1 pl-1 pr-3 transition ${
+              SETTINGS_NAV.match(location.pathname)
+                ? 'border-brand/40 bg-brand/10 text-fg'
+                : 'border-border-default bg-surface/80 text-fg-muted hover:border-border-default hover:bg-surface-elevated hover:text-fg'
+            }`}
+            aria-label="Settings"
+            title="Settings"
+          >
             <div
               className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-surface-elevated to-surface text-sm font-semibold text-brand-soft ring-1 ring-border-default"
               aria-hidden="true"
             >
               {initials}
             </div>
-            <span className="hidden max-w-[7rem] truncate text-sm text-fg-muted xl:inline">
+            <span className="hidden max-w-[7rem] truncate text-sm xl:inline">
               {firstName}
             </span>
-          </div>
+          </Link>
 
           <SignOutButton>
             <button
@@ -372,25 +390,42 @@ function AppNavbar({ leftContent, onChatClick, backTo, backLabel, children }) {
                 )
               })}
 
+              <div className="mt-2 border-t border-border-default pt-2">
+                <p className="px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.25em] text-fg-subtle">
+                  Account
+                </p>
+                {ACCOUNT_NAV.map((item) => {
+                  const active = item.match(location.pathname)
+                  return (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      onClick={closeMenu}
+                      aria-current={active ? 'page' : undefined}
+                      className={`mb-1 flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition ${
+                        active
+                          ? 'bg-surface-elevated text-fg ring-1 ring-brand/30'
+                          : 'text-fg-muted hover:bg-surface-elevated/70'
+                      }`}
+                    >
+                      <NavIcon
+                        name={NAV_ICONS[item.to]}
+                        className={`h-5 w-5 shrink-0 ${
+                          active ? 'text-brand-soft' : 'text-fg-subtle'
+                        }`}
+                      />
+                      {item.label}
+                    </Link>
+                  )
+                })}
+              </div>
+
               {children && (
                 <div className="mt-2 border-t border-border-default pt-2 [&_a]:mb-1 [&_a]:flex [&_a]:items-center [&_a]:rounded-xl [&_a]:px-3 [&_a]:py-3 [&_a]:text-sm [&_a]:font-medium [&_a]:text-fg-muted [&_a]:transition hover:[&_a]:bg-surface-elevated/70">
                   {children}
                 </div>
               )}
             </div>
-
-            {onChatClick && (
-              <div className="border-t border-border-default p-3">
-                <button
-                  type="button"
-                  onClick={handleChatClick}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-ai/35 bg-ai/10 px-4 py-3 text-sm font-medium text-ai-soft transition hover:bg-ai/20"
-                >
-                  <ChatBubbleIcon className="h-5 w-5 shrink-0 text-ai" />
-                  Ask Soverm
-                </button>
-              </div>
-            )}
 
             <div className="border-t border-border-default p-2">
               <SignOutButton>

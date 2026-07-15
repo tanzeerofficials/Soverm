@@ -117,7 +117,7 @@ function RecentTransactionsPanel({ transactions, isLoading }) {
   if (transactions.length === 0) {
     return (
       <div>
-        <p className="text-sm text-fg-muted">No recent spending yet. Sync your accounts to see activity.</p>
+        <p className="text-sm text-fg-muted">No recent activity yet. Sync your accounts to see money in and out.</p>
         <Link to="/expense-analyzer?tab=categories" className="mt-3 inline-flex text-sm font-medium text-ai-soft hover:underline">
           Browse categories →
         </Link>
@@ -128,18 +128,40 @@ function RecentTransactionsPanel({ transactions, isLoading }) {
   return (
     <div>
       <ul className="divide-y divide-border-default/80">
-        {transactions.map((transaction) => (
-          <li key={`${transaction.name}-${transaction.date}-${transaction.category}`} className="flex justify-between gap-3 py-3">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-fg">{transaction.name}</p>
-              <p className="mt-0.5 text-xs text-fg-subtle">
-                {formatQuickToolDate(transaction.date)}
-                {transaction.category ? ` · ${transaction.category}` : ''}
-              </p>
-            </div>
-            <span className="font-mono text-sm tabular-nums text-fg">{formatCurrency(transaction.amount)}</span>
-          </li>
-        ))}
+        {transactions.map((transaction) => {
+          const isInflow = transaction.direction === 'in'
+          const isMoved =
+            transaction.kind === 'internal_transfer' ||
+            transaction.kind === 'liability_payment'
+          const amountClass = isMoved
+            ? 'text-fg-subtle'
+            : isInflow
+              ? 'text-brand-soft'
+              : 'text-fg'
+          const prefix = isMoved ? '' : isInflow ? '+' : '−'
+
+          return (
+            <li
+              key={`${transaction.kind}-${transaction.name}-${transaction.date}-${transaction.category}`}
+              className="flex justify-between gap-3 py-3"
+            >
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-fg">{transaction.name}</p>
+                <p className="mt-0.5 text-xs text-fg-subtle">
+                  {formatQuickToolDate(transaction.date)}
+                  {transaction.badge ? ` · ${transaction.badge}` : ''}
+                  {transaction.category && !transaction.badge
+                    ? ` · ${transaction.category}`
+                    : ''}
+                </p>
+              </div>
+              <span className={`font-mono text-sm tabular-nums ${amountClass}`}>
+                {prefix}
+                {formatCurrency(transaction.amount)}
+              </span>
+            </li>
+          )
+        })}
       </ul>
     </div>
   )
@@ -203,7 +225,11 @@ function DashboardQuickTools({
     }
   }
 
-  const recentTransactions = collectRecentTransactions(expenseData?.categoryBreakdown)
+  const recentTransactions = collectRecentTransactions(
+    expenseData?.categoryBreakdown,
+    8,
+    expenseData?.recentCashFlowActivity
+  )
 
   return (
     <section id="dashboard-quick-tools" className="rounded-xl border border-border-default bg-surface p-4 sm:p-5">

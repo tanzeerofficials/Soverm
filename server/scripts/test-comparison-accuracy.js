@@ -15,6 +15,7 @@ import {
   isCashFlowIncomeRow,
   isCashFlowSpendingRow,
   isInternalMoveTransaction,
+  summarizeCashFlow,
 } from '../utils/transactionFilters.js'
 import { enforceStatDeltas } from '../services/claude.js'
 import { calculateTotalBalance } from '../utils/balanceHelpers.js'
@@ -182,6 +183,16 @@ console.log('Comparison + filter accuracy tests\n')
     'payroll income counts'
   )
   assert(
+    isCashFlowIncomeRow({
+      amount: -2000,
+      category: 'Transfer',
+      name: 'Zelle payment from Alex',
+      date: '2026-07-01',
+      pending: false,
+    }),
+    'Zelle received counts as income'
+  )
+  assert(
     isInternalMoveTransaction({
       amount: 500,
       category: 'Transfer',
@@ -216,6 +227,57 @@ console.log('Comparison + filter accuracy tests\n')
     'normal Amazon spend not treated as internal'
   )
   console.log('  pass: filters keep real cash flow, drop internal moves')
+  passed++
+}
+
+// 6b) Ledger summary: Zelle/payroll in moneyIn; savings/CC separate; Chipotle in moneyOut
+{
+  const summary = summarizeCashFlow([
+    {
+      name: 'Zelle payment from Alex',
+      category: 'Transfer',
+      amount: -2000,
+      date: '2026-07-10',
+      pending: false,
+    },
+    {
+      name: 'ACME PAYROLL',
+      category: 'Payroll',
+      amount: -3000,
+      date: '2026-07-09',
+      pending: false,
+    },
+    {
+      name: 'Chipotle',
+      category: 'Food and Drink',
+      amount: 14,
+      date: '2026-07-08',
+      pending: false,
+    },
+    {
+      name: 'Transfer to Savings',
+      category: 'Transfer',
+      amount: 500,
+      date: '2026-07-07',
+      pending: false,
+    },
+    {
+      name: 'CREDIT CARD AUTOPAY',
+      category: 'Payment',
+      amount: 200,
+      date: '2026-07-06',
+      pending: false,
+    },
+  ])
+
+  assert(summary.moneyIn === 5000, 'ledger moneyIn = Zelle + payroll')
+  assert(summary.moneyOut === 14, 'ledger moneyOut = Chipotle only')
+  assert(summary.internalMoved === 500, 'savings transfer not in moneyOut')
+  assert(summary.liabilityPayments === 200, 'CC autopay not in moneyOut')
+  assert(summary.byKind.peer_in === 2000, 'Zelle kind peer_in')
+  assert(summary.byKind.income === 3000, 'payroll kind income')
+  assert(summary.byKind.spend === 14, 'Chipotle kind spend')
+  console.log('  pass: summarizeCashFlow money in/out vs internal/liability')
   passed++
 }
 

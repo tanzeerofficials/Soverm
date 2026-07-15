@@ -37,6 +37,7 @@ function FloatingCfoChatModal({
   initialDraft = '',
   autoSendInitialDraft = false,
   suggestedPrompts,
+  contextLabel,
 }) {
   const threadId = insightId || GENERAL_CHAT_KEY
   const prompts = suggestedPrompts ?? buildDashboardSuggestedPrompts()
@@ -121,9 +122,10 @@ function FloatingCfoChatModal({
             expanded
             suggestedPrompts={prompts}
             contextLabel={
-              insightId
+              contextLabel ||
+              (insightId
                 ? 'Uses your accounts, recent transactions, and Expense Analyzer — plus this week’s check-in when available.'
-                : 'Uses your accounts and spending — plus this week’s check-in and what’s left when available.'
+                : 'Uses your accounts and spending — plus this week’s check-in and what’s left when available.')
             }
             onExpandedChange={(expanded) => {
               if (!expanded) {

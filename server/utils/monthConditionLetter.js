@@ -17,7 +17,13 @@ function formatMoney(amount) {
 /**
  * M2 — income vs spending narrative.
  */
-export function buildIncomeVsSpending({ income = 0, spent = 0 } = {}) {
+export function buildIncomeVsSpending({
+  income = 0,
+  spent = 0,
+  byKind = null,
+  internalMoved = 0,
+  liabilityPayments = 0,
+} = {}) {
   const incomeAmount = roundCurrency(income)
   const spentAmount = roundCurrency(spent)
   const net = roundCurrency(incomeAmount - spentAmount)
@@ -26,7 +32,7 @@ export function buildIncomeVsSpending({ income = 0, spent = 0 } = {}) {
   let summary
   if (incomeAmount <= 0 && spentAmount <= 0) {
     outcome = 'unknown'
-    summary = 'Not enough income and spending posted this month yet to judge the month.'
+    summary = 'Not enough external money in and out posted this month yet to judge the month.'
   } else if (net > 5) {
     outcome = 'surplus'
     summary = `You brought in ${formatMoney(incomeAmount)} and spent ${formatMoney(spentAmount)} — a surplus of ${formatMoney(net)}.`
@@ -41,9 +47,14 @@ export function buildIncomeVsSpending({ income = 0, spent = 0 } = {}) {
   return {
     income: incomeAmount,
     spent: spentAmount,
+    moneyIn: incomeAmount,
+    moneyOut: spentAmount,
     net,
     outcome,
     summary,
+    byKind: byKind ?? null,
+    internalMoved: roundCurrency(internalMoved),
+    liabilityPayments: roundCurrency(liabilityPayments),
   }
 }
 
@@ -316,8 +327,17 @@ export function buildMonthConditionLetter({
   priorSpent = 0,
   dayOfMonth = 1,
   whatsLeftAmount = null,
+  byKind = null,
+  internalMoved = 0,
+  liabilityPayments = 0,
 } = {}) {
-  const cashFlow = buildIncomeVsSpending({ income, spent })
+  const cashFlow = buildIncomeVsSpending({
+    income,
+    spent,
+    byKind,
+    internalMoved,
+    liabilityPayments,
+  })
   const drivers = topCategories.slice(0, 3).map((entry) => ({
     category: entry.category,
     amount: roundCurrency(entry.amount ?? entry.currentTotal ?? 0),

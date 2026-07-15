@@ -1,7 +1,7 @@
 /*
  * DASHBOARD SPENDING SNAPSHOT
  *
- * Compact Overview card — top category mover, recurring charges preview,
+ * Compact Tools card — top category mover, recurring charges preview,
  * and links into the Expense Analyzer.
  */
 

@@ -210,15 +210,60 @@ Scripts refuse localhost unless `ALLOW_LOCAL_DB=1`. Use Railway’s **public** P
 
 ## Stripe (Soverm Pro)
 
-1. Create a Product + recurring Price in Stripe; put the Price id in `STRIPE_PRICE_ID`
-2. Set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `APP_BASE_URL` (your Vercel URL)
-3. Point a Stripe webhook at `POST https://<api-host>/webhooks/stripe` for:
-   - `checkout.session.completed`
-   - `customer.subscription.updated`
-   - `customer.subscription.deleted`
-4. Run migration `019` so `users.stripe_*` columns exist
+Soverm Pro is **$5/mo**. Free: 1 AI insight/day + 7-day history. Pro: unlimited insights (safety ceiling 30/day) + full history.
 
-Without these env vars, `POST /api/billing/checkout` returns 503 and the client shows a friendly toast.
+### Production setup checklist (launch gate)
+
+Complete **before** inviting next-week testers. Deploy **client + API together** so Manage billing / portal UI matches the API.
+
+**Railway env (API service)**
+
+| Variable | Production value |
+|----------|------------------|
+| `STRIPE_SECRET_KEY` | Live `sk_live_…` (or `sk_test_…` until you go live) |
+| `STRIPE_PRICE_ID` | Recurring Price id `price_…` (not Product id) |
+| `STRIPE_WEBHOOK_SECRET` | `whsec_…` from the destination below |
+| `APP_BASE_URL` | `https://soverm.vercel.app` (no trailing slash) |
+
+**Database**
+
+```sh
+# From server/ against Railway public DATABASE_URL
+DATABASE_URL='...' npm run migrate:019
+# Expect: columns already exist, or migration applied once
+```
+
+Confirm `users.stripe_customer_id` and `users.stripe_subscription_id` exist (`verify:migrations` covers 019).
+
+**Stripe Dashboard**
+
+1. Webhook destination → `https://soverm-production.up.railway.app/webhooks/stripe`
+2. Events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`
+3. Customer Portal → allow payment method update + **cancel** (portal cancels fire the subscription events above)
+
+**15-minute smoke (human)**
+
+1. Fresh Free user on [soverm.vercel.app](https://soverm.vercel.app)
+2. Settings → **Upgrade** → Stripe Checkout with test/live card
+3. Return → Settings shows **Pro** within ~30s (webhook)
+4. **Manage billing** opens Customer Portal
+5. Cancel subscription in portal → Settings shows **Free** within ~30s
+6. Optional: delete-account path on a throwaway Pro user — Stripe sub cancels, no leftover charge
+
+Without the three Stripe env vars, `POST /api/billing/checkout` and `POST /api/billing/portal` return 503 and the client shows a friendly toast.
+
+### Account deletion
+
+Deleting an account cancels any active Stripe subscription first (so Stripe stops charging), then removes app data. Stripe outages are logged and do not block deletion.
+
+### Billing API
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/api/billing/status` | `{ configured, tier, isPro }` |
+| `POST` | `/api/billing/checkout` | Create Pro Checkout session |
+| `POST` | `/api/billing/portal` | Create Customer Portal session (Pro) |
+| `POST` | `/webhooks/stripe` | Checkout / subscription sync |
 
 ## API routes (summary)
 
@@ -228,7 +273,9 @@ Without these env vars, `POST /api/billing/checkout` returns 503 and the client 
 | `POST` | `/webhooks/clerk` | Clerk user sync / update / delete |
 | `POST` | `/webhooks/stripe` | Stripe Checkout / subscription sync |
 | `POST` | `/webhooks/plaid` | Plaid transaction sync push |
+| `GET` | `/api/billing/status` | Billing configured + tier |
 | `POST` | `/api/billing/checkout` | Create Pro Checkout session |
+| `POST` | `/api/billing/portal` | Create Customer Portal session |
 | `GET` | `/api/export/monthly-snapshot` | Monthly JSON/CSV export |
 | `GET`/`POST`/`DELETE` | `/api/category-limits` | Category soft limits |
 | `POST` | `/api/plaid/create-link-token` | Plaid Link token |

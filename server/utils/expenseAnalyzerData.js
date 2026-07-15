@@ -41,7 +41,7 @@ import {
   buildCancelKeepWatchPrompt,
 } from './billDefense.js'
 import {
-  EXCLUDE_INTERNAL_MOVES_FILTER,
+  buildRecentCashFlowActivity,
   isCashFlowIncomeRow,
   isCashFlowSpendingRow,
 } from './transactionFilters.js'
@@ -972,6 +972,7 @@ export function buildExpenseAnalyzerPayload(comparison, recurringLookbackRows, o
     totalReviewMonthly,
     overallSpending: overallSpendingWithSplit,
     billDefense,
+    recentCashFlowActivity: buildRecentCashFlowActivity(recurringLookbackRows, 12),
     narrativeSummary: buildTemplateNarrative({
       topMover,
       overallSpending,
@@ -1013,7 +1014,6 @@ export async function loadExpenseAnalyzerData(userId) {
        WHERE t.user_id = $1
          AND t.date >= NOW() - $2::interval
          ${NON_PENDING_FILTER}
-         ${EXCLUDE_INTERNAL_MOVES_FILTER}
        ORDER BY t.date ASC`,
       [userId, RECURRING_LOOKBACK_INTERVAL]
     ),

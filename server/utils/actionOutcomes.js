@@ -50,6 +50,45 @@ export function verifyActionOutcome(action, context = {}) {
     }
   }
 
+  /*
+   * Bill defense "plan to cancel" is a personal reminder — not a merchant cancel.
+   * Follow-up copy must stay ruthlessly honest so testers don't think Soverm cancelled Spotify.
+   */
+  if (metadata.kind === 'bill_defense' && metadata.decision === 'cancel') {
+    const merchant = metadata.merchant?.trim() || 'that subscription'
+    if (status === 'done') {
+      return {
+        tone: 'brand',
+        result: 'done',
+        summary: `You marked cancel ${merchant} done — nice. Keep watching for the next charge.`,
+        stillRelevant: false,
+      }
+    }
+    return {
+      tone: 'warning',
+      result: 'in_progress',
+      summary: `Reminder: cancel ${merchant} yourself. Soverm can’t cancel with the company.`,
+      stillRelevant: true,
+    }
+  }
+
+  if (metadata.kind === 'bill_defense') {
+    if (status === 'done') {
+      return {
+        tone: 'brand',
+        result: 'done',
+        summary: `You finished “${action.description}”.`,
+        stillRelevant: false,
+      }
+    }
+    return {
+      tone: 'neutral',
+      result: 'in_progress',
+      summary: `Follow-up: “${action.description}”. Mark done when finished.`,
+      stillRelevant: true,
+    }
+  }
+
   const spentThisWeek = roundCurrency(context.spentThisWeek ?? 0)
   const spentPriorWeek = roundCurrency(context.spentPriorWeek ?? 0)
   const catThis = context.categorySpendThisWeek

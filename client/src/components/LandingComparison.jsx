@@ -11,7 +11,7 @@ const COLUMNS = [
     title: 'Rocket Money / bank apps / sheets',
     tone: 'without',
     items: [
-      'Cancel subscriptions — then leave you alone',
+      'Cancel subscriptions for you — then leave you alone',
       'Balances and charts without “what’s left until payday”',
       'No weekly ritual that ends in one clear move',
       'Month-end is a statement PDF, not a condition letter',
@@ -27,7 +27,7 @@ const COLUMNS = [
       'Weekly check-in: how you did, one risk, one move',
       'Month-end accountant letter (Stable / Tight / At risk)',
       'Optional “Can I afford it?” check when you’re unsure',
-      'Bill defense + optional category caps that feed the same loop',
+      'Bill defense that reminds you to cancel — we don’t cancel with the merchant',
     ],
   },
 ]

@@ -8,7 +8,7 @@
 import { useAuth } from '@clerk/clerk-react'
 import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import AppNavbar from '../components/AppNavbar.jsx'
 import BillDefenseSection from '../components/BillDefenseSection.jsx'
 import HowCalculatedDisclosure from '../components/HowCalculatedDisclosure.jsx'
@@ -16,9 +16,10 @@ import PageHeader from '../components/PageHeader.jsx'
 import Skeleton from '../components/Skeleton.jsx'
 import { fetchMonthCondition } from '../lib/fetchMonthCondition.js'
 import { monthConditionQueryKey } from '../lib/queryKeys.js'
-import { buildCancelKeepWatchPrompt } from '../lib/chatSuggestedPrompts.js'
+import { buildCancelKeepWatchPrompt, buildMonthLetterSuggestedPrompts } from '../lib/chatSuggestedPrompts.js'
 import { markActivationStep } from '../lib/activationChecklist.js'
 import { trackMonthLetterView } from '../lib/analytics.js'
+import { useAskSoverm } from '../context/AskSovermContext.jsx'
 
 function formatCurrency(amount) {
   if (amount == null) {
@@ -42,7 +43,7 @@ function gradeTone(grade) {
 
 function MonthConditionPage() {
   const { getToken, userId } = useAuth()
-  const navigate = useNavigate()
+  const { openChat } = useAskSoverm()
   const [searchParams, setSearchParams] = useSearchParams()
   const monthParam = searchParams.get('month')
 
@@ -144,22 +145,25 @@ function MonthConditionPage() {
             {/* M2 cash flow */}
             <section className="rounded-xl border border-border-default bg-surface px-5 py-5 text-left">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-fg-subtle">
-                Income vs spending
+                Money in vs money out
+              </p>
+              <p className="mt-1 text-[11px] text-fg-subtle">
+                External cash only — own-account transfers and card payments are listed separately.
               </p>
               <p className="mt-3 text-sm leading-relaxed text-fg-muted">
                 {data.cashFlow?.summary}
               </p>
               <div className="mt-4 grid grid-cols-3 gap-3 text-center">
                 <div>
-                  <p className="text-[11px] text-fg-subtle">Income</p>
+                  <p className="text-[11px] text-fg-subtle">Money in</p>
                   <p className="mt-1 font-mono text-sm font-semibold tabular-nums text-fg">
-                    {formatCurrency(data.cashFlow?.income)}
+                    {formatCurrency(data.cashFlow?.moneyIn ?? data.cashFlow?.income)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[11px] text-fg-subtle">Spent</p>
+                  <p className="text-[11px] text-fg-subtle">Money out</p>
                   <p className="mt-1 font-mono text-sm font-semibold tabular-nums text-fg">
-                    {formatCurrency(data.cashFlow?.spent)}
+                    {formatCurrency(data.cashFlow?.moneyOut ?? data.cashFlow?.spent)}
                   </p>
                 </div>
                 <div>
@@ -173,6 +177,61 @@ function MonthConditionPage() {
                   </p>
                 </div>
               </div>
+
+              {(data.cashFlow?.byKind ||
+                data.cashFlow?.internalMoved > 0 ||
+                data.cashFlow?.liabilityPayments > 0) && (
+                <ul className="mt-4 space-y-1.5 border-t border-border-default/70 pt-3 text-xs text-fg-muted">
+                  {data.cashFlow?.byKind?.income > 0 && (
+                    <li className="flex justify-between gap-3">
+                      <span>Income / deposits</span>
+                      <span className="font-mono tabular-nums">
+                        {formatCurrency(data.cashFlow.byKind.income)}
+                      </span>
+                    </li>
+                  )}
+                  {data.cashFlow?.byKind?.peer_in > 0 && (
+                    <li className="flex justify-between gap-3">
+                      <span>Peer received (Zelle, Venmo, etc.)</span>
+                      <span className="font-mono tabular-nums">
+                        {formatCurrency(data.cashFlow.byKind.peer_in)}
+                      </span>
+                    </li>
+                  )}
+                  {data.cashFlow?.byKind?.spend > 0 && (
+                    <li className="flex justify-between gap-3">
+                      <span>Spending</span>
+                      <span className="font-mono tabular-nums">
+                        {formatCurrency(data.cashFlow.byKind.spend)}
+                      </span>
+                    </li>
+                  )}
+                  {data.cashFlow?.byKind?.peer_out > 0 && (
+                    <li className="flex justify-between gap-3">
+                      <span>Peer sent</span>
+                      <span className="font-mono tabular-nums">
+                        {formatCurrency(data.cashFlow.byKind.peer_out)}
+                      </span>
+                    </li>
+                  )}
+                  {data.cashFlow?.internalMoved > 0 && (
+                    <li className="flex justify-between gap-3 text-fg-subtle">
+                      <span>Moved between your accounts</span>
+                      <span className="font-mono tabular-nums">
+                        {formatCurrency(data.cashFlow.internalMoved)}
+                      </span>
+                    </li>
+                  )}
+                  {data.cashFlow?.liabilityPayments > 0 && (
+                    <li className="flex justify-between gap-3 text-fg-subtle">
+                      <span>Card / loan payments</span>
+                      <span className="font-mono tabular-nums">
+                        {formatCurrency(data.cashFlow.liabilityPayments)}
+                      </span>
+                    </li>
+                  )}
+                </ul>
+              )}
             </section>
 
             {/* M3 drivers */}
@@ -224,8 +283,12 @@ function MonthConditionPage() {
               onAskSoverm={(finding) => {
                 const prompt =
                   finding.reviewPrompt || buildCancelKeepWatchPrompt(finding)
-                const params = new URLSearchParams({ chat: 'open', prompt })
-                navigate(`/dashboard?${params.toString()}`)
+                openChat({
+                  prompt,
+                  suggestedPrompts: buildMonthLetterSuggestedPrompts(),
+                  contextLabel:
+                    'Using this month’s condition letter and your connected accounts.',
+                })
               }}
             />
 
