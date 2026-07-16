@@ -16,13 +16,45 @@
 
 import { Configuration, PlaidApi, PlaidEnvironments } from 'plaid'
 import db from '../db/index.js'
-import { resolvePlaidTransactionCategory } from '../utils/plaidCategory.js'
+import { resolvePlaidTransactionCategory, TRANSFER_CATEGORY_LABEL } from '../utils/plaidCategory.js'
 
 function formatBackfillDate(date) {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
+}
+
+/*
+ * correctPeerPaymentCategoriesForUser(userId)
+ *
+ * What it does: rewrites stored categories for Zelle/Venmo/etc. to Transfer.
+ * Why: Plaid often mislabels person-to-person sends (e.g. Personal Care).
+ * Runs on each sync so existing rows fix without waiting for a Plaid update.
+ */
+async function correctPeerPaymentCategoriesForUser(userId) {
+  const result = await db.query(
+    `UPDATE transactions
+     SET category = $2
+     WHERE user_id = $1
+       AND category IS DISTINCT FROM $2
+       AND (
+         name ILIKE '%zelle%'
+         OR name ILIKE '%venmo%'
+         OR name ILIKE '%cash app%'
+         OR name ILIKE '%cashapp%'
+         OR name ILIKE '%paypal%'
+         OR name ILIKE '%taptap%'
+         OR name ILIKE '%tap tap%'
+         OR name ILIKE '%remitly%'
+         OR name ILIKE '%western union%'
+         OR name ILIKE '%apple cash%'
+         OR name ILIKE '%google pay%'
+         OR name ILIKE '%wise%'
+       )`,
+    [userId, TRANSFER_CATEGORY_LABEL]
+  )
+  return result.rowCount ?? 0
 }
 
 /*
@@ -329,6 +361,15 @@ export async function syncAllAccountsForUser(userId) {
         counts.itemErrors = (counts.itemErrors ?? 0) + 1
         counts.partial = true
       }
+    }
+
+    try {
+      counts.peerCategoriesCorrected = await correctPeerPaymentCategoriesForUser(userId)
+    } catch (peerErr) {
+      console.warn(
+        `Peer category correction skipped for user ${userId}:`,
+        peerErr.message
+      )
     }
 
     return counts

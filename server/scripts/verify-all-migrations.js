@@ -233,6 +233,14 @@ const CHECKS = [
     check: () => notificationTriggerTypesOk([...CAP_TRIGGER_TYPES, ...RITUAL_TRIGGER_TYPES]),
     script: 'scripts/run-024-ritual-notification-types-migration.js',
   },
+  {
+    id: '025',
+    label: '025 stripe cancel at period end',
+    check: async () =>
+      (await columnExists('users', 'stripe_cancel_at_period_end')) &&
+      (await columnExists('users', 'stripe_current_period_end')),
+    script: 'scripts/run-025-stripe-cancel-at-period-end-migration.js',
+  },
 ]
 
 async function main() {

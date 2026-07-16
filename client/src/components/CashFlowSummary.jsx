@@ -54,8 +54,9 @@ function CashFlowSummary({
         </p>
         <p className="text-[11px] text-fg-subtle">{rangeLabel}</p>
       </div>
-      <p className="mt-1 text-[11px] text-fg-subtle">
-        External cash only — own-account transfers and card payments are listed separately.
+      <p className="mt-1 text-[11px] leading-relaxed text-fg-subtle">
+        How external money moved {rangeLabel} — not your current balance. Own-account transfers and
+        card payments are listed separately below and are not in Money in / Money out / Net.
       </p>
 
       <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-4">
@@ -85,7 +86,7 @@ function CashFlowSummary({
           }`}
         >
           <p className="text-[10px] font-semibold uppercase tracking-wide text-fg-subtle">
-            Net
+            Net this period
           </p>
           <p
             className={`mt-1 font-mono text-sm font-semibold tabular-nums leading-tight sm:text-xl ${

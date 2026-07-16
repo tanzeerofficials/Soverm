@@ -9,10 +9,10 @@ import { getAuth, requireAuth } from '@clerk/express'
 import { ensureUserExists } from '../utils/ensureUser.js'
 import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
 import { reportServerError } from '../utils/sentry.js'
-import { getUserTier } from '../utils/usage.js'
 import {
   createBillingPortalSession,
   createProCheckoutSession,
+  getBillingAccessStatus,
   isStripeBillingConfigured,
 } from '../services/stripeBilling.js'
 
@@ -23,23 +23,26 @@ router.use(requireAuth())
 /*
  * GET /api/billing/status
  *
- * What it does: tells the client whether Stripe is configured and the
- * user's current subscription_tier from the DB.
+ * What it does: tells the client whether Stripe is configured, the user's
+ * plan tier, and — if they canceled in the portal — when Pro access ends.
  *
- * Why: Settings can disable Upgrade when checkout is unavailable, and
- * show plan state without waiting solely on the usage endpoint.
+ * Why: Profile must show "Pro until {date}" after cancel-at-period-end so
+ * users know features stay available through the paid period.
  */
 router.get('/status', async (req, res) => {
   const { userId } = getAuth(req)
 
   try {
     await ensureUserExists(userId)
-    const tier = await getUserTier(userId)
+    const access = await getBillingAccessStatus(userId)
 
     res.json({
       configured: isStripeBillingConfigured(),
-      tier,
-      isPro: tier === 'pro',
+      tier: access.tier,
+      isPro: access.isPro,
+      cancelAtPeriodEnd: access.cancelAtPeriodEnd,
+      currentPeriodEnd: access.currentPeriodEnd,
+      proAccessEndsAt: access.proAccessEndsAt,
     })
   } catch (err) {
     reportServerError('to load billing status', err, { userId, req })

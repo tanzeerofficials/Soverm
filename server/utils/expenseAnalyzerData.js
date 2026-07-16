@@ -14,6 +14,7 @@ import {
   isSignificantCategoryDelta,
 } from './financialContext.js'
 import { formatAccountLabel } from './accountLabel.js'
+import { resolveSpendingCategoryLabel } from './plaidCategory.js'
 import {
   buildCategoryAccountBreakdowns,
   buildCategoryDrillDownMaps,
@@ -230,7 +231,7 @@ function resolveCategoryFromChain(chain) {
   const counts = new Map()
 
   for (const row of chain) {
-    const category = row.category || 'Uncategorized'
+    const category = resolveSpendingCategoryLabel(row)
     counts.set(category, (counts.get(category) ?? 0) + 1)
   }
 
@@ -694,7 +695,7 @@ function buildCategoryTotals(rows) {
   const byCategory = {}
 
   for (const row of rows) {
-    const category = row.category || 'Uncategorized'
+    const category = resolveSpendingCategoryLabel(row)
     byCategory[category] = (byCategory[category] ?? 0) + Number(row.amount)
   }
 
@@ -830,13 +831,28 @@ export function buildTemplateNarrative({
   }
 
   if (isSignificantCategoryDelta(topMover) && topMover.percent != null) {
-    parts.push(
-      `${topMover.category} is your biggest mover — ${formatComparisonPhrase(
-        topMover.currentTotal,
-        topMover.priorTotal,
-        topMover
-      )}.`
-    )
+    const currentLabel =
+      topMover.currentTotal != null ? `$${Number(topMover.currentTotal).toFixed(2)}` : null
+    const priorLabel =
+      topMover.priorTotal != null ? `$${Number(topMover.priorTotal).toFixed(2)}` : null
+
+    if (topMover.direction === 'up' && currentLabel && priorLabel) {
+      parts.push(
+        `Worth a quick look: ${topMover.category} is at ${currentLabel} this period (was ${priorLabel} before). A short review of that category can help when you have a minute.`
+      )
+    } else if (topMover.direction === 'down' && currentLabel && priorLabel) {
+      parts.push(
+        `${topMover.category} is quieter this period — ${currentLabel}, down from ${priorLabel} before.`
+      )
+    } else {
+      parts.push(
+        `${topMover.category} changed vs the prior 30 days — ${formatComparisonPhrase(
+          topMover.currentTotal,
+          topMover.priorTotal,
+          topMover
+        )}.`
+      )
+    }
   }
 
   if (recurringCharges.length > 0) {

@@ -1,5 +1,6 @@
 import { formatAccountLabel } from './accountLabel.js'
 import { normalizeMerchantName } from './merchantNormalize.js'
+import { resolveSpendingCategoryLabel } from './plaidCategory.js'
 import { isCashFlowSpendingRow } from './transactionFilters.js'
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
@@ -55,7 +56,7 @@ export function buildCategoryAccountBreakdowns(transactions) {
   const byCategory = new Map()
 
   for (const row of currentRows) {
-    const category = row.category || 'Uncategorized'
+    const category = resolveSpendingCategoryLabel(row)
     const account = accountSnapshotFromRow(row)
     const accountKey = account.id ?? account.label
     const categoryMap = byCategory.get(category) ?? new Map()
@@ -100,7 +101,7 @@ export function buildCategoryDrillDownMaps(transactions) {
   const byCategory = new Map()
 
   for (const row of currentRows) {
-    const category = row.category || 'Uncategorized'
+    const category = resolveSpendingCategoryLabel(row)
     const list = byCategory.get(category) ?? []
     list.push(row)
     byCategory.set(category, list)

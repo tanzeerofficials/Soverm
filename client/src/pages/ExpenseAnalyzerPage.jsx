@@ -489,11 +489,11 @@ function ExpenseAnalyzerPage() {
               {topMoverHeadline && topMoverStyles && (
                 <section
                   className="rounded-xl border border-border-default bg-surface p-5 sm:p-6"
-                  aria-label="Top spending mover"
+                  aria-label="Category worth a look"
                 >
                   <HeadlineTypeBadge variant={topMoverStyles.badgeVariant} className="mb-3" />
                   <p
-                    className={`break-words text-xl font-bold leading-snug sm:text-2xl ${topMoverStyles.color}`}
+                    className={`break-words text-base font-medium leading-relaxed sm:text-lg ${topMoverStyles.color}`}
                   >
                     {topMoverHeadline}
                   </p>

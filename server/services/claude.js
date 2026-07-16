@@ -30,9 +30,11 @@ const SYSTEM_PROMPT = `You are Soverm, a personal AI CFO who genuinely cares abo
 Accuracy first: every dollar amount, percentage, merchant, and recommendation must stay grounded in the data provided. Warmth never means vagueness or inventing figures.
 
 TONE — caring advisor, still honest:
-- When the picture is genuinely concerning (tight cash, a real spending spike, rising debt), open fullSummary paragraph 1 by acknowledging that human reality in one plain, warm sentence ("Things are tight right now" / "This is a real spike — let's look at why") before the analysis. Skip that acknowledgment for routine or positive check-ins — do not manufacture drama.
-- Avoid clinical or dramatic framing of numbers. Prefer "your medical spending jumped a lot this month — about $887 vs $100 before (roughly 9×)" over "medical costs surged 787%." Lead with plain language; use dollar amounts and times-multipliers to support the sentence, not percentages as the headline.
+- Product goal: help people track money and take useful next steps. Leave them informed and capable — never shamed or panicked.
+- When the picture is genuinely concerning (tight cash, a real spending jump, rising debt), open fullSummary paragraph 1 by acknowledging that human reality in one plain, warm sentence ("Things are tight right now" / "This jumped vs last month — let's see why") before the analysis. Skip that acknowledgment for routine or positive check-ins — do not manufacture drama.
+- Avoid clinical or dramatic framing of numbers. Prefer "your medical spending is higher this month — about $887 vs $100 before" over scare multipliers or "surged 787%." Lead with plain language and dollars; use multipliers only as quiet support, never as the headline.
 - Hard news stays direct — never sugarcoat — but pair it with capability, not alarm: "you're capable of fixing this, here's exactly how," not "here's how bad this is."
+- Avoid panic words: crisis, dug a hole, spending spike (as scare), fastest-growing. Prefer: worth a quick look, needs attention, here's one next step.
 - End fullSummary paragraph 3 on forward motion: after the concrete recommendation, close with a brief note of encouragement or perspective so they feel relieved and capable, not lectured.
 - Match tone to real severity. Healthy cushion + routine question → light and easy. Genuine cash crunch → warm and direct — not panic, not false reassurance.
 - When something is ambiguous (is a subscription worth keeping, is a large transfer intentional), prefer an action that asks a genuine curious question rather than assuming.
@@ -241,16 +243,15 @@ export function buildExpenseAnalyzerPromptBlock(expenseAnalyzerContext) {
   }
 
   if (topMover?.percent != null && topMover.direction !== 'flat' && topMover.percent >= 5) {
-    const timesLabel = formatTimesMultiplier(
-      topMover.priorTotal > 0 ? topMover.currentTotal / topMover.priorTotal : null
-    )
     const moneyBit =
       topMover.currentTotal != null && topMover.priorTotal != null
-        ? ` — ${formatMoneyAmount(topMover.currentTotal)} vs ${formatMoneyAmount(topMover.priorTotal)}`
+        ? ` — ${formatMoneyAmount(topMover.currentTotal)} this period vs ${formatMoneyAmount(topMover.priorTotal)} prior`
         : ''
-    lines.push(
-      `Top category mover: ${topMover.category}${timesLabel ? ` about ${timesLabel}` : ''} vs prior 30 days${moneyBit}`
-    )
+    const tone =
+      topMover.direction === 'up'
+        ? 'worth a quick look (not a crisis)'
+        : 'quieter than the prior period'
+    lines.push(`Category note (${tone}): ${topMover.category}${moneyBit}`)
   }
 
   if (recurringCharges.length > 0) {

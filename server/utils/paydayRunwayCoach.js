@@ -115,12 +115,12 @@ export function buildPaydayRunwayCoach({
 
   if (remaining <= 0 && billsTotal > 0) {
     verdict = 'at_risk'
-    title = 'At risk before payday'
-    detail = `Known bills (${formatMoney(billsTotal)}) already use up your balance. Essentials only until you get paid.`
+    title = 'Plan carefully until payday'
+    detail = `Known bills (${formatMoney(billsTotal)}) already use up your free balance. Focus on essentials until you get paid.`
   } else if (shortfall > 0 && daysUntil > 0) {
     verdict = 'at_risk'
-    title = 'At risk at this week’s pace'
-    detail = `Spending ~${formatMoney(dailySpendRate)}/day projects ${formatMoney(projectedSpendUntilPayday)} before payday — about ${formatMoney(shortfall)} more than you have free.`
+    title = 'This week’s pace may run tight'
+    detail = `Spending ~${formatMoney(dailySpendRate)}/day projects ${formatMoney(projectedSpendUntilPayday)} before payday — about ${formatMoney(shortfall)} more than you have free. A small cut now helps.`
   } else if (
     (daysUntil > 0 && remaining / daysUntil < 25) ||
     projectedLeftAtPayday < 50 ||

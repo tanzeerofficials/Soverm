@@ -204,7 +204,7 @@ DATABASE_URL='...' npm run migrate:019
 
 **Schema feature caches** (trackers / savings detections) refresh about every **60 seconds**, so new columns/tables become visible without a hard restart. A process restart still clears caches immediately.
 
-`verify:migrations` is an alias of `verify:all-migrations` (covers **006–024**). Focused scripts remain: `verify:tracker-migrations`, `verify:notification-trigger-types`.
+`verify:migrations` is an alias of `verify:all-migrations` (covers **006–025**). Focused scripts remain: `verify:tracker-migrations`, `verify:notification-trigger-types`.
 
 Scripts refuse localhost unless `ALLOW_LOCAL_DB=1`. Use Railway’s **public** Postgres URL from the Connect tab for production.
 
@@ -230,8 +230,11 @@ Complete **before** inviting next-week testers. Deploy **client + API together**
 ```sh
 # From server/ against Railway public DATABASE_URL
 DATABASE_URL='...' npm run migrate:019
+DATABASE_URL='...' npm run migrate:025
 # Expect: columns already exist, or migration applied once
 ```
+
+Migration **025** stores cancel-at-period-end so Profile can show when Pro access ends after a portal cancel.
 
 Confirm `users.stripe_customer_id` and `users.stripe_subscription_id` exist (`verify:migrations` covers 019).
 

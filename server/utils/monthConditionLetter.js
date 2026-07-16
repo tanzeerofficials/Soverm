@@ -38,7 +38,7 @@ export function buildIncomeVsSpending({
     summary = `You brought in ${formatMoney(incomeAmount)} and spent ${formatMoney(spentAmount)} — a surplus of ${formatMoney(net)}.`
   } else if (net < -5) {
     outcome = 'deficit'
-    summary = `You brought in ${formatMoney(incomeAmount)} and spent ${formatMoney(spentAmount)} — you dug a hole of ${formatMoney(Math.abs(net))}.`
+    summary = `You brought in ${formatMoney(incomeAmount)} and spent ${formatMoney(spentAmount)} — about ${formatMoney(Math.abs(net))} more went out than came in this month. Worth a calm review of where it went.`
   } else {
     outcome = 'breakeven'
     summary = `You roughly broke even: ${formatMoney(incomeAmount)} in, ${formatMoney(spentAmount)} out.`
@@ -202,7 +202,7 @@ export function gradeMonthCondition({
 
   let grade = 'stable'
   let title = 'Stable'
-  let summary = 'You’re covering the month without an obvious cash crisis.'
+  let summary = 'You’re covering the month without an obvious cash crunch.'
 
   if (
     cashFlow?.outcome === 'deficit' ||
@@ -210,8 +210,8 @@ export function gradeMonthCondition({
     (buffer?.posture === 'fragile' && cashFlow?.outcome !== 'surplus')
   ) {
     grade = 'at_risk'
-    title = 'At risk'
-    summary = `This month looks at risk: ${reasons.slice(0, 2).join('; ') || 'cash flow is under pressure'}.`
+    title = 'Needs attention'
+    summary = `This month needs a closer look: ${reasons.slice(0, 2).join('; ') || 'cash flow is under pressure'}. One clear next step can help.`
   } else if (
     cashFlow?.outcome === 'breakeven' ||
     buffer?.posture === 'thin' ||

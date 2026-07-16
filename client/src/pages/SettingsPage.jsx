@@ -165,6 +165,8 @@ function SettingsPage() {
   const { data: billingStatus } = useQuery({
     queryKey: billingStatusQueryKey,
     queryFn: () => fetchBillingStatus(getToken),
+    // Refresh after returning from Stripe portal so cancel-at-period-end shows promptly.
+    refetchOnWindowFocus: true,
   })
 
   const billingConfigured = billingStatus?.configured !== false
@@ -297,16 +299,38 @@ function SettingsPage() {
               <UsageBadge usage={usage} />
               {isPro ? (
                 <>
-                  <p className="text-xs text-fg-subtle">
-                    Update your payment method or cancel anytime in the Stripe billing portal.
-                  </p>
+                  {billingStatus?.cancelAtPeriodEnd && billingStatus?.proAccessEndsAt ? (
+                    <div className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-3">
+                      <p className="text-sm font-semibold text-fg">Cancellation scheduled</p>
+                      <p className="mt-1 text-sm text-fg-muted">
+                        You won&apos;t be charged again. Soverm Pro stays available until{' '}
+                        <span className="font-medium text-fg">
+                          {new Date(billingStatus.proAccessEndsAt).toLocaleDateString('en-US', {
+                            month: 'long',
+                            day: 'numeric',
+                            year: 'numeric',
+                          })}
+                        </span>
+                        .
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-fg-subtle">
+                      Update your payment method or cancel anytime in the Stripe billing portal.
+                      If you cancel, Pro stays active through the end of the billing period.
+                    </p>
+                  )}
                   <button
                     type="button"
                     onClick={handleManageBilling}
                     disabled={portalLoading || !billingConfigured}
                     className="mt-1 w-full rounded-lg border border-border-default bg-surface px-4 py-2.5 text-sm font-semibold text-fg transition hover:bg-surface-elevated disabled:opacity-60 sm:w-auto"
                   >
-                    {portalLoading ? 'Opening…' : 'Manage billing'}
+                    {portalLoading
+                      ? 'Opening…'
+                      : billingStatus?.cancelAtPeriodEnd
+                        ? 'Manage billing / undo cancel'
+                        : 'Manage billing'}
                   </button>
                   {!billingConfigured && (
                     <p className="text-xs text-fg-subtle">Billing management is unavailable right now.</p>

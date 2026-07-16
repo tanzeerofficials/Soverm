@@ -25,6 +25,7 @@
     "migrate:022": "node scripts/run-022-user-payday-migration.js",
     "migrate:023": "node scripts/run-023-action-lifecycle-migration.js",
     "migrate:024": "node scripts/run-024-ritual-notification-types-migration.js",
+    "migrate:025": "node scripts/run-025-stripe-cancel-at-period-end-migration.js",
     "test:payday-inference": "node scripts/test-payday-inference.js",
     "test:whats-left": "node scripts/test-whats-left-until-payday.js",
     "test:action-outcomes": "node scripts/test-action-outcomes.js",

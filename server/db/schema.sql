@@ -7,6 +7,8 @@ CREATE TABLE users (
   subscription_tier TEXT NOT NULL DEFAULT 'free' CHECK (subscription_tier IN ('free', 'pro')),
   stripe_customer_id TEXT,
   stripe_subscription_id TEXT,
+  stripe_cancel_at_period_end BOOLEAN NOT NULL DEFAULT false,
+  stripe_current_period_end TIMESTAMPTZ,
   proactive_notifications_enabled BOOLEAN NOT NULL DEFAULT true,
   monthly_budget NUMERIC(12, 2),
   pay_cadence TEXT CHECK (pay_cadence IS NULL OR pay_cadence IN ('weekly', 'biweekly', 'semimonthly', 'monthly')),

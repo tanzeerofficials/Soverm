@@ -137,7 +137,7 @@ function MonthConditionPage() {
                 {data.condition?.summary}
               </p>
               <p className="mt-2 text-xs text-fg-subtle">
-                Stable = cushion · Tight = little room · At risk = bills may outpace income
+                Stable = cushion · Tight = little room · Needs attention = plan ahead for bills
               </p>
               <p className="mt-1 text-xs text-fg-subtle">{data.periodLabel}</p>
             </section>
@@ -147,8 +147,10 @@ function MonthConditionPage() {
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-fg-subtle">
                 Money in vs money out
               </p>
-              <p className="mt-1 text-[11px] text-fg-subtle">
-                External cash only — own-account transfers and card payments are listed separately.
+              <p className="mt-1 text-[11px] leading-relaxed text-fg-subtle">
+                Calendar month so far ({data.periodLabel}) — not the same window as Home cash flow
+                (last 7 / 30 days). External cash only; own-account transfers and card payments are
+                listed separately.
               </p>
               <p className="mt-3 text-sm leading-relaxed text-fg-muted">
                 {data.cashFlow?.summary}

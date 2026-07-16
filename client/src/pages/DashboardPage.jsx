@@ -11,6 +11,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams, Link } from 'react-router-dom'
 import AppNavbar from '../components/AppNavbar.jsx'
 import DashboardHero from '../components/DashboardHero.jsx'
+import DashboardConnectedAccounts from '../components/DashboardConnectedAccounts.jsx'
 import DashboardSectionHeader from '../components/DashboardSectionHeader.jsx'
 import FirstInsightCelebration from '../components/FirstInsightCelebration.jsx'
 import DashboardNeedsAttention from '../components/DashboardNeedsAttention.jsx'
@@ -628,6 +629,10 @@ function DashboardPage() {
                 showSync={showOverviewSync}
                 showGenerateInsight={false}
               />
+
+              {hasAccounts && (
+                <DashboardConnectedAccounts accounts={dashboardData?.accounts ?? []} />
+              )}
 
               {!isPro && (
                 <FreeVsProPlanCallout

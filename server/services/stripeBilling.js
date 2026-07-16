@@ -57,6 +57,34 @@ export function tierFromSubscriptionStatus(status) {
   return null
 }
 
+/*
+ * What this does: reads cancel_at_period_end + current_period_end from a Stripe
+ * subscription so Profile can show "Pro until {date}" after a portal cancel.
+ *
+ * Why: Stripe keeps status=active until the paid period ends; we stay Pro but
+ * users need to see when access actually ends.
+ */
+export function subscriptionAccessFromStripe(subscription) {
+  if (!subscription || typeof subscription !== 'object') {
+    return {
+      cancelAtPeriodEnd: false,
+      currentPeriodEnd: null,
+    }
+  }
+
+  const cancelAtPeriodEnd = Boolean(subscription.cancel_at_period_end)
+  const endUnix = Number(subscription.current_period_end)
+  const currentPeriodEnd =
+    Number.isFinite(endUnix) && endUnix > 0
+      ? new Date(endUnix * 1000).toISOString()
+      : null
+
+  return {
+    cancelAtPeriodEnd,
+    currentPeriodEnd,
+  }
+}
+
 function appBaseUrl() {
   const raw = process.env.APP_BASE_URL || process.env.CLIENT_URL || 'http://localhost:5173'
   return raw.replace(/\/$/, '')
@@ -271,6 +299,8 @@ export async function setUserProFromStripe({
   userId,
   customerId,
   subscriptionId,
+  cancelAtPeriodEnd = false,
+  currentPeriodEnd = null,
 }) {
   if (!userId) {
     return { updated: false }
@@ -280,9 +310,17 @@ export async function setUserProFromStripe({
     `UPDATE users
      SET subscription_tier = 'pro',
          stripe_customer_id = COALESCE($2, stripe_customer_id),
-         stripe_subscription_id = COALESCE($3, stripe_subscription_id)
+         stripe_subscription_id = COALESCE($3, stripe_subscription_id),
+         stripe_cancel_at_period_end = $4,
+         stripe_current_period_end = $5::timestamptz
      WHERE id = $1`,
-    [userId, customerId ?? null, subscriptionId ?? null]
+    [
+      userId,
+      customerId ?? null,
+      subscriptionId ?? null,
+      Boolean(cancelAtPeriodEnd),
+      currentPeriodEnd,
+    ]
   )
 
   return { updated: true }
@@ -293,7 +331,9 @@ export async function setUserFreeFromStripe({ userId, customerId, subscriptionId
     await db.query(
       `UPDATE users
        SET subscription_tier = 'free',
-           stripe_subscription_id = NULL
+           stripe_subscription_id = NULL,
+           stripe_cancel_at_period_end = false,
+           stripe_current_period_end = NULL
        WHERE id = $1`,
       [userId]
     )
@@ -304,7 +344,9 @@ export async function setUserFreeFromStripe({ userId, customerId, subscriptionId
     await db.query(
       `UPDATE users
        SET subscription_tier = 'free',
-           stripe_subscription_id = NULL
+           stripe_subscription_id = NULL,
+           stripe_cancel_at_period_end = false,
+           stripe_current_period_end = NULL
        WHERE stripe_subscription_id = $1`,
       [subscriptionId]
     )
@@ -315,7 +357,9 @@ export async function setUserFreeFromStripe({ userId, customerId, subscriptionId
     await db.query(
       `UPDATE users
        SET subscription_tier = 'free',
-           stripe_subscription_id = NULL
+           stripe_subscription_id = NULL,
+           stripe_cancel_at_period_end = false,
+           stripe_current_period_end = NULL
        WHERE stripe_customer_id = $1`,
       [customerId]
     )
@@ -323,6 +367,74 @@ export async function setUserFreeFromStripe({ userId, customerId, subscriptionId
   }
 
   return { updated: false }
+}
+
+/*
+ * What this does: loads stored cancel/period-end fields, and for Pro users
+ * refreshes them from Stripe when we have a subscription id (portal cancel
+ * may land before the webhook).
+ */
+export async function getBillingAccessStatus(userId) {
+  const result = await db.query(
+    `SELECT subscription_tier,
+            stripe_subscription_id,
+            stripe_cancel_at_period_end,
+            stripe_current_period_end
+     FROM users
+     WHERE id = $1`,
+    [userId]
+  )
+
+  const row = result.rows[0]
+  if (!row) {
+    return {
+      tier: 'free',
+      isPro: false,
+      cancelAtPeriodEnd: false,
+      currentPeriodEnd: null,
+      proAccessEndsAt: null,
+    }
+  }
+
+  let cancelAtPeriodEnd = Boolean(row.stripe_cancel_at_period_end)
+  let currentPeriodEnd = row.stripe_current_period_end
+    ? new Date(row.stripe_current_period_end).toISOString()
+    : null
+
+  const tier = row.subscription_tier ?? 'free'
+  const isPro = tier === 'pro'
+  const subscriptionId = row.stripe_subscription_id
+  const stripe = getStripeClient()
+
+  if (isPro && subscriptionId && stripe) {
+    try {
+      const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+      const access = subscriptionAccessFromStripe(subscription)
+      cancelAtPeriodEnd = access.cancelAtPeriodEnd
+      currentPeriodEnd = access.currentPeriodEnd
+
+      await db.query(
+        `UPDATE users
+         SET stripe_cancel_at_period_end = $2,
+             stripe_current_period_end = $3::timestamptz
+         WHERE id = $1`,
+        [userId, cancelAtPeriodEnd, currentPeriodEnd]
+      )
+    } catch (err) {
+      console.warn('Stripe subscription retrieve for billing status failed:', err.message)
+    }
+  }
+
+  const proAccessEndsAt =
+    isPro && cancelAtPeriodEnd && currentPeriodEnd ? currentPeriodEnd : null
+
+  return {
+    tier,
+    isPro,
+    cancelAtPeriodEnd: isPro ? cancelAtPeriodEnd : false,
+    currentPeriodEnd: isPro ? currentPeriodEnd : null,
+    proAccessEndsAt,
+  }
 }
 
 export async function resolveClerkUserIdFromStripeObject(object) {

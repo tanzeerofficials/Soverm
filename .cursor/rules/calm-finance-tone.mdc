@@ -1,0 +1,33 @@
+---
+description: Calm, helpful finance tone — inform without alarming
+alwaysApply: true
+---
+
+# Calm finance tone (Soverm)
+
+Soverm’s job is to help people **track money and take useful next steps**. Copy, UI, insights, chat, notifications, and AI prompts must leave users **informed and capable**, never shamed or panicked.
+
+## Principles
+
+1. **Inform over alarm** — State what happened and what to do. Avoid scare framing (“21×”, “fastest-growing”, “crisis”, “dug a hole”, “spending spike”).
+2. **Numbers with context** — Prefer “$525 this period (was $25 before)” over multipliers or percent drama alone.
+3. **Capability, not judgment** — Hard news is fine; pair it with a calm next step (“worth a quick look”, “when you have a minute”).
+4. **Match severity** — Don’t manufacture drama for normal swings; don’t cheerlead when cash is genuinely tight. Warm + direct beats panic or false reassurance.
+5. **Help them act** — Every concerning surface should point to a concrete review path (category, week, bill, afford check) without urgency theater.
+
+## Prefer / avoid
+
+| Prefer | Avoid |
+|--------|--------|
+| Worth a quick look | Fastest-growing / 21× |
+| This period vs prior | Dug a hole / crisis |
+| Needs attention | Spending spike (as a scare badge) |
+| Here’s one useful next step | Here’s how bad this is |
+
+## When writing or changing code
+
+- User-facing strings (React, emails, digests, month letter, weekly review)
+- AI system prompts and template narratives (`claude.js`, expense analyzer summaries)
+- Badges, headlines, attention items, notification copy
+
+If a phrase would make a paycheck-to-paycheck user feel *worse* without giving them a clearer action, rewrite it.

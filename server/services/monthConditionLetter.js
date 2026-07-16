@@ -31,6 +31,7 @@ import {
   classifyCashFlowTransaction,
   MONEY_OUT_KINDS,
 } from '../utils/cashFlowClassification.js'
+import { resolveSpendingCategoryLabel } from '../utils/plaidCategory.js'
 import { EXPENSE_ANALYZER_TRANSACTION_SELECT } from '../utils/connectedAccountTransactions.js'
 
 async function loadMonthCashFlow(userId, startIso, endExclusiveIso) {
@@ -79,7 +80,7 @@ async function loadTopCategories(userId, startIso, endExclusiveIso, limit = 3) {
     if (!MONEY_OUT_KINDS.has(kind)) {
       continue
     }
-    const category = row.category || 'Uncategorized'
+    const category = resolveSpendingCategoryLabel(row)
     byCategory.set(category, (byCategory.get(category) ?? 0) + Math.abs(Number(row.amount) || 0))
   }
 

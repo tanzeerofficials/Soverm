@@ -56,7 +56,7 @@ function toneClasses(tone) {
 
 function verdictBadge(verdict) {
   if (verdict === 'at_risk') {
-    return 'At risk'
+    return 'Needs attention'
   }
   if (verdict === 'tight') {
     return 'Tight'
@@ -237,7 +237,7 @@ function WeeklyReviewPage() {
                   {coach.verdict === 'tight' &&
                     'Tight = you’ll likely make it, but there’s little room for surprises.'}
                   {coach.verdict === 'at_risk' &&
-                    'At risk = this week’s pace or bills may leave you short before payday.'}
+                    'Needs attention = this week’s pace or bills may leave you short before payday — plan a small adjustment.'}
                 </p>
               )}
 

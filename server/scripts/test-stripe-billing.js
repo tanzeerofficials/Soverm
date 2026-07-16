@@ -8,6 +8,7 @@ import assert from 'node:assert/strict'
 import {
   cancelStripeSubscriptionsForUser,
   isStripeBillingConfigured,
+  subscriptionAccessFromStripe,
   tierFromSubscriptionStatus,
 } from '../services/stripeBilling.js'
 
@@ -59,6 +60,28 @@ console.log('Stripe billing tests\n')
   assert.equal(tierFromSubscriptionStatus('past_due'), null)
   assert.equal(tierFromSubscriptionStatus('incomplete'), null)
   pass('tierFromSubscriptionStatus mapping')
+}
+
+// 2b) Cancel-at-period-end access window
+{
+  const active = subscriptionAccessFromStripe({
+    cancel_at_period_end: true,
+    current_period_end: 1_800_000_000,
+  })
+  assert.equal(active.cancelAtPeriodEnd, true)
+  assert.equal(active.currentPeriodEnd, new Date(1_800_000_000 * 1000).toISOString())
+
+  const renewing = subscriptionAccessFromStripe({
+    cancel_at_period_end: false,
+    current_period_end: 1_800_000_000,
+  })
+  assert.equal(renewing.cancelAtPeriodEnd, false)
+  assert.ok(renewing.currentPeriodEnd)
+
+  const empty = subscriptionAccessFromStripe(null)
+  assert.equal(empty.cancelAtPeriodEnd, false)
+  assert.equal(empty.currentPeriodEnd, null)
+  pass('subscriptionAccessFromStripe cancel window')
 }
 
 // 3) cancel helper skips when stripe is null

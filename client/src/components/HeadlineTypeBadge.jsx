@@ -12,8 +12,12 @@ const BADGE_VARIANTS = {
     className: 'border-brand/30 bg-brand/10 text-brand-soft',
   },
   spike: {
-    label: 'Spending spike',
-    className: 'border-warning/30 bg-warning/10 text-warning',
+    label: 'Worth a look',
+    className: 'border-border-default bg-surface-elevated text-fg-muted',
+  },
+  heads_up: {
+    label: 'Worth a look',
+    className: 'border-border-default bg-surface-elevated text-fg-muted',
   },
   insight: {
     label: 'Insight',

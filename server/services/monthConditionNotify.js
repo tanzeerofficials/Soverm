@@ -68,7 +68,7 @@ export async function buildMonthConditionNotifyForUser(
   const gradeLabel =
     letter?.condition?.title ||
     (gradeId === 'at_risk'
-      ? 'At risk'
+      ? 'Needs attention'
       : gradeId === 'tight'
         ? 'Tight'
         : gradeId === 'stable'

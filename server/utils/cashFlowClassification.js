@@ -204,7 +204,10 @@ export function summarizeCashFlow(transactions = [], { activityLimit = 24 } = {}
     activity.push({
       name: row.name,
       date: row.date,
-      category: row.category || KIND_LABELS[kind],
+      category:
+        kind === CASH_FLOW_KINDS.PEER_IN || kind === CASH_FLOW_KINDS.PEER_OUT
+          ? 'Transfer'
+          : row.category || KIND_LABELS[kind],
       amount: absolute,
       kind,
       kindLabel: KIND_LABELS[kind],
