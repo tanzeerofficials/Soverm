@@ -36,7 +36,7 @@ try {
   )
   assert(
     chatRouteSource.includes("router.get('/limits'"),
-    'chat.js must expose GET /limits for remaining hourly messages'
+    'chat.js must expose GET /limits for tier-aware message caps'
   )
   assert(
     chatRouteSource.includes('getChatRateLimitStatus'),

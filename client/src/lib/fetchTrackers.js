@@ -25,7 +25,7 @@ export async function createTracker(getToken, payload) {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
-    throw new Error(body.error || `Tracker create failed: ${res.status}`)
+    throw new Error(body.message || body.error || `Tracker create failed: ${res.status}`)
   }
 
   return res.json()
@@ -44,7 +44,7 @@ export async function updateTracker(getToken, trackerId, payload) {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
-    throw new Error(body.error || `Tracker update failed: ${res.status}`)
+    throw new Error(body.message || body.error || `Tracker update failed: ${res.status}`)
   }
 
   return res.json()
@@ -59,7 +59,7 @@ export async function deleteTracker(getToken, trackerId) {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
-    throw new Error(body.error || `Tracker delete failed: ${res.status}`)
+    throw new Error(body.message || body.error || `Tracker delete failed: ${res.status}`)
   }
 
   return res.json()

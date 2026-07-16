@@ -1,8 +1,8 @@
 /*
  * DASHBOARD ACTIONS SECTION
  *
- * Connect, sync, and optionally generate — Overview shows connect + sync;
- * Insight tab adds generate.
+ * Connect / sync / generate — each can be hidden so Overview stays ritual-first
+ * (only show Connect/Sync when the user actually needs them).
  */
 
 import ConnectBankButton from './ConnectBankButton.jsx'
@@ -18,11 +18,17 @@ function DashboardActionsSection({
   onLimitReached,
   onUsageUpdated,
   showConnectBank = true,
+  showSync = true,
   showGenerateInsight = true,
   sectionId = 'dashboard-actions',
   generateActionId = 'generate-insight-action',
   insightLoading = false,
 }) {
+  const showAny = showConnectBank || showSync || showGenerateInsight
+  if (!showAny) {
+    return null
+  }
+
   return (
     <section id={sectionId} aria-label="Dashboard actions">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
@@ -35,9 +41,11 @@ function DashboardActionsSection({
             />
           </div>
         )}
-        <div className="w-full sm:flex-1">
-          <SyncTransactionsButton className="w-full" showToast={showToast} />
-        </div>
+        {showSync && (
+          <div className="w-full sm:flex-1">
+            <SyncTransactionsButton className="w-full" showToast={showToast} />
+          </div>
+        )}
         {showGenerateInsight && (
           <div id={generateActionId} className="w-full sm:flex-1">
             <GenerateInsightButton

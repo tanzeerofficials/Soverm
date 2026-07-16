@@ -44,6 +44,7 @@ function chatLimitPayload(status) {
     limit: status.limit,
     count: status.count,
     allowed: status.allowed,
+    period: status.period ?? 'hour',
     retryAfterSeconds: status.retryAfterSeconds ?? null,
   }
 }
@@ -187,7 +188,7 @@ async function respondWithChatAnswer(req, res, {
 /*
  * GET /api/chat/limits
  *
- * Remaining Ask Soverm messages in the rolling hourly window.
+ * Remaining Ask Soverm messages (daily cap for Free, hourly cap for Pro).
  * Registered before /:insightId so "limits" is not treated as a UUID.
  */
 router.get('/limits', async (req, res) => {

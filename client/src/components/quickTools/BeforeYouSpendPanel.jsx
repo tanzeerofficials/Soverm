@@ -76,7 +76,7 @@ function BeforeYouSpendPanel({ getToken, softLimits = [], paydayConfigured = fal
         <div className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-3 text-sm text-fg-muted">
           Confirm payday first so we can judge against what&apos;s left until you&apos;re paid.{' '}
           <Link to="/settings" className="font-semibold text-ai-soft hover:underline">
-            Set payday in Settings
+            Set payday in Profile
           </Link>
         </div>
       )}

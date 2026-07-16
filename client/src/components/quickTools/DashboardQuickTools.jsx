@@ -213,8 +213,10 @@ function DashboardQuickTools({
   activeTab: controlledTab,
   onTabChange,
   isLoading = false,
+  isPro = false,
+  onUpgrade,
 }) {
-  const [internalTab, setInternalTab] = useState(QUICK_TOOL_TABS.TRACKER)
+  const [internalTab, setInternalTab] = useState(QUICK_TOOL_TABS.RECENT)
   const activeTab = controlledTab ?? internalTab
 
   function handleTabChange(tabId) {
@@ -255,6 +257,8 @@ function DashboardQuickTools({
           loadError={trackerError}
           onRetryLoad={onRetryTracker}
           getToken={getToken}
+          isPro={isPro}
+          onUpgrade={onUpgrade}
         />
       </QuickToolPanel>
 

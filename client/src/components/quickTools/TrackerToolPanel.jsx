@@ -42,9 +42,13 @@ function statusLabel(status, trackType) {
   return { text: 'Building', tone: 'muted' }
 }
 
-function TrackerTypeSelector({ mode, onChange, allowSpending = true }) {
+function TrackerTypeSelector({ mode, onChange, allowSpending = true, allowSaving = true, onUpgrade }) {
   return (
-    <div className={`grid gap-2 ${allowSpending ? 'grid-cols-2' : 'grid-cols-1'}`}>
+    <div
+      className={`grid gap-2 ${
+        allowSpending && allowSaving ? 'grid-cols-2' : 'grid-cols-1'
+      }`}
+    >
       {allowSpending && (
         <button
           type="button"
@@ -59,18 +63,29 @@ function TrackerTypeSelector({ mode, onChange, allowSpending = true }) {
           <p className="mt-1 text-xs text-fg-muted">Set a monthly spending cap</p>
         </button>
       )}
-      <button
-        type="button"
-        onClick={() => onChange(TRACK_MODES.SAVING)}
-        className={`rounded-lg border px-3 py-3 text-left transition ${
-          mode === TRACK_MODES.SAVING
-            ? 'border-brand/40 bg-brand/10 ring-1 ring-brand/30'
-            : 'border-border-default bg-app/40 hover:border-border-hover'
-        }`}
-      >
-        <p className="text-sm font-semibold text-fg">Track saving</p>
-        <p className="mt-1 text-xs text-fg-muted">Set a monthly savings target</p>
-      </button>
+      {allowSaving ? (
+        <button
+          type="button"
+          onClick={() => onChange(TRACK_MODES.SAVING)}
+          className={`rounded-lg border px-3 py-3 text-left transition ${
+            mode === TRACK_MODES.SAVING
+              ? 'border-brand/40 bg-brand/10 ring-1 ring-brand/30'
+              : 'border-border-default bg-app/40 hover:border-border-hover'
+          }`}
+        >
+          <p className="text-sm font-semibold text-fg">Track saving</p>
+          <p className="mt-1 text-xs text-fg-muted">Set a monthly savings target</p>
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={onUpgrade}
+          className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-3 text-left transition hover:bg-warning/10"
+        >
+          <p className="text-sm font-semibold text-fg">Track saving · Pro</p>
+          <p className="mt-1 text-xs text-fg-muted">Savings goals unlock with Soverm Pro</p>
+        </button>
+      )}
     </div>
   )
 }
@@ -84,7 +99,14 @@ function parseOptionalNumber(value) {
   return Number.isFinite(parsed) ? parsed : null
 }
 
-function TrackerCreateForm({ mode, snapshot, onCreated, isSaving, errorMessage }) {
+function TrackerCreateForm({
+  mode,
+  snapshot,
+  onCreated,
+  isSaving,
+  errorMessage,
+  allowCustomAlerts = true,
+}) {
   const [name, setName] = useState('')
   const [monthlyAmount, setMonthlyAmount] = useState('')
   const [purposeType, setPurposeType] = useState('future')
@@ -110,7 +132,7 @@ function TrackerCreateForm({ mode, snapshot, onCreated, isSaving, errorMessage }
       purposeType: mode === TRACK_MODES.SAVING ? purposeType : undefined,
       monthlyAmount: parsed,
       targetTotal: mode === TRACK_MODES.SAVING && targetTotal ? Number(targetTotal) : undefined,
-      ...(mode === TRACK_MODES.SPENDING
+      ...(mode === TRACK_MODES.SPENDING && allowCustomAlerts
         ? {
             alertWarningPercent: parseOptionalNumber(alertWarningPercent),
             alertRemainingDollars: parseOptionalNumber(alertRemainingDollars),
@@ -204,7 +226,7 @@ function TrackerCreateForm({ mode, snapshot, onCreated, isSaving, errorMessage }
         </label>
       )}
 
-      {mode === TRACK_MODES.SPENDING && (
+      {mode === TRACK_MODES.SPENDING && allowCustomAlerts && (
         <fieldset className="space-y-3 rounded-lg border border-border-default/70 bg-app/30 p-3">
           <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-fg-subtle">
             Alert me when (optional)
@@ -257,6 +279,13 @@ function TrackerCreateForm({ mode, snapshot, onCreated, isSaving, errorMessage }
         </fieldset>
       )}
 
+      {mode === TRACK_MODES.SPENDING && !allowCustomAlerts && (
+        <p className="text-xs text-fg-subtle">
+          Free uses the default {DEFAULT_SPENDING_CAP_WARNING_PERCENT}% warning. Custom alerts are on
+          Pro.
+        </p>
+      )}
+
       {errorMessage && (
         <p className="text-sm text-danger" role="alert">
           {errorMessage}
@@ -274,7 +303,15 @@ function TrackerCreateForm({ mode, snapshot, onCreated, isSaving, errorMessage }
   )
 }
 
-function TrackerEditForm({ mode, tracker, onSave, onCancel, isSaving, errorMessage }) {
+function TrackerEditForm({
+  mode,
+  tracker,
+  onSave,
+  onCancel,
+  isSaving,
+  errorMessage,
+  allowCustomAlerts = true,
+}) {
   const [name, setName] = useState(tracker.name ?? '')
   const [monthlyAmount, setMonthlyAmount] = useState(String(tracker.monthlyAmount ?? ''))
   const [purposeType, setPurposeType] = useState(tracker.purposeType ?? 'future')
@@ -305,7 +342,7 @@ function TrackerEditForm({ mode, tracker, onSave, onCancel, isSaving, errorMessa
       payload.targetTotal = targetTotal ? Number(targetTotal) : null
     }
 
-    if (mode === TRACK_MODES.SPENDING) {
+    if (mode === TRACK_MODES.SPENDING && allowCustomAlerts) {
       // Explicit null clears a custom threshold and falls back to the default 80%.
       payload.alertWarningPercent = parseOptionalNumber(alertWarningPercent)
       payload.alertRemainingDollars = parseOptionalNumber(alertRemainingDollars)
@@ -381,7 +418,7 @@ function TrackerEditForm({ mode, tracker, onSave, onCancel, isSaving, errorMessa
         </label>
       )}
 
-      {mode === TRACK_MODES.SPENDING && (
+      {mode === TRACK_MODES.SPENDING && allowCustomAlerts && (
         <fieldset className="space-y-3 rounded-lg border border-border-default/70 bg-app/30 p-3">
           <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-fg-subtle">
             Alert thresholds
@@ -455,7 +492,14 @@ function TrackerEditForm({ mode, tracker, onSave, onCancel, isSaving, errorMessa
   )
 }
 
-function SpendingTrackerCard({ tracker, periodLabel, getToken, onRemove, isRemoving }) {
+function SpendingTrackerCard({
+  tracker,
+  periodLabel,
+  getToken,
+  onRemove,
+  isRemoving,
+  allowCustomAlerts = true,
+}) {
   const { progress, monthlyAmount, name } = tracker
   const badge = statusLabel(progress.status, 'spending')
   const [isEditing, setIsEditing] = useState(false)
@@ -515,12 +559,17 @@ function SpendingTrackerCard({ tracker, periodLabel, getToken, onRemove, isRemov
           ? `Over by ${formatCurrency(progress.overBy)}`
           : `${formatCurrency(progress.remaining)} left to spend · ${progress.percentUsed}% used`}
       </p>
-      <p className="mt-1 text-xs text-fg-subtle">{describeSpendingAlertThresholds(tracker)}</p>
+      <p className="mt-1 text-xs text-fg-subtle">
+        {allowCustomAlerts
+          ? describeSpendingAlertThresholds(tracker)
+          : `Warns at ${DEFAULT_SPENDING_CAP_WARNING_PERCENT}% used (default)`}
+      </p>
 
       {isEditing ? (
         <TrackerEditForm
           mode={TRACK_MODES.SPENDING}
           tracker={tracker}
+          allowCustomAlerts={allowCustomAlerts}
           onSave={(payload) => editMutation.mutate(payload)}
           onCancel={() => {
             setIsEditing(false)
@@ -821,7 +870,15 @@ function SavingsDetectionsPanel({ detections, savingTrackers, getToken }) {
   )
 }
 
-function TrackerToolPanel({ snapshot, isLoading, loadError, onRetryLoad, getToken }) {
+function TrackerToolPanel({
+  snapshot,
+  isLoading,
+  loadError,
+  onRetryLoad,
+  getToken,
+  isPro = false,
+  onUpgrade,
+}) {
   const queryClient = useQueryClient()
   const [mode, setMode] = useState(TRACK_MODES.SPENDING)
   const [showCreate, setShowCreate] = useState(false)
@@ -875,11 +932,12 @@ function TrackerToolPanel({ snapshot, isLoading, loadError, onRetryLoad, getToke
 
   const trackers = snapshot?.trackers ?? []
   const spendingTracker = snapshot?.spendingTracker
-  const savingTrackers = snapshot?.savingTrackers ?? []
-  const pendingSavingsDetections = snapshot?.pendingSavingsDetections ?? []
+  const savingTrackers = isPro ? snapshot?.savingTrackers ?? [] : []
+  const pendingSavingsDetections = isPro ? snapshot?.pendingSavingsDetections ?? [] : []
   const periodLabel = snapshot?.periodLabel ?? 'This month'
   const hasSpending = Boolean(spendingTracker)
-  const canAddSaving = savingTrackers.length < 5
+  const canAddSaving = isPro && savingTrackers.length < 5
+  const canOpenCreate = !hasSpending || canAddSaving
 
   return (
     <div className="space-y-4">
@@ -898,6 +956,7 @@ function TrackerToolPanel({ snapshot, isLoading, loadError, onRetryLoad, getToke
           getToken={getToken}
           onRemove={() => deleteMutation.mutate(spendingTracker.id)}
           isRemoving={deleteMutation.isPending}
+          allowCustomAlerts={isPro}
         />
       )}
 
@@ -919,11 +978,30 @@ function TrackerToolPanel({ snapshot, isLoading, loadError, onRetryLoad, getToke
 
       {trackers.length === 0 && !showCreate && (
         <p className="text-sm text-fg-muted">
-          Track a monthly spending cap (e.g. $1,500) or a savings target (e.g. save $300 for debt payoff).
+          {isPro
+            ? 'Track a monthly spending cap (e.g. $1,500) or a savings target (e.g. save $300 for debt payoff).'
+            : 'Set one monthly spending cap on Free. Savings goals and custom alerts are on Pro.'}
         </p>
       )}
 
-      {!showCreate && (canAddSaving || !hasSpending) && (
+      {!isPro && hasSpending && !showCreate && (
+        <div className="rounded-lg border border-warning/25 bg-warning/5 px-3 py-3">
+          <p className="text-sm text-fg-muted">
+            Free includes one spending cap. Upgrade for savings goals and custom alert thresholds.
+          </p>
+          {onUpgrade && (
+            <button
+              type="button"
+              onClick={onUpgrade}
+              className="mt-2 text-sm font-semibold text-warning hover:underline"
+            >
+              Upgrade to Pro
+            </button>
+          )}
+        </div>
+      )}
+
+      {!showCreate && canOpenCreate && (
         <button
           type="button"
           onClick={() => {
@@ -945,14 +1023,19 @@ function TrackerToolPanel({ snapshot, isLoading, loadError, onRetryLoad, getToke
             mode={mode}
             onChange={setMode}
             allowSpending={!hasSpending}
+            allowSaving={isPro}
+            onUpgrade={onUpgrade}
           />
-          <TrackerCreateForm
-            mode={mode}
-            snapshot={snapshot}
-            onCreated={(payload) => createMutation.mutate(payload)}
-            isSaving={createMutation.isPending}
-            errorMessage={createError}
-          />
+          {(mode !== TRACK_MODES.SAVING || isPro) && (
+            <TrackerCreateForm
+              mode={mode}
+              snapshot={snapshot}
+              allowCustomAlerts={isPro}
+              onCreated={(payload) => createMutation.mutate(payload)}
+              isSaving={createMutation.isPending}
+              errorMessage={createError}
+            />
+          )}
           <button
             type="button"
             onClick={() => {

@@ -7,7 +7,7 @@ import BrandMark from './BrandMark.jsx'
 const PRIMARY_NAV = [
   {
     to: '/dashboard',
-    label: 'Dashboard',
+    label: 'Home',
     shortLabel: 'Home',
     match: (path) => path === '/dashboard',
   },
@@ -18,16 +18,16 @@ const PRIMARY_NAV = [
     match: (path) => path.startsWith('/weekly-review'),
   },
   {
-    to: '/month-condition',
-    label: 'Month letter',
-    shortLabel: 'Letter',
-    match: (path) => path.startsWith('/month-condition'),
-  },
-  {
     to: '/expense-analyzer',
     label: 'Expenses',
     shortLabel: 'Expenses',
     match: (path) => path.startsWith('/expense-analyzer'),
+  },
+  {
+    to: '/month-condition',
+    label: 'Month letter',
+    shortLabel: 'Letter',
+    match: (path) => path.startsWith('/month-condition'),
   },
 ]
 
@@ -41,8 +41,8 @@ const ACCOUNT_NAV = [
   },
   {
     to: '/settings',
-    label: 'Settings',
-    shortLabel: 'Settings',
+    label: 'Profile',
+    shortLabel: 'Profile',
     match: (path) => path.startsWith('/settings'),
   },
 ]
@@ -293,8 +293,8 @@ function AppNavbar({ leftContent, backTo, backLabel, children }) {
                 ? 'border-brand/40 bg-brand/10 text-fg'
                 : 'border-border-default bg-surface/80 text-fg-muted hover:border-border-default hover:bg-surface-elevated hover:text-fg'
             }`}
-            aria-label="Settings"
-            title="Settings"
+            aria-label="Profile"
+            title="Profile"
           >
             <div
               className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-surface-elevated to-surface text-sm font-semibold text-brand-soft ring-1 ring-border-default"

@@ -44,7 +44,7 @@ function TermsPage() {
         <p>
           Bank connections are provided through Plaid. By linking an account you authorize us to
           retrieve and store balances and transactions for the features you use. You can disconnect
-          accounts at any time in Settings.
+          accounts at any time in Profile.
         </p>
       </Section>
 

@@ -80,7 +80,7 @@ function PrivacyPage() {
 
       <Section title="What account deletion removes">
         <p>
-          When you delete your account from Settings, we permanently remove your Soverm data,
+          When you delete your account from Profile, we permanently remove your Soverm data,
           including: chat messages, insight action items, insights, transactions, connected
           accounts, Plaid item records, and your user profile. We also attempt to revoke linked
           Plaid Items and cancel any active Soverm Pro Stripe subscription so billing stops.

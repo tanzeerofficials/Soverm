@@ -7,12 +7,13 @@
 import { useEffect, useState } from 'react'
 import { useAuth, useClerk } from '@clerk/clerk-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import AppNavbar from '../components/AppNavbar.jsx'
 import ConfirmModal from '../components/ConfirmModal.jsx'
 import PageHeader from '../components/PageHeader.jsx'
 import SettingsSection from '../components/SettingsSection.jsx'
 import PaydaySettingsSection from '../components/PaydaySettingsSection.jsx'
+import ConnectBankButton from '../components/ConnectBankButton.jsx'
 import Skeleton from '../components/Skeleton.jsx'
 import UsageBadge from '../components/UsageBadge.jsx'
 import { useToastContext } from '../context/ToastContext.jsx'
@@ -279,11 +280,11 @@ function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-app text-fg">
-      <AppNavbar backTo="/dashboard" backLabel="Dashboard" />
+      <AppNavbar backTo="/dashboard" backLabel="Home" />
 
       <main className="mx-auto max-w-2xl px-4 pb-16 pt-24 sm:px-6 sm:pt-28">
         <PageHeader
-          title="Settings"
+          title="Profile"
           description="Manage your plan, payday, connected banks, notifications, and account data."
         />
 
@@ -380,41 +381,47 @@ function SettingsPage() {
             ) : accounts.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border-default px-4 py-8 text-center">
                 <p className="text-sm text-fg-muted">No banks connected yet.</p>
-                <Link
-                  to="/dashboard"
-                  className="mt-3 inline-block text-sm font-medium text-brand transition hover:text-brand-soft"
-                >
-                  Connect a bank on your dashboard
-                </Link>
+                <div className="mx-auto mt-4 max-w-xs">
+                  <ConnectBankButton showSecurityNote={false} />
+                </div>
               </div>
             ) : (
-              <ul className="space-y-3">
-                {accounts.map((account) => (
-                  <li
-                    key={account.id}
-                    className="flex items-start justify-between gap-3 rounded-xl border border-border-default bg-surface-elevated p-4"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-xs font-medium uppercase tracking-wide text-fg-muted">
-                        {account.bank_name}
-                      </p>
-                      <p className="mt-1 truncate text-sm font-medium text-fg">
-                        {account.account_name}
-                      </p>
-                      <p className="mt-2 font-mono text-sm tabular-nums text-brand-soft">
-                        {formatCurrency(getDisplayBalance(account))}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setAccountToDelete(account)}
-                      className="min-h-11 shrink-0 rounded-lg border border-border-default px-3 py-2 text-xs font-medium text-fg-muted transition hover:border-danger/40 hover:text-danger"
+              <div className="space-y-4">
+                <ul className="space-y-3">
+                  {accounts.map((account) => (
+                    <li
+                      key={account.id}
+                      className="flex items-start justify-between gap-3 rounded-xl border border-border-default bg-surface-elevated p-4"
                     >
-                      Disconnect
-                    </button>
-                  </li>
-                ))}
-              </ul>
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-medium uppercase tracking-wide text-fg-muted">
+                          {account.bank_name}
+                        </p>
+                        <p className="mt-1 truncate text-sm font-medium text-fg">
+                          {account.account_name}
+                        </p>
+                        <p className="mt-2 font-mono text-sm tabular-nums text-brand-soft">
+                          {formatCurrency(getDisplayBalance(account))}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setAccountToDelete(account)}
+                        className="min-h-11 shrink-0 rounded-lg border border-border-default px-3 py-2 text-xs font-medium text-fg-muted transition hover:border-danger/40 hover:text-danger"
+                      >
+                        Disconnect
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <div className="max-w-xs">
+                  <ConnectBankButton
+                    label="Add another bank"
+                    variant="secondary"
+                    showSecurityNote={false}
+                  />
+                </div>
+              </div>
             )}
           </SettingsSection>
 

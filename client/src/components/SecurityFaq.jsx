@@ -30,12 +30,12 @@ const FAQ_ITEMS = [
   {
     question: 'Can I disconnect my bank anytime?',
     answer:
-      'Yes — from your dashboard or Settings at any time. Disconnecting removes Soverm\'s access immediately and stops all future syncing. That account\'s spending is removed from your Expense Analyzer and category breakdowns going forward. Your past insights and transaction history are kept and won\'t be deleted unless you delete your account.',
+      'Yes — from your dashboard or Profile at any time. Disconnecting removes Soverm\'s access immediately and stops all future syncing. That account\'s spending is removed from your Expense Analyzer and category breakdowns going forward. Your past insights and transaction history are kept and won\'t be deleted unless you delete your account.',
   },
   {
     question: 'Can I delete my Soverm account and all my data?',
     answer:
-      'Yes. Go to Settings → Delete my account. You must type DELETE to confirm. This permanently removes your profile, bank links, transactions, insights, and chat history, and deletes your login. See our Privacy Policy for the full list.',
+      'Yes. Go to Profile → Delete my account. You must type DELETE to confirm. This permanently removes your profile, bank links, transactions, insights, and chat history, and deletes your login. See our Privacy Policy for the full list.',
   },
   {
     question: 'Is this a bank or a financial institution?',

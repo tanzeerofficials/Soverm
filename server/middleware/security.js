@@ -28,8 +28,10 @@ const rateLimitDefaults = {
 export const globalRateLimiter = rateLimit({
   ...rateLimitDefaults,
   windowMs: 15 * 60 * 1000,
-  max: 300,
-  skip: (req) => req.path.startsWith('/webhooks'),
+  // Local React Query + Strict Mode burns through 300 quickly (incl. OPTIONS).
+  max: process.env.NODE_ENV === 'production' ? 300 : 5000,
+  skip: (req) =>
+    req.path.startsWith('/webhooks') || req.method === 'OPTIONS',
 })
 
 /**

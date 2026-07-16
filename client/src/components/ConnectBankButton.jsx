@@ -11,7 +11,17 @@
 import { usePlaidLinkContext } from '../context/PlaidLinkContext.jsx'
 import { trackConnectBankClick } from '../lib/analytics.js'
 
-function ConnectBankButton({ className = '', highlighted = false, showSecurityNote = true }) {
+function ConnectBankButton({
+  className = '',
+  highlighted = false,
+  showSecurityNote = true,
+  /*
+   * Optional custom label for maintenance surfaces (e.g. “Add another bank”).
+   * Loading / error states still use clear system copy so users aren’t stuck.
+   */
+  label: labelOverride = null,
+  variant = 'primary',
+}) {
   const {
     open,
     ready,
@@ -21,13 +31,18 @@ function ConnectBankButton({ className = '', highlighted = false, showSecurityNo
     retryLinkToken,
   } = usePlaidLinkContext()
 
-  const label = isExchanging
+  const defaultLabel = isExchanging
     ? 'Connecting & syncing…'
     : isFetchingLinkToken
       ? 'Preparing connection…'
       : linkTokenError
         ? 'Retry bank connection'
         : 'Connect Your Bank'
+
+  const label =
+    labelOverride && !isExchanging && !isFetchingLinkToken && !linkTokenError
+      ? labelOverride
+      : defaultLabel
 
   function handleClick() {
     if (linkTokenError) {
@@ -39,10 +54,17 @@ function ConnectBankButton({ className = '', highlighted = false, showSecurityNo
     open()
   }
 
+  const isSecondary = variant === 'secondary'
+  const buttonClass = isSecondary
+    ? `min-h-11 w-full rounded-lg border border-brand/40 bg-brand/10 px-4 py-2.5 text-sm font-semibold text-brand-soft transition hover:bg-brand/15 disabled:cursor-not-allowed disabled:opacity-60 ${className}`
+    : `min-h-11 w-full rounded-lg bg-brand px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-60 ${
+        highlighted && !isExchanging ? 'animate-pulse' : ''
+      } ${className}`
+
   return (
     <div
       className={`flex w-full max-w-full flex-col items-center ${
-        highlighted
+        highlighted && !isSecondary
           ? 'rounded-lg ring-2 ring-brand ring-offset-1 ring-offset-app'
           : ''
       }`}
@@ -51,9 +73,7 @@ function ConnectBankButton({ className = '', highlighted = false, showSecurityNo
         type="button"
         onClick={handleClick}
         disabled={(!ready && !linkTokenError) || isExchanging || isFetchingLinkToken}
-        className={`min-h-11 w-full rounded-lg bg-brand px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-60 ${
-          highlighted && !isExchanging ? 'animate-pulse' : ''
-        } ${className}`}
+        className={buttonClass}
       >
         {label}
       </button>

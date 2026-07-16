@@ -17,12 +17,12 @@ const PRODUCT_LINKS_PUBLIC = [
 ]
 
 const PRODUCT_LINKS_APP = [
-  { to: '/dashboard', label: 'Dashboard' },
+  { to: '/dashboard', label: 'Home' },
   { to: '/weekly-review', label: 'Your week' },
-  { to: '/month-condition', label: 'Month letter' },
   { to: '/expense-analyzer', label: 'Expenses' },
+  { to: '/month-condition', label: 'Month letter' },
   { to: '/history', label: 'History' },
-  { to: '/settings', label: 'Settings' },
+  { to: '/settings', label: 'Profile' },
 ]
 
 function FooterLink({ to, children }) {

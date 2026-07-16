@@ -210,7 +210,7 @@ Scripts refuse localhost unless `ALLOW_LOCAL_DB=1`. Use Railway’s **public** P
 
 ## Stripe (Soverm Pro)
 
-Soverm Pro is **$5/mo**. Free: 1 AI insight/day + 7-day history. Pro: unlimited insights (safety ceiling 30/day) + full history.
+Soverm Pro is **$6.99/mo**. Free: 1 AI insight/day + 7-day history. Pro: unlimited insights (safety ceiling 30/day) + full history.
 
 ### Production setup checklist (launch gate)
 
@@ -243,11 +243,15 @@ Confirm `users.stripe_customer_id` and `users.stripe_subscription_id` exist (`ve
 
 **15-minute smoke (human)**
 
-1. Fresh Free user on [soverm.vercel.app](https://soverm.vercel.app)
+Do this in the browser (not a terminal script). Local `sk_test_…` keys use card `4242 4242 4242 4242`.
+
+1. Fresh Free user on [soverm.vercel.app](https://soverm.vercel.app) (or local `http://localhost:5173`)
 2. Settings → **Upgrade** → Stripe Checkout with test/live card
 3. Return → Settings shows **Pro** within ~30s (webhook)
 4. **Manage billing** opens Customer Portal
-5. Cancel subscription in portal → Settings shows **Free** within ~30s
+5. Cancel subscription in portal → confirmation (“Plan canceled”)
+   - Default portal cancel is **at period end** — Settings stays **Pro** until the period ends (status still `active`). That’s expected.
+   - To verify Free sync immediately: in Stripe Dashboard → Customers → subscription → Cancel → **Cancel immediately**, then Settings should show **Free** within ~30s (`customer.subscription.deleted`).
 6. Optional: delete-account path on a throwaway Pro user — Stripe sub cancels, no leftover charge
 
 Without the three Stripe env vars, `POST /api/billing/checkout` and `POST /api/billing/portal` return 503 and the client shows a friendly toast.

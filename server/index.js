@@ -85,10 +85,9 @@ const port = Number(process.env.PORT) || 5000
 app.set('trust proxy', 1)
 
 app.use(securityHeaders)
-app.use(globalRateLimiter)
 
-// CORS: comma-separated browser origins in ALLOWED_ORIGINS (no wildcards).
-// Include production Vercel URL, preview deployment URLs, and http://localhost:5173 for local dev.
+// CORS must run BEFORE rate limiting. Otherwise a 429 response has no
+// Access-Control-Allow-Origin header and the browser reports a misleading CORS error.
 function normalizeOrigin(origin) {
   return origin.replace(/^["']|["']$/g, '').replace(/\/$/, '').trim()
 }
@@ -145,6 +144,8 @@ app.use(
     credentials: true,
   })
 )
+
+app.use(globalRateLimiter)
 
 // Webhooks must read the raw body (not JSON) so signatures can be verified.
 // That is why these routes come BEFORE express.json().

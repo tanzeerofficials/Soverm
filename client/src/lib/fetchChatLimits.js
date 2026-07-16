@@ -2,7 +2,7 @@ import { chatLimitsQueryKey } from './queryKeys.js'
 
 /*
  * What this does: loads how many Ask Soverm messages the user has left
- * this hour (rolling window) so the chat UI can show "17 of 20 left".
+ * (5/day on Free, 20/hour on Pro) so the chat UI can show "3 of 5 left today".
  */
 export async function fetchChatLimits(getToken) {
   const token = await getToken()
@@ -21,12 +21,13 @@ export async function fetchChatLimits(getToken) {
   return response.json()
 }
 
-export function formatChatLimitLabel({ remaining, limit } = {}) {
+export function formatChatLimitLabel({ remaining, limit, period = 'hour' } = {}) {
   if (!Number.isFinite(remaining) || !Number.isFinite(limit) || limit <= 0) {
     return null
   }
   const left = Math.max(0, remaining)
-  return `${left} of ${limit} messages left this hour`
+  const windowLabel = period === 'day' ? 'today' : 'this hour'
+  return `${left} of ${limit} messages left ${windowLabel}`
 }
 
 export async function invalidateChatLimits(queryClient) {

@@ -122,3 +122,85 @@ export async function reserveFreeInsightSlot(client, userId) {
     },
   }
 }
+
+export const TRACKER_PRO_REQUIRED_MESSAGE =
+  'Savings goals and custom alerts are included with Soverm Pro.'
+
+export const TRACKER_SAVINGS_PRO_MESSAGE =
+  'Savings goals are included with Soverm Pro. Free includes one spending cap.'
+
+export const TRACKER_ALERTS_PRO_MESSAGE =
+  'Custom spending alerts are included with Soverm Pro.'
+
+function proRequiredError(message) {
+  const error = new Error(message)
+  error.statusCode = 403
+  error.code = 'pro_required'
+  return error
+}
+
+/*
+ * What it does: throws a 403 if the user is not on Pro.
+ * Why: true Pro-only paths (e.g. savings detections) must not be callable from Free.
+ */
+export async function assertProTier(userId) {
+  const tier = await getUserTier(userId)
+  if (tier !== 'pro') {
+    throw proRequiredError(TRACKER_PRO_REQUIRED_MESSAGE)
+  }
+}
+
+function bodyTouchesAlertFields(body) {
+  if (!body || typeof body !== 'object') {
+    return false
+  }
+  return (
+    'alertWarningPercent' in body ||
+    'alertRemainingDollars' in body ||
+    body.alertWarningPercent != null ||
+    body.alertRemainingDollars != null
+  )
+}
+
+/*
+ * Free: one spending cap (name + monthly amount). Pro: savings goals + custom alerts.
+ */
+export async function assertTrackerCreateAllowed(userId, body) {
+  const tier = await getUserTier(userId)
+  if (tier === 'pro') {
+    return
+  }
+
+  const trackType = body?.trackType === 'saving' ? 'saving' : 'spending'
+  if (trackType === 'saving') {
+    throw proRequiredError(TRACKER_SAVINGS_PRO_MESSAGE)
+  }
+  if (bodyTouchesAlertFields(body)) {
+    throw proRequiredError(TRACKER_ALERTS_PRO_MESSAGE)
+  }
+}
+
+export async function assertTrackerUpdateAllowed(userId, trackType, body) {
+  const tier = await getUserTier(userId)
+  if (tier === 'pro') {
+    return
+  }
+
+  if (trackType === 'saving') {
+    throw proRequiredError(TRACKER_SAVINGS_PRO_MESSAGE)
+  }
+  if (bodyTouchesAlertFields(body)) {
+    throw proRequiredError(TRACKER_ALERTS_PRO_MESSAGE)
+  }
+}
+
+export async function assertTrackerDeleteAllowed(userId, trackType) {
+  const tier = await getUserTier(userId)
+  if (tier === 'pro') {
+    return
+  }
+
+  if (trackType === 'saving') {
+    throw proRequiredError(TRACKER_SAVINGS_PRO_MESSAGE)
+  }
+}

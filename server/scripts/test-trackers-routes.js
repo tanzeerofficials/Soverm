@@ -70,13 +70,23 @@ async function request(app, method, path, body) {
   }
 }
 
-async function ensureTestUser() {
+async function ensureTestUser({ tier = 'free' } = {}) {
   await db.query(
-    `INSERT INTO users (id, email, name)
-     VALUES ($1, $2, $3)
-     ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, name = EXCLUDED.name`,
-    [TEST_USER_ID, TEST_USER_EMAIL, 'Tracker Integration Test']
+    `INSERT INTO users (id, email, name, subscription_tier)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (id) DO UPDATE
+       SET email = EXCLUDED.email,
+           name = EXCLUDED.name,
+           subscription_tier = EXCLUDED.subscription_tier`,
+    [TEST_USER_ID, TEST_USER_EMAIL, 'Tracker Integration Test', tier]
   )
+}
+
+async function setUserTier(tier) {
+  await db.query(`UPDATE users SET subscription_tier = $2 WHERE id = $1`, [
+    TEST_USER_ID,
+    tier,
+  ])
 }
 
 async function cleanupTestUser() {
@@ -125,6 +135,39 @@ async function main() {
   assert(emptyGet.body.trackers.length === 0, 'trackers list starts empty')
   console.log('  pass: GET empty snapshot')
   passed++
+
+  const freeCreate = await request(app, 'POST', '/api/trackers', {
+    trackType: 'spending',
+    monthlyAmount: 1500,
+    name: 'Free spending cap',
+  })
+  assert(freeCreate.status === 200, `free POST spending returns 200 (got ${freeCreate.status})`)
+  assert(freeCreate.body.configured === true, 'free spending cap configures snapshot')
+  console.log('  pass: free tier can create one spending cap')
+  passed++
+
+  const freeSaving = await request(app, 'POST', '/api/trackers', {
+    trackType: 'saving',
+    monthlyAmount: 100,
+    name: 'Blocked buffer',
+    purposeType: 'future',
+  })
+  assert(freeSaving.status === 403, `free POST saving returns 403 (got ${freeSaving.status})`)
+  assert(freeSaving.body.error === 'pro_required', 'free saving returns pro_required')
+  console.log('  pass: free tier cannot create savings goals')
+  passed++
+
+  const freeAlerts = await request(app, 'POST', '/api/trackers', {
+    trackType: 'spending',
+    monthlyAmount: 1600,
+    name: 'Alert attempt',
+    alertWarningPercent: 50,
+  })
+  assert(freeAlerts.status === 403, `free custom alerts return 403 (got ${freeAlerts.status})`)
+  console.log('  pass: free tier cannot set custom alert thresholds')
+  passed++
+
+  await setUserTier('pro')
 
   const createSpending = await request(app, 'POST', '/api/trackers', {
     trackType: 'spending',

@@ -37,12 +37,12 @@ function LandingHero() {
           </p>
 
           <h1 className="mt-5 text-2xl font-semibold leading-snug tracking-tight text-fg sm:text-3xl lg:text-4xl">
-            Know what&apos;s left until payday — and what to do this week.
+            Track your cash flow. Get clear insights. Stay ahead — and save.
           </h1>
 
           <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-fg-muted sm:text-lg">
-            A weekly check-in and month-end accountant letter for paycheck-to-paycheck life —
-            not another chart dashboard.
+            See what&apos;s coming in and going out, so you never scramble to payday — and keep
+            something left for yourself.
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">

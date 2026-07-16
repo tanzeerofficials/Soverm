@@ -26,4 +26,4 @@ See README → **Stripe (Soverm Pro) → Production setup checklist**. Short ver
 - Migration **019** applied on prod DB
 - Webhook → `https://soverm-production.up.railway.app/webhooks/stripe` (3 events)
 - Customer Portal cancel enabled
-- Smoke: Free → Upgrade → Pro → Manage billing → cancel → Free
+- Smoke: Free → Upgrade → Pro → Manage billing → cancel (portal cancel is usually *at period end* — Settings stays Pro until then; use Stripe “Cancel immediately” to verify Free within ~30s)

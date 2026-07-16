@@ -182,7 +182,7 @@ function NotificationBell() {
             <p className="border-t border-border-default/80 px-3.5 py-2.5 text-[10px] leading-relaxed text-fg-subtle">
               New alerts are paused. Turn them back on in{' '}
               <Link to="/settings" className="text-ai hover:underline">
-                Settings
+                Profile
               </Link>
               .
             </p>

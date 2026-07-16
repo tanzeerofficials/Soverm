@@ -26,7 +26,7 @@ const WHATS_LEFT_HELP = [
   'What’s left = your connected account balance minus known bills due on or before your next payday.',
   'Bills come from detected recurring charges (rent, subscriptions, etc.) scheduled before payday.',
   'No extra buffer is reserved yet (buffer = $0). A spending cap “safe to spend” is separate if you set one.',
-  'Confirm or edit payday anytime in Settings.',
+  'Confirm or edit payday anytime in Profile.',
 ]
 
 function formatCurrency(amount) {
@@ -210,7 +210,7 @@ function DashboardHero({
                 to="/settings"
                 className="mt-3 inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-brand-fg transition hover:bg-brand-hover"
               >
-                Set payday in Settings
+                Set payday in Profile
               </Link>
             </div>
           </>
@@ -258,7 +258,7 @@ function DashboardHero({
                 to="/settings"
                 className="mt-3 inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-brand-fg transition hover:bg-brand-hover"
               >
-                Set payday in Settings
+                Set payday in Profile
               </Link>
             </div>
           </>
@@ -280,7 +280,7 @@ function DashboardHero({
                 to="/settings"
                 className="mt-3 inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-brand-fg transition hover:bg-brand-hover"
               >
-                Set payday in Settings
+                Set payday in Profile
               </Link>
             </div>
           </>

@@ -46,7 +46,7 @@ async function parseJsonError(response) {
 
   if (data.error === 'rate_limit_exceeded') {
     const err = new Error(
-      data.message || 'Message limit reached for this hour. Try again in a few minutes.'
+      data.message || 'Message limit reached. Try again later.'
     )
     err.code = 'rate_limit_exceeded'
     err.chatLimit = {
@@ -54,6 +54,7 @@ async function parseJsonError(response) {
       limit: data.limit,
       count: data.count,
       allowed: false,
+      period: data.period ?? 'hour',
       retryAfterSeconds: data.retryAfterSeconds ?? null,
     }
     throw err

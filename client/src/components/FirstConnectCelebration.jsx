@@ -29,6 +29,7 @@ function FirstConnectCelebration({
   accountsConnected = 1,
   syncedAdded = 0,
   getToken,
+  isPro = false,
   onClose,
   onGenerateInsight,
   onGoalCreated,
@@ -132,7 +133,7 @@ function FirstConnectCelebration({
       await savePayday(getToken, { payCadence, nextPaydayOn })
       onPaydaySaved?.()
       await refreshWhatsLeft()
-      setStep('goal')
+      setStep(isPro ? 'goal' : 'whatsLeft')
     } catch (err) {
       setError(err.message || 'Couldn’t save payday')
     } finally {

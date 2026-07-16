@@ -7,6 +7,8 @@
 import { SignUpButton, useAuth } from '@clerk/clerk-react'
 import { useState } from 'react'
 import {
+  CHAT_HOURLY_LIMIT,
+  FREE_DAILY_CHAT_LIMIT,
   FREE_DAILY_INSIGHT_LIMIT,
   FREE_HISTORY_DAYS,
   PRO_MONTHLY_PRICE,
@@ -22,7 +24,8 @@ function formatCurrency(amount) {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(amount)
 }
 
@@ -43,9 +46,19 @@ const FEATURE_ROWS = [
     pro: 'Included',
   },
   {
+    label: 'Spending tracker',
+    free: '1 spending cap',
+    pro: 'Custom alerts',
+  },
+  {
+    label: 'Savings goals',
+    free: '—',
+    pro: 'Up to 5 goals',
+  },
+  {
     label: 'Ask Soverm chat',
-    free: 'Included',
-    pro: 'Included',
+    free: `${FREE_DAILY_CHAT_LIMIT} messages/day`,
+    pro: `${CHAT_HOURLY_LIMIT}/hour`,
   },
   {
     label: 'AI insights per day',
@@ -104,10 +117,11 @@ function PricingSection() {
       <div className="text-center">
         <p className="text-sm font-medium uppercase tracking-wide text-brand">Pricing</p>
         <h2 id="pricing-heading" className="mt-2 text-2xl font-bold text-fg sm:text-3xl">
-          The weekly loop stays free
+          Free tells you where you stand. Pro helps you stay on track.
         </h2>
         <p className="mt-3 text-sm text-fg-muted">
-          Your week, what&apos;s left, and the month letter stay free. Pro unlocks more insight depth
+          Free includes the weekly loop — your week, what&apos;s left, the month letter, afford
+          checks, and one spending cap. Pro adds savings goals, custom alerts, unlimited insights,
           and full history.
         </p>
       </div>
@@ -120,8 +134,8 @@ function PricingSection() {
           <h3 className="text-lg font-semibold text-fg">Free</h3>
           <p className="mt-2 font-mono text-3xl font-light text-fg">$0</p>
           <p className="mt-2 text-sm text-fg-muted">
-            Weekly check-in, what&apos;s left, month letter, and “Can I afford it?” — no card
-            required.
+            Weekly check-in, what&apos;s left, month letter, afford checks, and one spending cap —
+            no card required.
           </p>
           <FeatureList tier="free" />
           <div className="mt-8">
@@ -143,7 +157,8 @@ function PricingSection() {
             <span className="text-base font-normal text-fg-muted">/mo</span>
           </p>
           <p className="mt-2 text-sm text-fg-muted">
-            Unlimited AI insights and full history when you want more depth.
+            Savings goals, custom alerts, unlimited AI insights, and full history when you want more
+            depth.
           </p>
           <FeatureList tier="pro" />
           <div className="mt-8">

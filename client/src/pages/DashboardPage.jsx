@@ -6,13 +6,12 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useAuth } from '@clerk/clerk-react'
+import { useAuth, useUser } from '@clerk/clerk-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams, Link } from 'react-router-dom'
 import AppNavbar from '../components/AppNavbar.jsx'
 import DashboardHero from '../components/DashboardHero.jsx'
 import DashboardSectionHeader from '../components/DashboardSectionHeader.jsx'
-import DashboardAccountCard from '../components/DashboardAccountCard.jsx'
 import FirstInsightCelebration from '../components/FirstInsightCelebration.jsx'
 import DashboardNeedsAttention from '../components/DashboardNeedsAttention.jsx'
 import DashboardQuickTools from '../components/quickTools/DashboardQuickTools.jsx'
@@ -25,12 +24,12 @@ import InsightFreshnessNudge from '../components/InsightFreshnessNudge.jsx'
 import SecurityNote from '../components/SecurityNote'
 import UsageBadge from '../components/UsageBadge.jsx'
 import PaywallCard from '../components/PaywallCard.jsx'
+import FreeVsProPlanCallout from '../components/FreeVsProPlanCallout.jsx'
 import { useToastContext } from '../context/ToastContext.jsx'
 import FirstConnectCelebration from '../components/FirstConnectCelebration.jsx'
-import ConfirmModal from '../components/ConfirmModal'
-import DashboardOnboarding from '../components/DashboardOnboarding.jsx'
 import ActivationChecklist from '../components/ActivationChecklist.jsx'
 import DashboardActionsSection from '../components/DashboardActionsSection.jsx'
+import ConnectBankButton from '../components/ConnectBankButton.jsx'
 import {
   DASHBOARD_TABS,
   DashboardTabBar,
@@ -59,6 +58,8 @@ import {
   buildAttentionItems,
   countIncompleteActions,
   getInsightFreshnessNudge,
+  hoursSinceSync,
+  SYNC_STALE_HOURS,
 } from '../lib/dashboardAttention.js'
 import {
   dismissAttentionItem,
@@ -67,7 +68,6 @@ import {
 import { markNotificationRead } from '../lib/fetchNotifications.js'
 import { syncTransactions } from '../lib/syncTransactions.js'
 import { consumeFirstConnectCelebration } from '../lib/firstConnectCelebration.js'
-import { disconnectAccount, getDisconnectConfirmMessage } from '../lib/disconnectAccount.js'
 import { fetchUsage } from '../lib/fetchUsage.js'
 import { trackUpgradeProClick } from '../lib/analytics.js'
 import {
@@ -75,9 +75,9 @@ import {
   startProCheckout,
 } from '../lib/startProCheckout.js'
 import {
-  getInitialOnboardingCollapsed,
+  buildHomeGreeting,
+  hasVisitedDashboard,
   markDashboardVisited,
-  setOnboardingCollapsedPreference,
 } from '../lib/dashboardUiPrefs.js'
 import { useAskSoverm } from '../context/AskSovermContext.jsx'
 import { buildActivationChecklist } from '../lib/activationChecklist.js'
@@ -94,6 +94,7 @@ function minutesSinceSync(lastSyncedAt) {
 
 function DashboardPage() {
   const { getToken, userId } = useAuth()
+  const { user } = useUser()
   const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
   const { openChat } = useAskSoverm()
@@ -103,16 +104,8 @@ function DashboardPage() {
   const [limitReached, setLimitReached] = useState(false)
   const [selectedRange, setSelectedRange] = useState('30d')
   const { showToast } = useToastContext()
-  const [accountToDelete, setAccountToDelete] = useState(null)
   const [firstConnectCelebration, setFirstConnectCelebration] = useState(null)
   const [firstInsightCelebration, setFirstInsightCelebration] = useState(false)
-  /*
-   * Re-read onboarding preference when Clerk userId arrives / changes so we
-   * never show User A's collapsed state after signing in as User B.
-   */
-  const [onboardingCollapsed, setOnboardingCollapsed] = useState(() =>
-    getInitialOnboardingCollapsed(userId)
-  )
   const [activeTab, setActiveTab] = useState(DASHBOARD_TABS.OVERVIEW)
   const [quickToolsTab, setQuickToolsTab] = useState(QUICK_TOOL_TABS.TRACKER)
   const [attentionDismissalVersion, setAttentionDismissalVersion] = useState(0)
@@ -120,10 +113,18 @@ function DashboardPage() {
   const lastAutoSyncAttempt = useRef(0)
   const prevAccountCount = useRef(null)
   const celebrateFirstInsightRef = useRef(false)
-
-  useEffect(() => {
-    setOnboardingCollapsed(getInitialOnboardingCollapsed(userId))
-  }, [userId])
+  /*
+   * Snapshot “have they opened Home before?” once — markDashboardVisited runs
+   * later, so this stays accurate for Hi vs Welcome back in this session.
+   */
+  const hasVisitedHomeBefore = useRef(hasVisitedDashboard(userId))
+  const homeGreeting = useMemo(
+    () =>
+      buildHomeGreeting(user?.firstName, {
+        hasVisitedBefore: hasVisitedHomeBefore.current,
+      }),
+    [user?.firstName]
+  )
 
   const { data: usage } = useQuery({
     queryKey: usageQueryKey,
@@ -132,6 +133,17 @@ function DashboardPage() {
 
   const showPaywall =
     limitReached || (!usage?.isPro && usage?.remainingToday === 0)
+
+  const isPro = usage?.isPro ?? false
+
+  async function handleUpgrade(source) {
+    trackUpgradeProClick(source)
+    try {
+      await startProCheckout(getToken)
+    } catch (err) {
+      showToast(checkoutErrorToastMessage(err), 'error')
+    }
+  }
 
   const {
     data: dashboardData,
@@ -267,11 +279,19 @@ function DashboardPage() {
   const hasSynced = !!dashboardData?.lastSyncedAt
   const hasInsight = !!dashboardData?.latestInsight
   const highlightGenerate = hasAccounts && hasSynced && !hasInsight
+  /*
+   * Overview only shows Connect/Sync when the user actually needs them —
+   * otherwise the home job is “open your week,” not bank maintenance.
+   */
+  const showOverviewConnect = !hasAccounts
+  const showOverviewSync =
+    hasAccounts &&
+    (!hasSynced || hoursSinceSync(dashboardData?.lastSyncedAt) >= SYNC_STALE_HOURS)
 
   const { data: expenseTeaser, isPending: expenseTeaserLoading } = useQuery({
     queryKey: expenseAnalyzerSummaryQueryKey,
     queryFn: () => fetchExpenseAnalyzerSummary(getToken),
-    enabled: hasAccounts && activeTab === DASHBOARD_TABS.TOOLS,
+    enabled: hasAccounts,
   })
 
   const {
@@ -387,7 +407,7 @@ function DashboardPage() {
     [attentionItems, attentionContext, attentionDismissalVersion, userId]
   )
 
-  const showAttentionAllClear = hasAccounts && hasInsight && visibleAttentionItems.length === 0
+  const showAttentionAllClear = hasAccounts && visibleAttentionItems.length === 0
 
   async function handleDismissAttentionItem(item) {
     dismissAttentionItem(item, attentionContext, userId)
@@ -483,11 +503,6 @@ function DashboardPage() {
     triggerGenerateInsight()
   }
 
-  function handleOnboardingCollapsedChange(collapsed) {
-    setOnboardingCollapsed(collapsed)
-    setOnboardingCollapsedPreference(collapsed, userId)
-  }
-
   function renderInsightSection() {
     return (
       <section>
@@ -528,14 +543,7 @@ function DashboardPage() {
                 </p>
                 <PaywallCard
                   spent={dashboardData?.spent}
-                  onUpgrade={async () => {
-                    trackUpgradeProClick('dashboard_paywall')
-                    try {
-                      await startProCheckout(getToken)
-                    } catch (err) {
-                      showToast(checkoutErrorToastMessage(err), 'error')
-                    }
-                  }}
+                  onUpgrade={() => handleUpgrade('dashboard_paywall')}
                 />
               </div>
             )}
@@ -545,34 +553,7 @@ function DashboardPage() {
     )
   }
 
-  function renderAccountsSection() {
-    return (
-      <section className="mt-6">
-        <DashboardSectionHeader title="Connected accounts" />
-        {(dashboardData?.accounts ?? []).length === 0 ? (
-          <div className="mt-4 rounded-xl border border-dashed border-border-default bg-surface px-6 py-10 text-center">
-            <p className="text-sm font-medium text-fg">No bank connected yet</p>
-            <p className="mt-2 text-sm text-fg-muted">
-              Tap <span className="text-brand-soft">Connect Your Bank</span> above to link
-              your first account.
-            </p>
-          </div>
-        ) : (
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {(dashboardData?.accounts ?? []).map((account) => (
-              <DashboardAccountCard
-                key={account.id}
-                account={account}
-                onDisconnect={setAccountToDelete}
-              />
-            ))}
-          </div>
-        )}
-      </section>
-    )
-  }
-
-  const overviewSetupPending = !hasAccounts || highlightGenerate
+  const overviewSetupPending = !activationComplete
   const insightAttentionPending = !hasInsight || incompleteActionCount > 0
 
   const showSkeleton = isPending && dashboardData === undefined
@@ -622,6 +603,10 @@ function DashboardPage() {
               activeTab={activeTab}
               className="mt-8 space-y-6 outline-none"
             >
+              <p className="text-left text-lg font-semibold tracking-tight text-fg sm:text-xl">
+                {homeGreeting}
+              </p>
+
               <DashboardHero
                 hasAccounts={hasAccounts}
                 totalBalance={dashboardData?.totalBalance ?? 0}
@@ -639,8 +624,16 @@ function DashboardPage() {
               <DashboardActionsSection
                 showToast={showToast}
                 highlightedConnect={!hasAccounts}
+                showConnectBank={showOverviewConnect}
+                showSync={showOverviewSync}
                 showGenerateInsight={false}
               />
+
+              {!isPro && (
+                <FreeVsProPlanCallout
+                  onUpgrade={() => handleUpgrade('dashboard_overview')}
+                />
+              )}
 
               <DashboardNeedsAttention
                 items={visibleAttentionItems}
@@ -667,40 +660,48 @@ function DashboardPage() {
               )}
 
               {hasAccounts && (
+                <>
+                  <DashboardUpcomingBills
+                    forecast={forecastData}
+                    isLoading={forecastLoading}
+                    onOpenForecast={() => {
+                      setActiveTab(DASHBOARD_TABS.TOOLS)
+                      setQuickToolsTab(QUICK_TOOL_TABS.FORECAST)
+                      requestAnimationFrame(() => {
+                        document.getElementById('dashboard-quick-tools')?.scrollIntoView({
+                          behavior: 'smooth',
+                          block: 'start',
+                        })
+                      })
+                    }}
+                  />
+
+                  <DashboardSpendingSnapshot
+                    summary={expenseTeaser}
+                    isLoading={expenseTeaserLoading}
+                  />
+                </>
+              )}
+
+              {hasAccounts && (
                 <div className="mx-auto max-w-xl space-y-4">
+                  {/*
+                   * One setup surface on Overview: ActivationChecklist only.
+                   * Insight onboarding stays on the Insight tab.
+                   */}
                   <ActivationChecklist
                     hasAccounts={hasAccounts}
                     paydayConfigured={Boolean(trackerData?.payday?.configured)}
                   />
-                  {/* One setup surface: onboarding only after activation checklist is done */}
-                  {activationComplete &&
-                    !hasInsight &&
-                    Boolean(trackerData?.payday?.configured) &&
-                    Boolean(trackerData?.whatsLeftUntilPayday?.configured) && (
-                      <DashboardOnboarding
-                        hasAccounts={hasAccounts}
-                        hasSynced={hasSynced}
-                        hasPayday={Boolean(trackerData?.payday?.configured)}
-                        hasWhatsLeft={Boolean(trackerData?.whatsLeftUntilPayday?.configured)}
-                        hasInsight={hasInsight}
-                        collapsed={onboardingCollapsed}
-                        onCollapsedChange={handleOnboardingCollapsedChange}
-                      />
-                    )}
                   {!hasInsight && <SecurityNote />}
                 </div>
               )}
 
-              {!hasAccounts && !hasInsight && (
+              {!hasAccounts && (
                 <div className="mx-auto max-w-xl space-y-4">
-                  <DashboardOnboarding
+                  <ActivationChecklist
                     hasAccounts={hasAccounts}
-                    hasSynced={hasSynced}
-                    hasPayday={false}
-                    hasWhatsLeft={false}
-                    hasInsight={hasInsight}
-                    collapsed={onboardingCollapsed}
-                    onCollapsedChange={handleOnboardingCollapsedChange}
+                    paydayConfigured={false}
                   />
                   <SecurityNote />
                 </div>
@@ -771,57 +772,32 @@ function DashboardPage() {
                     Recent transactions, period comparisons, and account health appear here once
                     your accounts are linked.
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab(DASHBOARD_TABS.OVERVIEW)}
-                    className="mt-4 rounded-lg border border-border-default bg-surface-elevated px-4 py-2 text-sm font-medium text-fg transition hover:border-border-hover"
-                  >
-                    Go to Overview
-                  </button>
+                  <div className="mx-auto mt-4 max-w-xs">
+                    <ConnectBankButton showSecurityNote={false} />
+                  </div>
                 </div>
               )}
 
               {hasAccounts && (
-                <>
-                  {renderAccountsSection()}
-
-                  <DashboardUpcomingBills
-                    forecast={forecastData}
-                    isLoading={forecastLoading}
-                    onOpenForecast={() => {
-                      setQuickToolsTab(QUICK_TOOL_TABS.FORECAST)
-                      requestAnimationFrame(() => {
-                        document.getElementById('dashboard-quick-tools')?.scrollIntoView({
-                          behavior: 'smooth',
-                          block: 'start',
-                        })
-                      })
-                    }}
-                  />
-
-                  <DashboardSpendingSnapshot
-                    summary={expenseTeaser}
-                    isLoading={expenseTeaserLoading}
-                  />
-
-                  <DashboardQuickTools
-                    accounts={dashboardData?.accounts ?? []}
-                    lastSyncedAt={dashboardData?.lastSyncedAt}
-                    expenseData={expenseAnalyzerData}
-                    trackerSnapshot={trackerData}
-                    forecast={forecastData}
-                    trackerLoading={trackerLoading}
-                    trackerError={trackerIsError ? trackerError?.message : null}
-                    forecastLoading={toolsForecastLoading}
-                    forecastError={forecastIsError ? forecastError?.message : null}
-                    onRetryTracker={() => refetchTrackers()}
-                    onRetryForecast={() => refetchForecast()}
-                    getToken={getToken}
-                    activeTab={quickToolsTab}
-                    onTabChange={setQuickToolsTab}
-                    isLoading={quickToolsLoading}
-                  />
-                </>
+                <DashboardQuickTools
+                  accounts={dashboardData?.accounts ?? []}
+                  lastSyncedAt={dashboardData?.lastSyncedAt}
+                  expenseData={expenseAnalyzerData}
+                  trackerSnapshot={trackerData}
+                  forecast={forecastData}
+                  trackerLoading={trackerLoading}
+                  trackerError={trackerIsError ? trackerError?.message : null}
+                  forecastLoading={toolsForecastLoading}
+                  forecastError={forecastIsError ? forecastError?.message : null}
+                  onRetryTracker={() => refetchTrackers()}
+                  onRetryForecast={() => refetchForecast()}
+                  getToken={getToken}
+                  activeTab={quickToolsTab}
+                  onTabChange={setQuickToolsTab}
+                  isLoading={quickToolsLoading}
+                  isPro={isPro}
+                  onUpgrade={() => handleUpgrade('quick_tools_tracker')}
+                />
               )}
             </DashboardTabPanel>
           </>
@@ -832,6 +808,7 @@ function DashboardPage() {
         accountsConnected={firstConnectCelebration?.accountsConnected ?? 1}
         syncedAdded={firstConnectCelebration?.syncedAdded ?? 0}
         getToken={getToken}
+        isPro={isPro}
         onClose={handleFirstConnectClose}
         onGenerateInsight={handleFirstConnectGenerate}
         onPaydaySaved={() => {
@@ -841,32 +818,6 @@ function DashboardPage() {
         onGoalCreated={() => {
           queryClient.invalidateQueries({ queryKey: trackerQueryKey })
           showToast('Cash buffer goal created', 'success')
-        }}
-      />
-      <ConfirmModal
-        isOpen={!!accountToDelete}
-        title="Disconnect this account?"
-        message={
-          accountToDelete
-            ? getDisconnectConfirmMessage(accountToDelete.account_name)
-            : ''
-        }
-        confirmLabel="Disconnect"
-        onCancel={() => setAccountToDelete(null)}
-        onConfirm={async () => {
-          if (!accountToDelete) return
-
-          const accountName = accountToDelete.account_name
-
-          try {
-            await disconnectAccount(getToken, accountToDelete.id)
-            setAccountToDelete(null)
-            showToast(`"${accountName}" disconnected`, 'success')
-            await invalidateAfterAccountChange(queryClient)
-          } catch (err) {
-            console.error('Failed to disconnect account:', err.message)
-            showToast('Failed to disconnect account — please try again', 'error')
-          }
         }}
       />
 

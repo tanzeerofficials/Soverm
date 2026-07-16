@@ -19,10 +19,64 @@ import {
   applySavingsTransferDetection,
   dismissSavingsTransferDetection,
 } from '../services/savingsTransferDetection.js'
+import db from '../db/index.js'
 import { ensureUserExists } from '../utils/ensureUser.js'
+import {
+  assertProTier,
+  assertTrackerCreateAllowed,
+  assertTrackerDeleteAllowed,
+  assertTrackerUpdateAllowed,
+} from '../utils/usage.js'
 import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
 import { reportServerError } from '../utils/sentry.js'
 import { validateUuidParam } from '../utils/validation.js'
+
+async function getActiveTrackerType(userId, trackerId) {
+  const result = await db.query(
+    `SELECT track_type
+     FROM monthly_trackers
+     WHERE id = $1 AND user_id = $2 AND active = true`,
+    [trackerId, userId]
+  )
+  return result.rows[0]?.track_type ?? null
+}
+
+function handleTrackerRouteError(res, err, { userId, req, label }) {
+  if (err.statusCode === 400) {
+    return res.status(400).json({ error: err.message })
+  }
+
+  if (err.statusCode === 403) {
+    return res.status(403).json({
+      error: err.code || 'pro_required',
+      message: err.message,
+    })
+  }
+
+  if (err.statusCode === 404) {
+    return res.status(404).json({ error: err.message })
+  }
+
+  if (err.statusCode === 409) {
+    return res.status(409).json({
+      error: err.message,
+      code: err.code || 'possible_duplicate',
+    })
+  }
+
+  if (
+    err.statusCode === 503 ||
+    err.message.includes('migration 013') ||
+    err.message.includes('migration 014') ||
+    err.message.includes('migration 016') ||
+    err.message.includes('migration 017')
+  ) {
+    return res.status(503).json({ error: err.message })
+  }
+
+  reportServerError(label, err, { userId, req })
+  return res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
+}
 
 async function respondWithSnapshot(res, userId, extra = {}) {
   const snapshot = await buildTrackerSnapshotWithFallback(userId)
@@ -58,19 +112,15 @@ export function createTrackersRouter({
 
     try {
       await ensureUserExists(userId)
+      await assertTrackerCreateAllowed(userId, req.body)
       const tracker = await createTracker(userId, req.body)
       await respondWithSnapshot(res, userId, { tracker })
     } catch (err) {
-      if (err.statusCode === 400) {
-        return res.status(400).json({ error: err.message })
-      }
-
-      if (err.statusCode === 503 || err.message.includes('migration 013') || err.message.includes('migration 014') || err.message.includes('migration 016')) {
-        return res.status(503).json({ error: err.message })
-      }
-
-      reportServerError('to create tracker', err, { userId, req })
-      res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
+      return handleTrackerRouteError(res, err, {
+        userId,
+        req,
+        label: 'to create tracker',
+      })
     }
   })
 
@@ -94,30 +144,15 @@ export function createTrackersRouter({
     }
 
     try {
+      await assertProTier(userId)
       const result = await applySavingsTransferDetection(userId, id, trackerId, { force })
       await respondWithSnapshot(res, userId, result)
     } catch (err) {
-      if (err.statusCode === 400) {
-        return res.status(400).json({ error: err.message })
-      }
-
-      if (err.statusCode === 404) {
-        return res.status(404).json({ error: err.message })
-      }
-
-      if (err.statusCode === 409) {
-        return res.status(409).json({
-          error: err.message,
-          code: err.code || 'possible_duplicate',
-        })
-      }
-
-      if (err.statusCode === 503 || err.message.includes('migration 017')) {
-        return res.status(503).json({ error: err.message })
-      }
-
-      reportServerError('to apply savings detection', err, { userId, req })
-      res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
+      return handleTrackerRouteError(res, err, {
+        userId,
+        req,
+        label: 'to apply savings detection',
+      })
     }
   })
 
@@ -131,19 +166,15 @@ export function createTrackersRouter({
     }
 
     try {
+      await assertProTier(userId)
       const result = await dismissSavingsTransferDetection(userId, id)
       await respondWithSnapshot(res, userId, result)
     } catch (err) {
-      if (err.statusCode === 404) {
-        return res.status(404).json({ error: err.message })
-      }
-
-      if (err.statusCode === 503 || err.message.includes('migration 017')) {
-        return res.status(503).json({ error: err.message })
-      }
-
-      reportServerError('to dismiss savings detection', err, { userId, req })
-      res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
+      return handleTrackerRouteError(res, err, {
+        userId,
+        req,
+        label: 'to dismiss savings detection',
+      })
     }
   })
 
@@ -157,23 +188,19 @@ export function createTrackersRouter({
     }
 
     try {
+      const trackType = await getActiveTrackerType(userId, id)
+      if (!trackType) {
+        return res.status(404).json({ error: 'Tracker not found' })
+      }
+      await assertTrackerUpdateAllowed(userId, trackType, req.body)
       const tracker = await updateTracker(userId, id, req.body)
       await respondWithSnapshot(res, userId, { tracker })
     } catch (err) {
-      if (err.statusCode === 400) {
-        return res.status(400).json({ error: err.message })
-      }
-
-      if (err.statusCode === 404) {
-        return res.status(404).json({ error: err.message })
-      }
-
-      if (err.statusCode === 503 || err.message.includes('migration 013') || err.message.includes('migration 014') || err.message.includes('migration 016')) {
-        return res.status(503).json({ error: err.message })
-      }
-
-      reportServerError('to update tracker', err, { userId, req })
-      res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
+      return handleTrackerRouteError(res, err, {
+        userId,
+        req,
+        label: 'to update tracker',
+      })
     }
   })
 
@@ -187,19 +214,19 @@ export function createTrackersRouter({
     }
 
     try {
+      const trackType = await getActiveTrackerType(userId, id)
+      if (!trackType) {
+        return res.status(404).json({ error: 'Tracker not found' })
+      }
+      await assertTrackerDeleteAllowed(userId, trackType)
       await deleteTracker(userId, id)
       await respondWithSnapshot(res, userId, { id })
     } catch (err) {
-      if (err.statusCode === 404) {
-        return res.status(404).json({ error: err.message })
-      }
-
-      if (err.statusCode === 503 || err.message.includes('migration 013') || err.message.includes('migration 014')) {
-        return res.status(503).json({ error: err.message })
-      }
-
-      reportServerError('to delete tracker', err, { userId, req })
-      res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
+      return handleTrackerRouteError(res, err, {
+        userId,
+        req,
+        label: 'to delete tracker',
+      })
     }
   })
 
