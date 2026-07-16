@@ -148,9 +148,11 @@ function MonthConditionPage() {
                 Money in vs money out
               </p>
               <p className="mt-1 text-[11px] leading-relaxed text-fg-subtle">
-                Calendar month so far ({data.periodLabel}) — not the same window as Home cash flow
-                (last 7 / 30 days). External cash only; own-account transfers and card payments are
-                listed separately.
+                Calendar month so far ({data.periodLabel}). On Home, pick the{' '}
+                <span className="font-medium text-fg-muted">Month</span> range to compare the same
+                window. External cash only — Self deposits, income, peers, spending, and cash out
+                are labeled below. Self transfers and card payments stay separate so Net is not
+                double-counted.
               </p>
               <p className="mt-3 text-sm leading-relaxed text-fg-muted">
                 {data.cashFlow?.summary}
@@ -181,12 +183,21 @@ function MonthConditionPage() {
               </div>
 
               {(data.cashFlow?.byKind ||
+                data.cashFlow?.selfTransfers > 0 ||
                 data.cashFlow?.internalMoved > 0 ||
                 data.cashFlow?.liabilityPayments > 0) && (
                 <ul className="mt-4 space-y-1.5 border-t border-border-default/70 pt-3 text-xs text-fg-muted">
+                  {data.cashFlow?.byKind?.self_deposit > 0 && (
+                    <li className="flex justify-between gap-3">
+                      <span>Self deposit</span>
+                      <span className="font-mono tabular-nums">
+                        {formatCurrency(data.cashFlow.byKind.self_deposit)}
+                      </span>
+                    </li>
+                  )}
                   {data.cashFlow?.byKind?.income > 0 && (
                     <li className="flex justify-between gap-3">
-                      <span>Income / deposits</span>
+                      <span>Income / paycheck</span>
                       <span className="font-mono tabular-nums">
                         {formatCurrency(data.cashFlow.byKind.income)}
                       </span>
@@ -216,11 +227,26 @@ function MonthConditionPage() {
                       </span>
                     </li>
                   )}
-                  {data.cashFlow?.internalMoved > 0 && (
-                    <li className="flex justify-between gap-3 text-fg-subtle">
-                      <span>Moved between your accounts</span>
+                  {data.cashFlow?.byKind?.cash_out > 0 && (
+                    <li className="flex justify-between gap-3">
+                      <span>Cash out (ATM)</span>
                       <span className="font-mono tabular-nums">
-                        {formatCurrency(data.cashFlow.internalMoved)}
+                        {formatCurrency(data.cashFlow.byKind.cash_out)}
+                      </span>
+                    </li>
+                  )}
+                  {(data.cashFlow?.byKind?.self_transfer > 0 ||
+                    data.cashFlow?.selfTransfers > 0 ||
+                    data.cashFlow?.internalMoved > 0) && (
+                    <li className="flex justify-between gap-3 text-fg-subtle">
+                      <span>Self transfer</span>
+                      <span className="font-mono tabular-nums">
+                        {formatCurrency(
+                          data.cashFlow?.byKind?.self_transfer ||
+                            data.cashFlow?.selfTransfers ||
+                            data.cashFlow?.internalMoved ||
+                            0
+                        )}
                       </span>
                     </li>
                   )}

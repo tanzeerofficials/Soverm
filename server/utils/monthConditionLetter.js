@@ -21,12 +21,16 @@ export function buildIncomeVsSpending({
   income = 0,
   spent = 0,
   byKind = null,
+  selfTransfers = 0,
   internalMoved = 0,
   liabilityPayments = 0,
 } = {}) {
   const incomeAmount = roundCurrency(income)
   const spentAmount = roundCurrency(spent)
   const net = roundCurrency(incomeAmount - spentAmount)
+  const selfTransferAmount = roundCurrency(
+    selfTransfers || internalMoved || byKind?.self_transfer || 0
+  )
 
   let outcome = 'flat'
   let summary
@@ -53,7 +57,8 @@ export function buildIncomeVsSpending({
     outcome,
     summary,
     byKind: byKind ?? null,
-    internalMoved: roundCurrency(internalMoved),
+    selfTransfers: selfTransferAmount,
+    internalMoved: selfTransferAmount,
     liabilityPayments: roundCurrency(liabilityPayments),
   }
 }
@@ -328,6 +333,7 @@ export function buildMonthConditionLetter({
   dayOfMonth = 1,
   whatsLeftAmount = null,
   byKind = null,
+  selfTransfers = 0,
   internalMoved = 0,
   liabilityPayments = 0,
 } = {}) {
@@ -335,6 +341,7 @@ export function buildMonthConditionLetter({
     income,
     spent,
     byKind,
+    selfTransfers,
     internalMoved,
     liabilityPayments,
   })

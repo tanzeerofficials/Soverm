@@ -16,7 +16,18 @@
 
 import { Configuration, PlaidApi, PlaidEnvironments } from 'plaid'
 import db from '../db/index.js'
-import { resolvePlaidTransactionCategory, TRANSFER_CATEGORY_LABEL } from '../utils/plaidCategory.js'
+import {
+  CASH_OUT_NAME_PATTERN,
+  DEPOSIT_NAME_PATTERN,
+  PAYROLL_INCOME_NAME_PATTERN,
+} from '../utils/cashFlowClassification.js'
+import {
+  CASH_OUT_CATEGORY_LABEL,
+  PEER_TRANSFER_CATEGORY_LABEL,
+  resolvePlaidTransactionCategory,
+  SELF_DEPOSIT_CATEGORY_LABEL,
+  SELF_TRANSFER_CATEGORY_LABEL,
+} from '../utils/plaidCategory.js'
 
 function formatBackfillDate(date) {
   const year = date.getFullYear()
@@ -28,7 +39,7 @@ function formatBackfillDate(date) {
 /*
  * correctPeerPaymentCategoriesForUser(userId)
  *
- * What it does: rewrites stored categories for Zelle/Venmo/etc. to Transfer.
+ * What it does: rewrites stored categories for Zelle/Venmo/etc. to Peer transfer.
  * Why: Plaid often mislabels person-to-person sends (e.g. Personal Care).
  * Runs on each sync so existing rows fix without waiting for a Plaid update.
  */
@@ -52,7 +63,95 @@ async function correctPeerPaymentCategoriesForUser(userId) {
          OR name ILIKE '%google pay%'
          OR name ILIKE '%wise%'
        )`,
-    [userId, TRANSFER_CATEGORY_LABEL]
+    [userId, PEER_TRANSFER_CATEGORY_LABEL]
+  )
+  return result.rowCount ?? 0
+}
+
+/*
+ * correctSelfDepositCategoriesForUser(userId)
+ *
+ * What it does: rewrites ATM / mobile / check deposit credits to "Self deposit".
+ * Why: banks/Plaid often store those as Transfer; we want a clear Money-in bucket.
+ */
+async function correctSelfDepositCategoriesForUser(userId) {
+  const result = await db.query(
+    `UPDATE transactions
+     SET category = $2
+     WHERE user_id = $1
+       AND amount < 0
+       AND category IS DISTINCT FROM $2
+       AND COALESCE(name, '') ~* $3
+       AND COALESCE(name, '') !~* $4`,
+    [
+      userId,
+      SELF_DEPOSIT_CATEGORY_LABEL,
+      DEPOSIT_NAME_PATTERN,
+      PAYROLL_INCOME_NAME_PATTERN,
+    ]
+  )
+  return result.rowCount ?? 0
+}
+
+/*
+ * correctMislabeledPayrollSelfDepositsForUser(userId)
+ *
+ * What it does: undoes Self deposit on paycheck / direct-deposit credits.
+ * Why: an earlier matcher treated "DIRECT DEPOSIT" like an ATM deposit.
+ */
+async function correctMislabeledPayrollSelfDepositsForUser(userId) {
+  const result = await db.query(
+    `UPDATE transactions
+     SET category = 'Income'
+     WHERE user_id = $1
+       AND amount < 0
+       AND category = $2
+       AND COALESCE(name, '') ~* $3`,
+    [userId, SELF_DEPOSIT_CATEGORY_LABEL, PAYROLL_INCOME_NAME_PATTERN]
+  )
+  return result.rowCount ?? 0
+}
+
+/*
+ * correctCashOutCategoriesForUser(userId)
+ *
+ * What it does: rewrites ATM / cash withdrawals to "Cash out".
+ * Why: those often look like Transfer; users need to see cash leaving the bank.
+ */
+async function correctCashOutCategoriesForUser(userId) {
+  const result = await db.query(
+    `UPDATE transactions
+     SET category = $2
+     WHERE user_id = $1
+       AND amount > 0
+       AND category IS DISTINCT FROM $2
+       AND (
+         COALESCE(name, '') ~* $3
+         OR COALESCE(category, '') ~* '\\batm\\b'
+       )`,
+    [userId, CASH_OUT_CATEGORY_LABEL, CASH_OUT_NAME_PATTERN]
+  )
+  return result.rowCount ?? 0
+}
+
+/*
+ * correctLegacyTransferCategoriesForUser(userId)
+ *
+ * What it does: renames leftover vague "Transfer" labels to "Self transfer".
+ * Why: after peer / deposit / cash-out fixes, remaining transfers are own-account moves.
+ */
+async function correctLegacyTransferCategoriesForUser(userId) {
+  const result = await db.query(
+    `UPDATE transactions
+     SET category = $2
+     WHERE user_id = $1
+       AND category IS DISTINCT FROM $2
+       AND COALESCE(category, '') ~* 'transfer'
+       AND COALESCE(category, '') !~* 'peer transfer'
+       AND COALESCE(category, '') !~* 'self deposit'
+       AND COALESCE(category, '') !~* 'self transfer'
+       AND COALESCE(category, '') !~* 'cash out'`,
+    [userId, SELF_TRANSFER_CATEGORY_LABEL]
   )
   return result.rowCount ?? 0
 }
@@ -369,6 +468,38 @@ export async function syncAllAccountsForUser(userId) {
       console.warn(
         `Peer category correction skipped for user ${userId}:`,
         peerErr.message
+      )
+    }
+
+    try {
+      counts.selfDepositCategoriesCorrected =
+        await correctSelfDepositCategoriesForUser(userId)
+      counts.payrollSelfDepositCorrections =
+        await correctMislabeledPayrollSelfDepositsForUser(userId)
+    } catch (depositErr) {
+      console.warn(
+        `Self deposit category correction skipped for user ${userId}:`,
+        depositErr.message
+      )
+    }
+
+    try {
+      counts.cashOutCategoriesCorrected =
+        await correctCashOutCategoriesForUser(userId)
+    } catch (cashOutErr) {
+      console.warn(
+        `Cash out category correction skipped for user ${userId}:`,
+        cashOutErr.message
+      )
+    }
+
+    try {
+      counts.legacyTransferCategoriesCorrected =
+        await correctLegacyTransferCategoriesForUser(userId)
+    } catch (legacyErr) {
+      console.warn(
+        `Legacy transfer category correction skipped for user ${userId}:`,
+        legacyErr.message
       )
     }
 

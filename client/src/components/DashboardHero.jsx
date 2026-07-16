@@ -9,6 +9,7 @@ import SpendingSparkline from './SpendingSparkline.jsx'
 import HowCalculatedDisclosure from './HowCalculatedDisclosure.jsx'
 
 const RANGE_OPTIONS = [
+  { value: 'mtd', label: 'Month' },
   { value: '7d', label: '7D' },
   { value: '30d', label: '30D' },
   { value: '3m', label: '3M' },
@@ -16,6 +17,7 @@ const RANGE_OPTIONS = [
 ]
 
 const RANGE_LABELS = {
+  mtd: 'this calendar month so far',
   '7d': 'in the last 7 days',
   '30d': 'in the last 30 days',
   '3m': 'in the last 3 months',

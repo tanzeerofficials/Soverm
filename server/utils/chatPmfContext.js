@@ -106,15 +106,20 @@ export function slimMonthConditionForChat(letter) {
           summary: letter.condition.summary,
         }
       : null,
-    cashFlow: letter.cashFlow
-      ? {
-          income: roundCurrency(letter.cashFlow.income),
-          spent: roundCurrency(letter.cashFlow.spent),
-          net: roundCurrency(letter.cashFlow.net),
-          outcome: letter.cashFlow.outcome,
-          summary: letter.cashFlow.summary,
-        }
-      : null,
+        cashFlow: letter.cashFlow
+          ? {
+              income: roundCurrency(letter.cashFlow.income),
+              spent: roundCurrency(letter.cashFlow.spent),
+              net: roundCurrency(letter.cashFlow.net),
+              outcome: letter.cashFlow.outcome,
+              summary: letter.cashFlow.summary,
+              byKind: letter.cashFlow.byKind ?? null,
+              selfTransfers: roundCurrency(
+                letter.cashFlow.selfTransfers ?? letter.cashFlow.internalMoved ?? 0
+              ),
+              liabilityPayments: roundCurrency(letter.cashFlow.liabilityPayments ?? 0),
+            }
+          : null,
     topDrivers: (letter.drivers ?? []).slice(0, 3).map((driver) => ({
       category: driver.category,
       amount: roundCurrency(driver.amount),

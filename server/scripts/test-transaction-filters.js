@@ -124,7 +124,93 @@ assert(
   }),
   'Sent Zelle counts as spend'
 )
-console.log('  pass: cash-flow row helpers including Zelle')
+assert(
+  isCashFlowIncomeRow({
+    category: 'Transfer',
+    name: 'Mobile Banking Deposit',
+    amount: -7000,
+    date: '2026-07-08',
+    pending: false,
+  }),
+  'Bank deposit (Plaid Transfer category) counts as Money in'
+)
+assert(
+  !isInternalMoveTransaction({
+    category: 'Transfer',
+    name: 'ATM CASH DEPOSIT',
+    amount: -7000,
+  }),
+  'ATM deposit is not an internal move'
+)
+assert(
+  isInternalMoveTransaction({
+    category: 'Transfer',
+    name: 'Online Banking transfer from CHECKING',
+    amount: -500,
+  }),
+  'Own-account transfer credit stays internal'
+)
+assert(
+  isCashFlowSpendingRow({
+    category: 'ATM',
+    name: 'BANK OF AMERICA ATM',
+    amount: 200,
+    date: '2026-07-08',
+    pending: false,
+  }),
+  'ATM cash withdrawal counts as Money out'
+)
+assert(
+  classifyCashFlowTransaction({
+    category: 'ATM',
+    name: 'ATM WITHDRAWAL',
+    amount: 200,
+    date: '2026-07-08',
+    pending: false,
+  }) === 'cash_out',
+  'ATM withdrawal → cash_out'
+)
+assert(
+  classifyCashFlowTransaction({
+    category: 'Transfer',
+    name: 'Mobile Banking Deposit',
+    amount: -7000,
+    date: '2026-07-08',
+    pending: false,
+  }) === 'self_deposit',
+  'Mobile deposit → self_deposit'
+)
+assert(
+  classifyCashFlowTransaction({
+    category: 'Transfer',
+    name: 'DIRECT DEPOSIT ACME CORP',
+    amount: -3200,
+    date: '2026-07-08',
+    pending: false,
+  }) === 'income',
+  'Direct deposit payroll → income (not self_deposit)'
+)
+assert(
+  classifyCashFlowTransaction({
+    category: 'Payroll',
+    name: 'DIR DEP PAYROLL',
+    amount: -2500,
+    date: '2026-07-08',
+    pending: false,
+  }) === 'income',
+  'DIR DEP payroll → income'
+)
+assert(
+  isCashFlowIncomeRow({
+    category: 'Self deposit',
+    name: 'DIRECT DEPOSIT WEEKLY',
+    amount: -1800,
+    date: '2026-07-08',
+    pending: false,
+  }),
+  'Mis-tagged payroll still counts as Money in via name'
+)
+console.log('  pass: cash-flow row helpers including Zelle + deposits + cash out')
 passed++
 
 /*
@@ -173,6 +259,20 @@ const ledgerRows = [
     date: '2026-07-05',
     pending: true,
   },
+  {
+    name: 'Mobile Banking Deposit',
+    category: 'Transfer',
+    amount: -7000,
+    date: '2026-07-04',
+    pending: false,
+  },
+  {
+    name: 'ATM WITHDRAWAL',
+    category: 'ATM',
+    amount: 60,
+    date: '2026-07-03',
+    pending: false,
+  },
 ]
 
 assert(
@@ -188,8 +288,8 @@ assert(
   'Chipotle → spend'
 )
 assert(
-  classifyCashFlowTransaction(ledgerRows[3]) === 'internal_transfer',
-  'Transfer to Savings → internal_transfer'
+  classifyCashFlowTransaction(ledgerRows[3]) === 'self_transfer',
+  'Transfer to Savings → self_transfer'
 )
 assert(
   classifyCashFlowTransaction(ledgerRows[4]) === 'liability_payment',
@@ -199,42 +299,62 @@ assert(
   classifyCashFlowTransaction(ledgerRows[5]) === null,
   'Pending rows are not classified'
 )
+assert(
+  classifyCashFlowTransaction(ledgerRows[6]) === 'self_deposit',
+  'Mobile deposit → self_deposit'
+)
+assert(
+  classifyCashFlowTransaction(ledgerRows[7]) === 'cash_out',
+  'ATM withdrawal → cash_out'
+)
 
 const summary = summarizeCashFlow(ledgerRows, { activityLimit: 20 })
 
-assert(summary.moneyIn === 5200, 'moneyIn = payroll + Zelle only')
-assert(summary.moneyOut === 14, 'moneyOut = Chipotle only (not transfer/CC)')
-assert(summary.net === 5186, 'net = moneyIn - moneyOut')
+assert(summary.moneyIn === 12200, 'moneyIn = payroll + Zelle + self deposit')
+assert(summary.moneyOut === 74, 'moneyOut = Chipotle + cash out')
+assert(summary.net === 12126, 'net = moneyIn - moneyOut')
 assert(summary.byKind.peer_in === 2000, 'byKind.peer_in')
 assert(summary.byKind.income === 3200, 'byKind.income')
+assert(summary.byKind.self_deposit === 7000, 'byKind.self_deposit')
 assert(summary.byKind.spend === 14, 'byKind.spend')
-assert(summary.byKind.internal_transfer === 500, 'byKind.internal_transfer')
+assert(summary.byKind.cash_out === 60, 'byKind.cash_out')
+assert(summary.byKind.self_transfer === 500, 'byKind.self_transfer')
 assert(summary.byKind.liability_payment === 250, 'byKind.liability_payment')
-assert(summary.internalMoved === 500, 'internalMoved separate from moneyOut')
+assert(summary.selfTransfers === 500, 'selfTransfers separate from moneyOut')
+assert(summary.internalMoved === 500, 'internalMoved alias for selfTransfers')
 assert(summary.liabilityPayments === 250, 'liabilityPayments separate from moneyOut')
-assert(summary.activity.length === 5, 'activity includes all posted classified rows')
+assert(summary.activity.length === 7, 'activity includes all posted classified rows')
 assert(
-  summary.activity.some((row) => row.kind === 'internal_transfer'),
-  'activity includes own-account transfer'
+  summary.activity.some((row) => row.kind === 'self_transfer'),
+  'activity includes self transfer'
 )
 assert(
-  summary.activity.some((row) => row.kind === 'liability_payment'),
-  'activity includes card payment'
+  summary.activity.some((row) => row.kind === 'self_deposit' && row.badge === 'Self deposit'),
+  'self deposit badge'
+)
+assert(
+  summary.activity.some((row) => row.kind === 'cash_out' && row.badge === 'Cash out'),
+  'cash out badge'
 )
 assert(
   summary.activity.find((row) => row.kind === 'peer_in')?.badge === 'Zelle in',
   'Zelle peer_in gets Zelle in badge'
 )
+assert(
+  summary.activity.find((row) => row.kind === 'self_transfer')?.badge ===
+    'Self transfer out',
+  'self transfer debit badge'
+)
 console.log('  pass: classifyCashFlowTransaction + summarizeCashFlow accuracy')
 passed++
 
-const recent = buildRecentCashFlowActivity(ledgerRows, 8)
+const recent = buildRecentCashFlowActivity(ledgerRows, 12)
 
-assert(recent.length === 5, 'recent activity includes all classified posted rows')
+assert(recent.length === 7, 'recent activity includes all classified posted rows')
 assert(recent[0].direction === 'in' && recent[0].amount === 2000, 'Zelle inflow listed first')
 assert(
-  recent.some((row) => row.kind === 'internal_transfer' && row.amount === 500),
-  'own-account transfer appears in recent ledger'
+  recent.some((row) => row.kind === 'self_transfer' && row.amount === 500),
+  'self transfer appears in recent ledger'
 )
 assert(
   recent.some((row) => row.kind === 'liability_payment' && row.amount === 250),

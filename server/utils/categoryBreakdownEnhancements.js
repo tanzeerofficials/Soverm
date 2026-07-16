@@ -1,7 +1,11 @@
 import { formatAccountLabel } from './accountLabel.js'
 import { normalizeMerchantName } from './merchantNormalize.js'
 import { resolveSpendingCategoryLabel } from './plaidCategory.js'
-import { isCashFlowSpendingRow } from './transactionFilters.js'
+import {
+  classifyCashFlowTransaction,
+  isCashFlowSpendingRow,
+  resolveCashFlowBadge,
+} from './transactionFilters.js'
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 const TOP_MERCHANTS_LIMIT = 5
@@ -137,12 +141,18 @@ export function buildCategoryDrillDownMaps(transactions) {
     const recentTransactions = [...rows]
       .sort((left, right) => parseDateOnly(right.date) - parseDateOnly(left.date))
       .slice(0, RECENT_TRANSACTIONS_LIMIT)
-      .map((row) => ({
-        name: row.name,
-        amount: Math.round(Number(row.amount) * 100) / 100,
-        date: formatPublicDate(row.date),
-        accountLabel: accountSnapshotFromRow(row).label,
-      }))
+      .map((row) => {
+        const kind = classifyCashFlowTransaction(row)
+        return {
+          name: row.name,
+          amount: Math.round(Number(row.amount) * 100) / 100,
+          date: formatPublicDate(row.date),
+          accountLabel: accountSnapshotFromRow(row).label,
+          kind,
+          badge: kind ? resolveCashFlowBadge(kind, row.name, row.amount) : null,
+          category: resolveSpendingCategoryLabel(row),
+        }
+      })
 
     result.set(category, { topMerchants, recentTransactions })
   }

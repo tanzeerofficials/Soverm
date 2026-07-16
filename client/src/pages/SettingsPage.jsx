@@ -171,6 +171,16 @@ function SettingsPage() {
 
   const billingConfigured = billingStatus?.configured !== false
   const isPro = usage?.isPro ?? billingStatus?.isPro ?? false
+  const cancelAtPeriodEnd = Boolean(billingStatus?.cancelAtPeriodEnd)
+  const billingPeriodEndsAt =
+    billingStatus?.currentPeriodEnd || billingStatus?.proAccessEndsAt || null
+  const billingPeriodEndsLabel = billingPeriodEndsAt
+    ? new Date(billingPeriodEndsAt).toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    : null
 
   const { data: notificationData } = useQuery({
     queryKey: notificationsAllQueryKey,
@@ -299,26 +309,31 @@ function SettingsPage() {
               <UsageBadge usage={usage} />
               {isPro ? (
                 <>
-                  {billingStatus?.cancelAtPeriodEnd && billingStatus?.proAccessEndsAt ? (
+                  {cancelAtPeriodEnd && billingPeriodEndsLabel ? (
                     <div className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-3">
                       <p className="text-sm font-semibold text-fg">Cancellation scheduled</p>
                       <p className="mt-1 text-sm text-fg-muted">
                         You won&apos;t be charged again. Soverm Pro stays available until{' '}
-                        <span className="font-medium text-fg">
-                          {new Date(billingStatus.proAccessEndsAt).toLocaleDateString('en-US', {
-                            month: 'long',
-                            day: 'numeric',
-                            year: 'numeric',
-                          })}
-                        </span>
-                        .
+                        <span className="font-medium text-fg">{billingPeriodEndsLabel}</span>
+                        . After that date you move back to Free.
                       </p>
                     </div>
                   ) : (
-                    <p className="text-xs text-fg-subtle">
-                      Update your payment method or cancel anytime in the Stripe billing portal.
-                      If you cancel, Pro stays active through the end of the billing period.
-                    </p>
+                    <div className="space-y-1.5 text-xs leading-relaxed text-fg-subtle">
+                      {billingPeriodEndsLabel ? (
+                        <p>
+                          Current billing period ends{' '}
+                          <span className="font-medium text-fg-muted">{billingPeriodEndsLabel}</span>
+                          . Renews automatically unless you cancel.
+                        </p>
+                      ) : null}
+                      <p>
+                        Update your payment method or cancel anytime in the Stripe billing portal.
+                        {billingPeriodEndsLabel
+                          ? ` If you cancel, Pro stays active through ${billingPeriodEndsLabel}.`
+                          : ' If you cancel, Pro stays active through the end of the billing period.'}
+                      </p>
+                    </div>
                   )}
                   <button
                     type="button"
@@ -328,7 +343,7 @@ function SettingsPage() {
                   >
                     {portalLoading
                       ? 'Opening…'
-                      : billingStatus?.cancelAtPeriodEnd
+                      : cancelAtPeriodEnd
                         ? 'Manage billing / undo cancel'
                         : 'Manage billing'}
                   </button>

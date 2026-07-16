@@ -18,6 +18,7 @@ import {
 import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
 import { reportServerError } from '../utils/sentry.js'
 import { buildCashFlowForecastForUser } from '../services/cashFlowForecast.js'
+import { calendarMonthSqlBounds } from '../utils/calendarMonth.js'
 
 const router = Router()
 
@@ -44,6 +45,7 @@ const DEFAULT_RANGE = '30d'
 /*
  * Fixed day counts (not calendar months/years) so SQL totals match the
  * client sparkline, which always fills exactly 7 / 30 / 90 / 365 days.
+ * `mtd` is special: current calendar month (same window as the Month letter).
  */
 const RANGE_INTERVALS = {
   '7d': '7 days',
@@ -53,6 +55,9 @@ const RANGE_INTERVALS = {
 }
 
 function resolveRange(rangeParam) {
+  if (rangeParam === 'mtd') {
+    return 'mtd'
+  }
   if (typeof rangeParam === 'string' && rangeParam in RANGE_INTERVALS) {
     return rangeParam
   }
@@ -64,7 +69,8 @@ function resolveRange(rangeParam) {
  *
  * What it does:
  * - Loads accounts, income/spend totals for a time range, and latest insight
- * - Accepts ?range=7d|30d|3m|1y (defaults to 30d)
+ * - Accepts ?range=mtd|7d|30d|3m|1y (defaults to 30d)
+ * - `mtd` = calendar month so far (aligned with Month letter)
  * - External money in/out exclude own-account transfers and credit-card payments
  * - Also returns a cashFlow breakdown (byKind) so the UI can show sources
  * - Returns everything the dashboard needs in one JSON payload
@@ -78,7 +84,16 @@ router.get('/summary', async (req, res) => {
 
   try {
     const appliedRange = resolveRange(req.query.range)
-    const interval = RANGE_INTERVALS[appliedRange]
+    const useMonthToDate = appliedRange === 'mtd'
+    const interval = useMonthToDate ? null : RANGE_INTERVALS[appliedRange]
+    const monthBounds = useMonthToDate ? calendarMonthSqlBounds() : null
+
+    const dateFilterSql = useMonthToDate
+      ? `AND t.date >= $2::date AND t.date < $3::date`
+      : `AND t.date >= NOW() - $2::interval`
+    const dateFilterParams = useMonthToDate
+      ? [userId, monthBounds.startIso, monthBounds.endExclusiveIso]
+      : [userId, interval]
 
     const [
       accountsResult,
@@ -102,10 +117,10 @@ router.get('/summary', async (req, res) => {
            AND t.amount > 0
            ${NON_PENDING_FILTER}
            ${EXCLUDE_INTERNAL_MOVES_FILTER}
-           AND t.date >= NOW() - $2::interval
+           ${dateFilterSql}
          GROUP BY t.date::date
          ORDER BY t.date::date ASC`,
-        [userId, interval]
+        dateFilterParams
       ),
       db.query(
         `SELECT ${EXPENSE_ANALYZER_TRANSACTION_SELECT}
@@ -113,9 +128,9 @@ router.get('/summary', async (req, res) => {
          ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
          WHERE t.user_id = $1
            ${NON_PENDING_FILTER}
-           AND t.date >= NOW() - $2::interval
+           ${dateFilterSql}
          ORDER BY t.date DESC`,
-        [userId, interval]
+        dateFilterParams
       ),
       db.query(
         `SELECT id, content, created_at
@@ -179,14 +194,22 @@ router.get('/summary', async (req, res) => {
         moneyOut: cashFlow.moneyOut,
         net: cashFlow.net,
         byKind: cashFlow.byKind,
+        selfTransfers: cashFlow.selfTransfers,
         internalMoved: cashFlow.internalMoved,
         liabilityPayments: cashFlow.liabilityPayments,
+        activity: cashFlow.activity,
       },
       spendingSeries,
       accounts,
       latestInsight,
       lastSyncedAt,
       appliedRange,
+      ...(useMonthToDate
+        ? {
+            periodStart: monthBounds.startIso,
+            periodEndExclusive: monthBounds.endExclusiveIso,
+          }
+        : {}),
     })
   } catch (err) {
     reportServerError('to load dashboard summary', err, { userId, req })

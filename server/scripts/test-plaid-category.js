@@ -51,7 +51,7 @@ try {
     resolvePlaidTransactionCategory({
       name: 'Zelle payment to Akash Instyle Fix Conf# vuhwg6l5d',
       personal_finance_category: { primary: 'PERSONAL_CARE' },
-    }) === 'Transfer',
+    }) === 'Peer transfer',
     'Zelle overrides Plaid Personal Care mislabel'
   )
 
@@ -59,7 +59,7 @@ try {
     resolvePlaidTransactionCategory({
       name: 'Venmo to Sam',
       personal_finance_category: { primary: 'GENERAL_MERCHANDISE' },
-    }) === 'Transfer',
+    }) === 'Peer transfer',
     'Venmo overrides merchandise mislabel'
   )
 
@@ -67,27 +67,81 @@ try {
     resolvePlaidTransactionCategory({
       name: 'Starbucks',
       personal_finance_category: { primary: 'TRANSFER_OUT' },
-    }) === 'Transfer',
-    'TRANSFER_* PFC primary maps to Transfer'
+    }) === 'Self transfer',
+    'TRANSFER_* PFC primary maps to Self transfer'
   )
 
   assert(
     resolveSpendingCategoryLabel({
       name: 'Zelle payment to Akash',
       category: 'Personal Care',
-    }) === 'Transfer',
-    'Already-synced Zelle rows bucket as Transfer in Expense Analyzer'
+    }) === 'Peer transfer',
+    'Already-synced Zelle rows bucket as Peer transfer'
   )
 
   assert(
     resolveSpendingCategoryLabel({
       name: 'Some merchant',
       category: 'Transfer Out',
-    }) === 'Transfer',
-    'Transfer Out labels normalize to Transfer'
+    }) === 'Self transfer',
+    'Transfer Out labels normalize to Self transfer'
   )
 
-  console.log('  pass: peer payment and transfer overrides')
+  assert(
+    resolvePlaidTransactionCategory({
+      name: 'Mobile Banking Deposit',
+      amount: -7000,
+      personal_finance_category: { primary: 'TRANSFER_IN' },
+    }) === 'Self deposit',
+    'ATM/mobile deposit credit maps to Self deposit'
+  )
+
+  assert(
+    resolveSpendingCategoryLabel({
+      name: 'ATM CASH DEPOSIT',
+      category: 'Transfer',
+      amount: -7000,
+    }) === 'Self deposit',
+    'Already-synced deposit rows bucket as Self deposit'
+  )
+
+  assert(
+    resolvePlaidTransactionCategory({
+      name: 'Online Banking transfer from CHECKING',
+      amount: -500,
+      personal_finance_category: { primary: 'TRANSFER_IN' },
+    }) === 'Self transfer',
+    'Own-account transfer credit maps to Self transfer'
+  )
+
+  assert(
+    resolvePlaidTransactionCategory({
+      name: 'ATM WITHDRAWAL 1234',
+      amount: 100,
+      personal_finance_category: { primary: 'TRANSFER_OUT' },
+    }) === 'Cash out',
+    'ATM withdrawal maps to Cash out'
+  )
+
+  assert(
+    resolvePlaidTransactionCategory({
+      name: 'DIRECT DEPOSIT ACME PAYROLL',
+      amount: -3200,
+      personal_finance_category: { primary: 'TRANSFER_IN' },
+    }) === 'Income',
+    'Direct deposit maps to Income, not Self deposit or Self transfer'
+  )
+
+  assert(
+    resolveSpendingCategoryLabel({
+      name: 'DIRECT DEPOSIT WEEKLY PAY',
+      category: 'Self deposit',
+      amount: -2000,
+    }) === 'Income',
+    'Read path: payroll memo not Self deposit even if category was wrong'
+  )
+
+  console.log('  pass: peer, self deposit, self transfer, cash out overrides')
   passed++
 
   console.log(`\n${passed}/${passed} tests passed`)

@@ -788,6 +788,7 @@ function DashboardPage() {
                   accounts={dashboardData?.accounts ?? []}
                   lastSyncedAt={dashboardData?.lastSyncedAt}
                   expenseData={expenseAnalyzerData}
+                  cashFlowActivity={dashboardData?.cashFlow?.activity ?? null}
                   trackerSnapshot={trackerData}
                   forecast={forecastData}
                   trackerLoading={trackerLoading}

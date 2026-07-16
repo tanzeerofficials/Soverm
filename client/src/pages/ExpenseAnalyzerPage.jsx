@@ -663,6 +663,9 @@ function ExpenseAnalyzerPage() {
                                           </p>
                                           <p className="mt-0.5 text-xs text-fg-subtle">
                                             {formatChargeDate(transaction.date)}
+                                            {transaction.badge
+                                              ? ` · ${transaction.badge}`
+                                              : ''}
                                             {transaction.accountLabel
                                               ? ` · ${transaction.accountLabel}`
                                               : ''}

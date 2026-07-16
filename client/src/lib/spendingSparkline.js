@@ -31,14 +31,7 @@ function toLocalDateKey(value) {
   return `${year}-${month}-${day}`
 }
 
-/*
- * fillSpendingSeries(sparseSeries, range)
- *
- * Turns sparse daily totals from the API into a fixed-length series with
- * zero-filled gaps so the sparkline renders a continuous shape.
- */
-export function fillSpendingSeries(sparseSeries = [], range = '30d') {
-  const dayCount = RANGE_DAY_COUNTS[range] ?? RANGE_DAY_COUNTS['30d']
+function buildDateMap(sparseSeries = []) {
   const byDate = new Map()
 
   for (const row of sparseSeries) {
@@ -49,10 +42,36 @@ export function fillSpendingSeries(sparseSeries = [], range = '30d') {
     }
   }
 
+  return byDate
+}
+
+/*
+ * fillSpendingSeries(sparseSeries, range)
+ *
+ * Turns sparse daily totals from the API into a fixed-length series with
+ * zero-filled gaps so the sparkline renders a continuous shape.
+ * `mtd` fills from the 1st of this month through today.
+ */
+export function fillSpendingSeries(sparseSeries = [], range = '30d') {
+  const byDate = buildDateMap(sparseSeries)
   const end = new Date()
   end.setHours(12, 0, 0, 0)
 
   const result = []
+
+  if (range === 'mtd') {
+    const start = new Date(end.getFullYear(), end.getMonth(), 1, 12, 0, 0, 0)
+    for (let cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
+      const key = toLocalDateKey(cursor)
+      result.push({
+        date: key,
+        amount: byDate.get(key) ?? 0,
+      })
+    }
+    return result
+  }
+
+  const dayCount = RANGE_DAY_COUNTS[range] ?? RANGE_DAY_COUNTS['30d']
 
   for (let offset = dayCount - 1; offset >= 0; offset -= 1) {
     const day = new Date(end)

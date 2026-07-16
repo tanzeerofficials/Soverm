@@ -2,8 +2,8 @@
  * CASH FLOW SUMMARY
  *
  * Headline Money in / Money out / Net for the selected dashboard range.
- * Own-account transfers and card payments stay out of the headline and
- * appear as separate source notes when present.
+ * Breakdown lists every money kind specifically (Self deposit, Cash out,
+ * Self transfer, peer rails, etc.) so nothing hides under a vague label.
  */
 
 import { computeCashFlowMetrics } from '../lib/cashFlowSummary.js'
@@ -15,6 +15,18 @@ function formatCurrency(amount) {
   }).format(amount)
 }
 
+/** Ordered breakdown rows — only shown when the amount is > 0. */
+const BREAKDOWN_ROWS = [
+  { key: 'self_deposit', label: 'Self deposit', tone: 'in' },
+  { key: 'income', label: 'Income / paycheck', tone: 'in' },
+  { key: 'peer_in', label: 'Peer received (Zelle, Venmo, …)', tone: 'in' },
+  { key: 'spend', label: 'Spending', tone: 'out' },
+  { key: 'peer_out', label: 'Peer sent', tone: 'out' },
+  { key: 'cash_out', label: 'Cash out (ATM)', tone: 'out' },
+  { key: 'self_transfer', label: 'Self transfer', tone: 'moved' },
+  { key: 'liability_payment', label: 'Card / loan payments', tone: 'moved' },
+]
+
 function CashFlowSummary({
   income = 0,
   spent = 0,
@@ -24,27 +36,23 @@ function CashFlowSummary({
   const moneyIn = cashFlow?.moneyIn ?? income
   const moneyOut = cashFlow?.moneyOut ?? spent
   const byKind = cashFlow?.byKind ?? null
-  const internalMoved = cashFlow?.internalMoved ?? 0
-  const liabilityPayments = cashFlow?.liabilityPayments ?? 0
 
   const { net, spendRatio, spendPercent, netIsPositive } = computeCashFlowMetrics(
     moneyIn,
     moneyOut
   )
 
-  const sourceNotes = []
-  if (byKind?.peer_in > 0) {
-    sourceNotes.push(`Incl. ${formatCurrency(byKind.peer_in)} Zelle/peer received`)
-  }
-  if (byKind?.peer_out > 0) {
-    sourceNotes.push(`${formatCurrency(byKind.peer_out)} peer sent`)
-  }
-  if (internalMoved > 0) {
-    sourceNotes.push(`${formatCurrency(internalMoved)} moved between your accounts`)
-  }
-  if (liabilityPayments > 0) {
-    sourceNotes.push(`${formatCurrency(liabilityPayments)} card/loan payments`)
-  }
+  const breakdown = BREAKDOWN_ROWS.map((row) => {
+    let amount = byKind?.[row.key] ?? 0
+    // Back-compat: older payloads used internalMoved instead of byKind.self_transfer
+    if (row.key === 'self_transfer' && amount === 0) {
+      amount = cashFlow?.selfTransfers ?? cashFlow?.internalMoved ?? 0
+    }
+    if (row.key === 'liability_payment' && amount === 0) {
+      amount = cashFlow?.liabilityPayments ?? 0
+    }
+    return { ...row, amount }
+  }).filter((row) => row.amount > 0)
 
   return (
     <div className="mx-auto mt-6 max-w-xl rounded-xl border border-border-default bg-app/50 p-4 sm:p-5">
@@ -55,8 +63,8 @@ function CashFlowSummary({
         <p className="text-[11px] text-fg-subtle">{rangeLabel}</p>
       </div>
       <p className="mt-1 text-[11px] leading-relaxed text-fg-subtle">
-        How external money moved {rangeLabel} — not your current balance. Own-account transfers and
-        card payments are listed separately below and are not in Money in / Money out / Net.
+        Every dollar labeled specifically {rangeLabel}. Money in / out / Net are external cash only —
+        Self transfers and card payments are listed below so your balance change still makes sense.
       </p>
 
       <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-4">
@@ -99,10 +107,18 @@ function CashFlowSummary({
         </div>
       </div>
 
-      {sourceNotes.length > 0 && (
-        <ul className="mt-3 space-y-1 text-center text-[11px] text-fg-subtle">
-          {sourceNotes.map((note) => (
-            <li key={note}>{note}</li>
+      {breakdown.length > 0 && (
+        <ul className="mt-4 space-y-1.5 border-t border-border-default/70 pt-3 text-left text-[11px] text-fg-muted">
+          {breakdown.map((row) => (
+            <li
+              key={row.key}
+              className={`flex justify-between gap-3 ${
+                row.tone === 'moved' ? 'text-fg-subtle' : ''
+              }`}
+            >
+              <span>{row.label}</span>
+              <span className="font-mono tabular-nums">{formatCurrency(row.amount)}</span>
+            </li>
           ))}
         </ul>
       )}

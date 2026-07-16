@@ -131,6 +131,7 @@ function RecentTransactionsPanel({ transactions, isLoading }) {
         {transactions.map((transaction) => {
           const isInflow = transaction.direction === 'in'
           const isMoved =
+            transaction.kind === 'self_transfer' ||
             transaction.kind === 'internal_transfer' ||
             transaction.kind === 'liability_payment'
           const amountClass = isMoved
@@ -147,12 +148,17 @@ function RecentTransactionsPanel({ transactions, isLoading }) {
             >
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium text-fg">{transaction.name}</p>
-                <p className="mt-0.5 text-xs text-fg-subtle">
-                  {formatQuickToolDate(transaction.date)}
-                  {transaction.badge ? ` · ${transaction.badge}` : ''}
-                  {transaction.category && !transaction.badge
-                    ? ` · ${transaction.category}`
-                    : ''}
+                <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-fg-subtle">
+                  <span>{formatQuickToolDate(transaction.date)}</span>
+                  {transaction.badge ? (
+                    <span className="rounded-md border border-border-default/80 bg-app/60 px-1.5 py-0.5 text-[10px] font-medium text-fg-muted">
+                      {transaction.badge}
+                    </span>
+                  ) : null}
+                  {transaction.category &&
+                  transaction.category !== transaction.badge ? (
+                    <span>· {transaction.category}</span>
+                  ) : null}
                 </p>
               </div>
               <span className={`font-mono text-sm tabular-nums ${amountClass}`}>
@@ -201,6 +207,7 @@ function DashboardQuickTools({
   accounts = [],
   lastSyncedAt,
   expenseData,
+  cashFlowActivity = null,
   trackerSnapshot,
   forecast,
   trackerLoading = false,
@@ -230,7 +237,7 @@ function DashboardQuickTools({
   const recentTransactions = collectRecentTransactions(
     expenseData?.categoryBreakdown,
     8,
-    expenseData?.recentCashFlowActivity
+    cashFlowActivity ?? expenseData?.recentCashFlowActivity
   )
 
   return (

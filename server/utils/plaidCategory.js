@@ -4,15 +4,27 @@
  * Maps Plaid personal_finance_category (and legacy category arrays) into the
  * string we store on transactions.category.
  *
- * Peer rails (Zelle, Venmo, etc.) often arrive mislabeled by Plaid — e.g.
- * PERSONAL_CARE for a person-to-person send. We override those to Transfer
- * so spending charts and category soft limits stay honest.
+ * We prefer specific labels over Plaid's vague TRANSFER_* buckets:
+ * - Peer rails (Zelle, Venmo, …) → Peer transfer
+ * - ATM / check / mobile deposits → Self deposit
+ * - ATM cash withdrawals → Cash out
+ * - Own-account moves → Self transfer
  */
 
-import { isPeerPaymentTransaction } from './cashFlowClassification.js'
+import {
+  isCashOutTransaction,
+  isDepositTransaction,
+  isPayrollIncomeTransaction,
+  isPeerPaymentTransaction,
+} from './cashFlowClassification.js'
 
-/** Stored label for peer rails and Plaid TRANSFER_* primaries. */
-export const TRANSFER_CATEGORY_LABEL = 'Transfer'
+/** @deprecated Prefer PEER_TRANSFER_CATEGORY_LABEL for peer rails. */
+export const TRANSFER_CATEGORY_LABEL = 'Peer transfer'
+
+export const PEER_TRANSFER_CATEGORY_LABEL = 'Peer transfer'
+export const SELF_DEPOSIT_CATEGORY_LABEL = 'Self deposit'
+export const SELF_TRANSFER_CATEGORY_LABEL = 'Self transfer'
+export const CASH_OUT_CATEGORY_LABEL = 'Cash out'
 
 function formatPersonalFinanceCategoryPrimary(primary) {
   return primary
@@ -31,7 +43,7 @@ function isTransferPrimary(primary) {
 
 /*
  * What this does: picks the category string to store for a Plaid transaction.
- * Why: peer payments must not inherit Plaid mislabels like Personal Care.
+ * Why: vague Transfer labels confuse users — we store the specific kind instead.
  */
 export function resolvePlaidTransactionCategory(transaction) {
   const name =
@@ -39,16 +51,34 @@ export function resolvePlaidTransactionCategory(transaction) {
     transaction?.merchant_name ||
     transaction?.original_description ||
     ''
+  const amount = Number(transaction?.amount)
+  const row = { name, amount, category: null }
 
-  if (isPeerPaymentTransaction({ name })) {
-    return TRANSFER_CATEGORY_LABEL
+  if (isPeerPaymentTransaction(row)) {
+    return PEER_TRANSFER_CATEGORY_LABEL
+  }
+
+  if (isPayrollIncomeTransaction(row) && Number.isFinite(amount) && amount < 0) {
+    const primary = transaction?.personal_finance_category?.primary
+    if (primary && !isTransferPrimary(primary)) {
+      return formatPersonalFinanceCategoryPrimary(primary)
+    }
+    return 'Income'
+  }
+
+  if (isDepositTransaction(row) && Number.isFinite(amount) && amount < 0) {
+    return SELF_DEPOSIT_CATEGORY_LABEL
+  }
+
+  if (isCashOutTransaction(row) && Number.isFinite(amount) && amount > 0) {
+    return CASH_OUT_CATEGORY_LABEL
   }
 
   const primary = transaction?.personal_finance_category?.primary
 
   if (primary) {
     if (isTransferPrimary(primary)) {
-      return TRANSFER_CATEGORY_LABEL
+      return SELF_TRANSFER_CATEGORY_LABEL
     }
     return formatPersonalFinanceCategoryPrimary(primary)
   }
@@ -56,22 +86,46 @@ export function resolvePlaidTransactionCategory(transaction) {
   if (Array.isArray(transaction?.category) && transaction.category.length > 0) {
     const legacy = transaction.category[0]
     if (typeof legacy === 'string' && legacy.toLowerCase().includes('transfer')) {
-      return TRANSFER_CATEGORY_LABEL
+      return SELF_TRANSFER_CATEGORY_LABEL
+    }
+    if (typeof legacy === 'string' && legacy.toLowerCase() === 'atm') {
+      return amount > 0 ? CASH_OUT_CATEGORY_LABEL : SELF_DEPOSIT_CATEGORY_LABEL
     }
     return legacy
   }
 
   return null
 }
-
 /*
  * What this does: category bucket for Expense Analyzer / month letter / charts.
- * Why: already-synced Zelle rows may still say "Personal Care" or "Transfer Out"
- * until corrected — read-time resolve keeps surfaces consistent.
+ * Why: already-synced rows may still say "Transfer" or "Personal Care" until
+ * corrected — read-time resolve keeps surfaces specific and consistent.
  */
 export function resolveSpendingCategoryLabel(row) {
   if (isPeerPaymentTransaction(row)) {
-    return TRANSFER_CATEGORY_LABEL
+    return PEER_TRANSFER_CATEGORY_LABEL
+  }
+
+  const amount = Number(row?.amount)
+  if (isPayrollIncomeTransaction(row) && Number.isFinite(amount) && amount < 0) {
+    const category = typeof row?.category === 'string' ? row.category.trim() : ''
+    const lower = category.toLowerCase()
+    if (
+      category &&
+      lower !== 'self deposit' &&
+      lower !== 'self transfer' &&
+      lower !== 'transfer' &&
+      !lower.includes('transfer')
+    ) {
+      return category
+    }
+    return 'Income'
+  }
+  if (isDepositTransaction(row) && Number.isFinite(amount) && amount < 0) {
+    return SELF_DEPOSIT_CATEGORY_LABEL
+  }
+  if (isCashOutTransaction(row) && Number.isFinite(amount) && amount > 0) {
+    return CASH_OUT_CATEGORY_LABEL
   }
 
   const category = typeof row?.category === 'string' ? row.category.trim() : ''
@@ -79,9 +133,24 @@ export function resolveSpendingCategoryLabel(row) {
     return 'Uncategorized'
   }
 
-  // Normalize leftover Plaid labels like "Transfer Out" / "Transfer In".
-  if (category.toLowerCase().includes('transfer')) {
-    return TRANSFER_CATEGORY_LABEL
+  const lower = category.toLowerCase()
+  if (
+    lower === 'self deposit' ||
+    lower === 'self transfer' ||
+    lower === 'cash out' ||
+    lower === 'peer transfer'
+  ) {
+    return category
+  }
+
+  // Legacy "Transfer" / "Transfer In" / "Transfer Out" → Self transfer
+  // (peer rails already handled above).
+  if (lower.includes('transfer')) {
+    return SELF_TRANSFER_CATEGORY_LABEL
+  }
+
+  if (lower === 'atm' || lower.includes('atm')) {
+    return amount > 0 ? CASH_OUT_CATEGORY_LABEL : category
   }
 
   return category

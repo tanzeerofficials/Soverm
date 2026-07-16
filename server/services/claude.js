@@ -17,7 +17,7 @@ import {
   formatTimesMultiplier,
 } from '../utils/financialContext.js'
 import { buildExpenseAnalyzerChatContextFromPayload } from '../utils/expenseAnalyzerChatContext.js'
-import { isInternalMoveTransaction } from '../utils/transactionFilters.js'
+import { classifyCashFlowTransaction } from '../utils/transactionFilters.js'
 
 export { buildExpenseAnalyzerChatContextFromPayload }
 
@@ -41,8 +41,9 @@ TONE — caring advisor, still honest:
 
 Critical cash-flow rules:
 - Overall income and spending totals are pre-computed. Never re-sum them from the transaction list.
-- Rows marked INTERNAL_MOVE (transfers between own accounts, credit-card/loan payments) must not be treated as income or discretionary spending.
-- Peer payments (Zelle, Venmo, TapTap Send, remittances) count as real income when received and real spend when sent — even if Plaid labels them Transfer. Own-account transfers and credit-card payments do not.`
+- Rows are tagged with a specific kind. SELF_TRANSFER and LIABILITY_PAYMENT must not be treated as income or discretionary spending.
+- SELF_DEPOSIT (ATM / check / mobile deposit) and PEER_IN (Zelle, Venmo, etc.) count as real money in. PEER_OUT and CASH_OUT count as real money out.
+- Never call something a vague "transfer" when a specific tag is present.`
 
 function extractJsonObject(text) {
   const start = text.indexOf('{')
@@ -207,10 +208,13 @@ actions must be an array of exactly 3 strings. Each one is a specific, concrete 
 function formatTransactions(transactions) {
   return transactions
     .map((t) => {
-      const internalTag = isInternalMoveTransaction(t)
-        ? ' | INTERNAL_MOVE (do not count as income or spend)'
-        : ''
-      return `${t.date} | ${t.name} | $${t.amount} | ${t.category || 'Uncategorized'}${internalTag}`
+      const kind = classifyCashFlowTransaction(t)
+      const kindTag = kind ? ` | ${String(kind).toUpperCase()}` : ''
+      const note =
+        kind === 'self_transfer' || kind === 'liability_payment'
+          ? ' (do not count as income or spend)'
+          : ''
+      return `${t.date} | ${t.name} | $${t.amount} | ${t.category || 'Uncategorized'}${kindTag}${note}`
     })
     .join('\n')
 }
@@ -795,7 +799,7 @@ No month-over-month comparison is available for this user. Do not reference any 
     block: `
 
 Pre-computed month-over-month spending and income changes (30-day windows — use these exact figures, do not recalculate).
-These totals already exclude transfers between the user's own accounts and credit-card/loan payments.
+These totals already exclude Self transfers between the user's own accounts and credit-card/loan payments.
 Describe changes with times-multipliers and dollar amounts (e.g. "about 1.2× — $842 vs $700"), not percentage headlines like "up 18%":
 ${lines.join('\n')}
 

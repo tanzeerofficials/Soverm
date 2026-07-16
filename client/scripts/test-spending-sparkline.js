@@ -56,6 +56,14 @@ try {
   console.log('  pass: fillSpendingSeries zero-fills gaps')
   passed++
 
+  const mtd = fillSpendingSeries([{ date: localDateKey(0), amount: 12 }], 'mtd')
+  const today = new Date()
+  const expectedMtdDays = today.getDate()
+  assert(mtd.length === expectedMtdDays, `mtd should fill ${expectedMtdDays} days this month`)
+  assert(mtd[0].date.endsWith('-01'), 'mtd series should start on the 1st')
+  console.log('  pass: fillSpendingSeries mtd calendar month')
+  passed++
+
   const geometry = buildSparklineGeometry([0, 10, 5, 20])
   assert(geometry.coords.length === 4, 'Geometry should include all coordinates')
   assert(geometry.line.includes(','), 'Line path should be built')

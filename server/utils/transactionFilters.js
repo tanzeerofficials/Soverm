@@ -18,6 +18,7 @@ export {
   buildRecentCashFlowActivity,
   classifyCashFlowTransaction,
   summarizeCashFlow,
+  resolveCashFlowBadge,
   CASH_FLOW_KINDS,
   KIND_LABELS,
   KIND_BADGES,
