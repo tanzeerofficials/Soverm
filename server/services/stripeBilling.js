@@ -58,11 +58,14 @@ export function tierFromSubscriptionStatus(status) {
 }
 
 /*
- * What this does: reads cancel_at_period_end + current_period_end from a Stripe
+ * What this does: reads cancel_at_period_end + period end from a Stripe
  * subscription so Profile can show "Pro until {date}" after a portal cancel.
  *
  * Why: Stripe keeps status=active until the paid period ends; we stay Pro but
  * users need to see when access actually ends.
+ *
+ * Note: newer Stripe API versions may put current_period_end on subscription
+ * items instead of the top-level subscription — we check both, plus cancel_at.
  */
 export function subscriptionAccessFromStripe(subscription) {
   if (!subscription || typeof subscription !== 'object') {
@@ -72,17 +75,43 @@ export function subscriptionAccessFromStripe(subscription) {
     }
   }
 
-  const cancelAtPeriodEnd = Boolean(subscription.cancel_at_period_end)
-  const endUnix = Number(subscription.current_period_end)
-  const currentPeriodEnd =
-    Number.isFinite(endUnix) && endUnix > 0
-      ? new Date(endUnix * 1000).toISOString()
-      : null
+  const status = subscription.status
+  const isActiveLike = status === 'active' || status === 'trialing'
+  const cancelAtUnix = Number(subscription.cancel_at)
+
+  // Portal "cancel at period end" sets cancel_at_period_end; some configs only set cancel_at.
+  const cancelAtPeriodEnd =
+    Boolean(subscription.cancel_at_period_end) ||
+    (isActiveLike && Number.isFinite(cancelAtUnix) && cancelAtUnix > 0)
+
+  const currentPeriodEnd = readSubscriptionPeriodEndIso(subscription)
 
   return {
     cancelAtPeriodEnd,
     currentPeriodEnd,
   }
+}
+
+function readSubscriptionPeriodEndIso(subscription) {
+  const candidates = [
+    Number(subscription.current_period_end),
+    Number(subscription.cancel_at),
+  ]
+
+  const items = subscription.items?.data
+  if (Array.isArray(items)) {
+    for (const item of items) {
+      candidates.push(Number(item?.current_period_end))
+    }
+  }
+
+  for (const endUnix of candidates) {
+    if (Number.isFinite(endUnix) && endUnix > 0) {
+      return new Date(endUnix * 1000).toISOString()
+    }
+  }
+
+  return null
 }
 
 function appBaseUrl() {
@@ -217,6 +246,94 @@ export async function createBillingPortalSession({ userId }) {
   return {
     url: session.url,
   }
+}
+
+/*
+ * What this does: turns off cancel_at_period_end on the user's Stripe subscription.
+ * Why: after a portal cancel, Profile needs a one-tap "Keep Pro / Resubscribe"
+ * without hunting for Renew in the Stripe portal UI.
+ */
+export async function reactivateProSubscription({ userId }) {
+  const stripe = getStripeClient()
+  if (!stripe) {
+    throw billingNotConfiguredError()
+  }
+
+  const userResult = await db.query(
+    `SELECT id, subscription_tier, stripe_customer_id, stripe_subscription_id
+     FROM users
+     WHERE id = $1`,
+    [userId]
+  )
+
+  const user = userResult.rows[0]
+  if (!user) {
+    const error = new Error('User not found')
+    error.statusCode = 404
+    throw error
+  }
+
+  if (user.subscription_tier !== 'pro') {
+    const error = new Error('Soverm Pro is required to renew')
+    error.statusCode = 400
+    throw error
+  }
+
+  const subscription = await resolveActiveSubscription(stripe, user)
+  if (!subscription) {
+    const error = new Error('No active Stripe subscription found to renew')
+    error.statusCode = 400
+    throw error
+  }
+
+  const updated = await stripe.subscriptions.update(subscription.id, {
+    cancel_at_period_end: false,
+  })
+  const access = subscriptionAccessFromStripe(updated)
+
+  await setUserProFromStripe({
+    userId,
+    customerId: user.stripe_customer_id,
+    subscriptionId: updated.id,
+    cancelAtPeriodEnd: access.cancelAtPeriodEnd,
+    currentPeriodEnd: access.currentPeriodEnd,
+  })
+
+  return {
+    cancelAtPeriodEnd: access.cancelAtPeriodEnd,
+    currentPeriodEnd: access.currentPeriodEnd,
+    proAccessEndsAt: null,
+  }
+}
+
+async function resolveActiveSubscription(stripe, user) {
+  if (user.stripe_subscription_id) {
+    try {
+      const subscription = await stripe.subscriptions.retrieve(user.stripe_subscription_id, {
+        expand: ['items.data'],
+      })
+      if (subscription && (subscription.status === 'active' || subscription.status === 'trialing')) {
+        return subscription
+      }
+    } catch (err) {
+      console.warn('Stripe subscription retrieve failed:', err.message)
+    }
+  }
+
+  if (!user.stripe_customer_id) {
+    return null
+  }
+
+  const listed = await stripe.subscriptions.list({
+    customer: user.stripe_customer_id,
+    status: 'all',
+    limit: 10,
+    expand: ['data.items.data'],
+  })
+
+  return (
+    listed.data.find((row) => row.status === 'active' || row.status === 'trialing') ?? null
+  )
 }
 
 /**
@@ -377,6 +494,7 @@ export async function setUserFreeFromStripe({ userId, customerId, subscriptionId
 export async function getBillingAccessStatus(userId) {
   const result = await db.query(
     `SELECT subscription_tier,
+            stripe_customer_id,
             stripe_subscription_id,
             stripe_cancel_at_period_end,
             stripe_current_period_end
@@ -393,6 +511,7 @@ export async function getBillingAccessStatus(userId) {
       cancelAtPeriodEnd: false,
       currentPeriodEnd: null,
       proAccessEndsAt: null,
+      hasStripeCustomer: false,
     }
   }
 
@@ -403,23 +522,26 @@ export async function getBillingAccessStatus(userId) {
 
   const tier = row.subscription_tier ?? 'free'
   const isPro = tier === 'pro'
-  const subscriptionId = row.stripe_subscription_id
+  const hasStripeCustomer = Boolean(row.stripe_customer_id)
   const stripe = getStripeClient()
 
-  if (isPro && subscriptionId && stripe) {
+  if (isPro && stripe && (row.stripe_subscription_id || row.stripe_customer_id)) {
     try {
-      const subscription = await stripe.subscriptions.retrieve(subscriptionId)
-      const access = subscriptionAccessFromStripe(subscription)
-      cancelAtPeriodEnd = access.cancelAtPeriodEnd
-      currentPeriodEnd = access.currentPeriodEnd
+      const subscription = await resolveActiveSubscription(stripe, row)
+      if (subscription) {
+        const access = subscriptionAccessFromStripe(subscription)
+        cancelAtPeriodEnd = access.cancelAtPeriodEnd
+        currentPeriodEnd = access.currentPeriodEnd ?? currentPeriodEnd
 
-      await db.query(
-        `UPDATE users
-         SET stripe_cancel_at_period_end = $2,
-             stripe_current_period_end = $3::timestamptz
-         WHERE id = $1`,
-        [userId, cancelAtPeriodEnd, currentPeriodEnd]
-      )
+        await db.query(
+          `UPDATE users
+           SET stripe_subscription_id = COALESCE($2, stripe_subscription_id),
+               stripe_cancel_at_period_end = $3,
+               stripe_current_period_end = $4::timestamptz
+           WHERE id = $1`,
+          [userId, subscription.id, cancelAtPeriodEnd, currentPeriodEnd]
+        )
+      }
     } catch (err) {
       console.warn('Stripe subscription retrieve for billing status failed:', err.message)
     }
@@ -434,6 +556,7 @@ export async function getBillingAccessStatus(userId) {
     cancelAtPeriodEnd: isPro ? cancelAtPeriodEnd : false,
     currentPeriodEnd: isPro ? currentPeriodEnd : null,
     proAccessEndsAt,
+    hasStripeCustomer,
   }
 }
 

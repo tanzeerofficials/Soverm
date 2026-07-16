@@ -36,6 +36,8 @@ import {
   checkoutErrorToastMessage,
   openBillingPortal,
   portalErrorToastMessage,
+  reactivateErrorToastMessage,
+  reactivateProSubscription,
   startProCheckout,
 } from '../lib/startProCheckout.js'
 
@@ -79,6 +81,7 @@ function SettingsPage() {
   const [isDeletingAccount, setIsDeletingAccount] = useState(false)
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [portalLoading, setPortalLoading] = useState(false)
+  const [reactivateLoading, setReactivateLoading] = useState(false)
 
   /*
    * Stripe redirects leave this page; browser Back can restore a cached copy
@@ -89,6 +92,7 @@ function SettingsPage() {
     function resetBillingButtonState() {
       setCheckoutLoading(false)
       setPortalLoading(false)
+      setReactivateLoading(false)
     }
 
     function onPageShow(event) {
@@ -255,6 +259,24 @@ function SettingsPage() {
     }
   }
 
+  /*
+   * What this does: undoes a scheduled cancel so Pro keeps renewing.
+   * Why: users who cancel in Stripe need an obvious Keep Pro button on Profile.
+   */
+  async function handleKeepPro() {
+    setReactivateLoading(true)
+    try {
+      await reactivateProSubscription(getToken)
+      await queryClient.invalidateQueries({ queryKey: billingStatusQueryKey })
+      await queryClient.invalidateQueries({ queryKey: usageQueryKey })
+      showToast('Soverm Pro will keep renewing — cancellation removed', 'success')
+    } catch (err) {
+      showToast(reactivateErrorToastMessage(err), 'error')
+    } finally {
+      setReactivateLoading(false)
+    }
+  }
+
   async function handleDisconnectConfirm() {
     if (!accountToDelete) return
 
@@ -309,46 +331,75 @@ function SettingsPage() {
               <UsageBadge usage={usage} />
               {isPro ? (
                 <>
-                  {cancelAtPeriodEnd && billingPeriodEndsLabel ? (
+                  {cancelAtPeriodEnd ? (
                     <div className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-3">
                       <p className="text-sm font-semibold text-fg">Cancellation scheduled</p>
                       <p className="mt-1 text-sm text-fg-muted">
-                        You won&apos;t be charged again. Soverm Pro stays available until{' '}
-                        <span className="font-medium text-fg">{billingPeriodEndsLabel}</span>
-                        . After that date you move back to Free.
+                        You won&apos;t be charged again.
+                        {billingPeriodEndsLabel ? (
+                          <>
+                            {' '}
+                            Soverm Pro stays available until{' '}
+                            <span className="font-medium text-fg">{billingPeriodEndsLabel}</span>
+                            . After that date you move back to Free.
+                          </>
+                        ) : (
+                          <> Soverm Pro stays available through the end of this billing period.</>
+                        )}
                       </p>
+                      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                        <button
+                          type="button"
+                          onClick={handleKeepPro}
+                          disabled={reactivateLoading || !billingConfigured}
+                          className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-brand-soft disabled:opacity-60 sm:w-auto"
+                        >
+                          {reactivateLoading ? 'Renewing…' : 'Keep Pro / Resubscribe'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleManageBilling}
+                          disabled={portalLoading || !billingConfigured}
+                          className="w-full rounded-lg border border-border-default bg-surface px-4 py-2.5 text-sm font-semibold text-fg transition hover:bg-surface-elevated disabled:opacity-60 sm:w-auto"
+                        >
+                          {portalLoading ? 'Opening…' : 'Manage billing'}
+                        </button>
+                      </div>
                     </div>
                   ) : (
-                    <div className="space-y-1.5 text-xs leading-relaxed text-fg-subtle">
-                      {billingPeriodEndsLabel ? (
+                    <>
+                      <div className="space-y-1.5 text-xs leading-relaxed text-fg-subtle">
+                        {billingPeriodEndsLabel ? (
+                          <p>
+                            Current billing period ends{' '}
+                            <span className="font-medium text-fg-muted">
+                              {billingPeriodEndsLabel}
+                            </span>
+                            . Renews automatically unless you cancel.
+                          </p>
+                        ) : null}
                         <p>
-                          Current billing period ends{' '}
-                          <span className="font-medium text-fg-muted">{billingPeriodEndsLabel}</span>
-                          . Renews automatically unless you cancel.
+                          Update your payment method or cancel anytime in the Stripe billing
+                          portal.
+                          {billingPeriodEndsLabel
+                            ? ` If you cancel, Pro stays active through ${billingPeriodEndsLabel}.`
+                            : ' If you cancel, Pro stays active through the end of the billing period.'}
                         </p>
-                      ) : null}
-                      <p>
-                        Update your payment method or cancel anytime in the Stripe billing portal.
-                        {billingPeriodEndsLabel
-                          ? ` If you cancel, Pro stays active through ${billingPeriodEndsLabel}.`
-                          : ' If you cancel, Pro stays active through the end of the billing period.'}
-                      </p>
-                    </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleManageBilling}
+                        disabled={portalLoading || !billingConfigured}
+                        className="mt-1 w-full rounded-lg border border-border-default bg-surface px-4 py-2.5 text-sm font-semibold text-fg transition hover:bg-surface-elevated disabled:opacity-60 sm:w-auto"
+                      >
+                        {portalLoading ? 'Opening…' : 'Manage billing'}
+                      </button>
+                    </>
                   )}
-                  <button
-                    type="button"
-                    onClick={handleManageBilling}
-                    disabled={portalLoading || !billingConfigured}
-                    className="mt-1 w-full rounded-lg border border-border-default bg-surface px-4 py-2.5 text-sm font-semibold text-fg transition hover:bg-surface-elevated disabled:opacity-60 sm:w-auto"
-                  >
-                    {portalLoading
-                      ? 'Opening…'
-                      : cancelAtPeriodEnd
-                        ? 'Manage billing / undo cancel'
-                        : 'Manage billing'}
-                  </button>
                   {!billingConfigured && (
-                    <p className="text-xs text-fg-subtle">Billing management is unavailable right now.</p>
+                    <p className="text-xs text-fg-subtle">
+                      Billing management is unavailable right now.
+                    </p>
                   )}
                 </>
               ) : (
@@ -356,6 +407,9 @@ function SettingsPage() {
                   <p className="text-xs text-fg-subtle">
                     {usage?.generatedToday ?? 0} insight
                     {(usage?.generatedToday ?? 0) === 1 ? '' : 's'} generated today
+                    {billingStatus?.hasStripeCustomer
+                      ? ' · You can resubscribe to Pro anytime.'
+                      : ''}
                   </p>
                   <button
                     type="button"
@@ -365,9 +419,11 @@ function SettingsPage() {
                   >
                     {checkoutLoading
                       ? 'Redirecting…'
-                      : billingConfigured
-                        ? 'Upgrade to Soverm Pro'
-                        : 'Checkout unavailable'}
+                      : !billingConfigured
+                        ? 'Checkout unavailable'
+                        : billingStatus?.hasStripeCustomer
+                          ? 'Resubscribe to Soverm Pro'
+                          : 'Upgrade to Soverm Pro'}
                   </button>
                 </>
               )}

@@ -67,6 +67,7 @@ console.log('Stripe billing tests\n')
   const active = subscriptionAccessFromStripe({
     cancel_at_period_end: true,
     current_period_end: 1_800_000_000,
+    status: 'active',
   })
   assert.equal(active.cancelAtPeriodEnd, true)
   assert.equal(active.currentPeriodEnd, new Date(1_800_000_000 * 1000).toISOString())
@@ -74,9 +75,26 @@ console.log('Stripe billing tests\n')
   const renewing = subscriptionAccessFromStripe({
     cancel_at_period_end: false,
     current_period_end: 1_800_000_000,
+    status: 'active',
   })
   assert.equal(renewing.cancelAtPeriodEnd, false)
   assert.ok(renewing.currentPeriodEnd)
+
+  const itemPeriodOnly = subscriptionAccessFromStripe({
+    cancel_at_period_end: true,
+    status: 'active',
+    items: { data: [{ current_period_end: 1_800_000_100 }] },
+  })
+  assert.equal(itemPeriodOnly.cancelAtPeriodEnd, true)
+  assert.equal(itemPeriodOnly.currentPeriodEnd, new Date(1_800_000_100 * 1000).toISOString())
+
+  const cancelAtOnly = subscriptionAccessFromStripe({
+    cancel_at_period_end: false,
+    cancel_at: 1_800_000_200,
+    status: 'active',
+  })
+  assert.equal(cancelAtOnly.cancelAtPeriodEnd, true)
+  assert.equal(cancelAtOnly.currentPeriodEnd, new Date(1_800_000_200 * 1000).toISOString())
 
   const empty = subscriptionAccessFromStripe(null)
   assert.equal(empty.cancelAtPeriodEnd, false)

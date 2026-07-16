@@ -14,6 +14,7 @@ import {
   createProCheckoutSession,
   getBillingAccessStatus,
   isStripeBillingConfigured,
+  reactivateProSubscription,
 } from '../services/stripeBilling.js'
 
 const router = Router()
@@ -43,6 +44,7 @@ router.get('/status', async (req, res) => {
       cancelAtPeriodEnd: access.cancelAtPeriodEnd,
       currentPeriodEnd: access.currentPeriodEnd,
       proAccessEndsAt: access.proAccessEndsAt,
+      hasStripeCustomer: access.hasStripeCustomer,
     })
   } catch (err) {
     reportServerError('to load billing status', err, { userId, req })
@@ -89,6 +91,42 @@ router.post('/checkout', async (req, res) => {
     }
 
     reportServerError('to create Stripe checkout session', err, { userId, req })
+    res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
+  }
+})
+
+/*
+ * POST /api/billing/reactivate
+ *
+ * What it does: clears cancel_at_period_end on the active Stripe subscription.
+ * Why: Profile needs an obvious Keep Pro / Resubscribe after a scheduled cancel.
+ */
+router.post('/reactivate', async (req, res) => {
+  const { userId } = getAuth(req)
+
+  try {
+    if (!isStripeBillingConfigured()) {
+      return res.status(503).json({
+        error: 'billing_not_configured',
+        message: 'Soverm Pro billing is not available yet.',
+      })
+    }
+
+    await ensureUserExists(userId)
+    const access = await reactivateProSubscription({ userId })
+
+    res.json({
+      success: true,
+      cancelAtPeriodEnd: access.cancelAtPeriodEnd,
+      currentPeriodEnd: access.currentPeriodEnd,
+      proAccessEndsAt: access.proAccessEndsAt,
+    })
+  } catch (err) {
+    if (err.statusCode === 400 || err.statusCode === 404 || err.statusCode === 503) {
+      return res.status(err.statusCode).json({ error: err.message })
+    }
+
+    reportServerError('to reactivate Soverm Pro subscription', err, { userId, req })
     res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
   }
 })

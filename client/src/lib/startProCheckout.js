@@ -68,6 +68,40 @@ export async function openBillingPortal(getToken) {
   return postBillingSession(getToken, '/api/billing/portal')
 }
 
+/**
+ * Clears a scheduled cancel so Pro keeps renewing (still inside paid period).
+ */
+export async function reactivateProSubscription(getToken) {
+  const token = await getToken()
+  if (!token) {
+    const error = new Error('Please sign in to continue')
+    error.code = 'not_signed_in'
+    throw error
+  }
+
+  const res = await fetch(`${import.meta.env.VITE_API_URL}/api/billing/reactivate`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: '{}',
+  })
+
+  const data = await res.json().catch(() => ({}))
+
+  if (!res.ok) {
+    const error = new Error(
+      data.message || data.error || `Couldn’t renew Pro (${res.status})`
+    )
+    error.code = data.error || 'billing_failed'
+    error.status = res.status
+    throw error
+  }
+
+  return data
+}
+
 export function checkoutErrorToastMessage(err) {
   if (err?.code === 'billing_not_configured' || err?.status === 503) {
     return 'Soverm Pro checkout is not available yet — please try again later'
@@ -95,4 +129,14 @@ export function portalErrorToastMessage(err) {
     return 'Upgrade to Soverm Pro to manage billing'
   }
   return 'Couldn’t open billing portal — please try again'
+}
+
+export function reactivateErrorToastMessage(err) {
+  if (err?.code === 'billing_not_configured' || err?.status === 503) {
+    return 'Billing is not available yet — please try again later'
+  }
+  if (err?.code === 'not_signed_in') {
+    return 'Sign in to renew Soverm Pro'
+  }
+  return 'Couldn’t renew Pro — open Manage billing or try again'
 }
