@@ -29,6 +29,7 @@ import FreeVsProPlanCallout from '../components/FreeVsProPlanCallout.jsx'
 import { useToastContext } from '../context/ToastContext.jsx'
 import FirstConnectCelebration from '../components/FirstConnectCelebration.jsx'
 import ActivationChecklist from '../components/ActivationChecklist.jsx'
+import TrackerDiscoveryHint from '../components/TrackerDiscoveryHint.jsx'
 import DashboardActionsSection from '../components/DashboardActionsSection.jsx'
 import ConnectBankButton from '../components/ConnectBankButton.jsx'
 import {
@@ -527,7 +528,12 @@ function DashboardPage() {
               insight={dashboardData?.latestInsight}
               onChatError={(message) => showToast(message, 'error')}
               onOpenFloatingChat={(prompt = '') => {
-                openChat({ prompt, autoSend: Boolean(prompt) })
+                openChat({
+                  prompt,
+                  autoSend: Boolean(prompt),
+                  contextLabel:
+                    'Your ongoing Ask Soverm chat — grounded in this check-in and your live accounts when available.',
+                })
               }}
               showActions={false}
             />
@@ -618,6 +624,8 @@ function DashboardPage() {
                 spent={dashboardData?.spent ?? 0}
                 cashFlow={dashboardData?.cashFlow ?? null}
                 spendingSeries={dashboardData?.spendingSeries ?? []}
+                periodStart={dashboardData?.periodStart ?? null}
+                todayIso={dashboardData?.todayIso ?? null}
                 trackerSnapshot={trackerData}
                 trackerLoading={trackerLoading}
               />
@@ -697,6 +705,22 @@ function DashboardPage() {
                   <ActivationChecklist
                     hasAccounts={hasAccounts}
                     paydayConfigured={Boolean(trackerData?.payday?.configured)}
+                  />
+                  <TrackerDiscoveryHint
+                    hasTrackerConfigured={Boolean(
+                      trackerData?.spendingTracker ||
+                        (trackerData?.savingTrackers?.length ?? 0) > 0
+                    )}
+                    onOpenTracker={() => {
+                      setActiveTab(DASHBOARD_TABS.TOOLS)
+                      setQuickToolsTab(QUICK_TOOL_TABS.TRACKER)
+                      requestAnimationFrame(() => {
+                        document.getElementById('dashboard-quick-tools')?.scrollIntoView({
+                          behavior: 'smooth',
+                          block: 'start',
+                        })
+                      })
+                    }}
                   />
                   {!hasInsight && <SecurityNote />}
                 </div>

@@ -5,13 +5,15 @@
  */
 
 import db from '../db/index.js'
-import { CONNECTED_ACCOUNT_TRANSACTION_JOINS } from '../utils/connectedAccountTransactions.js'
+import {
+  CONNECTED_ACCOUNT_TRANSACTION_JOINS,
+  EXPENSE_ANALYZER_TRANSACTION_SELECT,
+} from '../utils/connectedAccountTransactions.js'
 import { calendarMonthSqlBounds } from '../utils/calendarMonth.js'
 import { roundCurrency } from '../utils/safeToSpend.js'
-import {
-  EXCLUDE_INTERNAL_MOVES_FILTER,
-  NON_PENDING_FILTER,
-} from '../utils/transactionFilters.js'
+import { isCashFlowSpendingRow } from '../utils/cashFlowClassification.js'
+import { resolveSpendingCategoryLabel } from '../utils/plaidCategory.js'
+import { NON_PENDING_FILTER } from '../utils/transactionFilters.js'
 
 const MAX_LIMITS_PER_USER = 5
 
@@ -53,28 +55,49 @@ function mapLimitRow(row, spent = 0) {
   }
 }
 
+/*
+ * Sum spend per soft-limit category using remapped labels + cash-flow classifier
+ * so caps match what users see in Expenses / the month letter.
+ */
 async function loadSpentByCategory(userId, categories) {
   if (categories.length === 0) {
     return new Map()
   }
 
+  const categorySet = new Set(categories)
+  const spent = new Map(categories.map((category) => [category, 0]))
   const { startIso, endExclusiveIso } = calendarMonthSqlBounds()
   const result = await db.query(
-    `SELECT COALESCE(t.category, 'Uncategorized') AS category,
-            COALESCE(SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END), 0) AS spent
+    `SELECT ${EXPENSE_ANALYZER_TRANSACTION_SELECT}
      FROM transactions t
      ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
      WHERE t.user_id = $1
        ${NON_PENDING_FILTER}
-       ${EXCLUDE_INTERNAL_MOVES_FILTER}
        AND t.date >= $2::date
-       AND t.date < $3::date
-       AND COALESCE(t.category, 'Uncategorized') = ANY($4::text[])
-     GROUP BY 1`,
-    [userId, startIso, endExclusiveIso, categories]
+       AND t.date < $3::date`,
+    [userId, startIso, endExclusiveIso]
   )
 
-  return new Map(result.rows.map((row) => [row.category, Number(row.spent)]))
+  for (const row of result.rows) {
+    if (!isCashFlowSpendingRow(row)) {
+      continue
+    }
+    const remapped = resolveSpendingCategoryLabel(row)
+    const raw = row.category || 'Uncategorized'
+    const key = categorySet.has(remapped)
+      ? remapped
+      : categorySet.has(raw)
+        ? raw
+        : null
+    if (!key) {
+      continue
+    }
+    spent.set(key, (spent.get(key) ?? 0) + Math.abs(Number(row.amount) || 0))
+  }
+
+  return new Map(
+    [...spent.entries()].map(([category, amount]) => [category, roundCurrency(amount)])
+  )
 }
 
 export async function listCategorySoftLimits(userId) {

@@ -7,8 +7,8 @@ const RANGE_DAY_COUNTS = {
 
 /*
  * Format a Date as YYYY-MM-DD in local calendar time.
- * Avoids toISOString() which shifts the day near UTC midnight for US timezones
- * and can make the sparkline total disagree with Cash Flow Spend.
+ * Prefer server-provided todayIso / periodStart for MTD so the sparkline
+ * matches Cash Flow (app timezone), not the browser's local midnight.
  */
 function toLocalDateKey(value) {
   if (!value) {
@@ -45,24 +45,46 @@ function buildDateMap(sparseSeries = []) {
   return byDate
 }
 
+function addDaysIso(isoDate, days) {
+  const [year, month, day] = isoDate.split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day + days))
+  const y = date.getUTCFullYear()
+  const m = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const d = String(date.getUTCDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+function eachIsoDayInclusive(startIso, endIso) {
+  const days = []
+  for (let cursor = startIso; cursor <= endIso; cursor = addDaysIso(cursor, 1)) {
+    days.push(cursor)
+  }
+  return days
+}
+
 /*
- * fillSpendingSeries(sparseSeries, range)
+ * fillSpendingSeries(sparseSeries, range, options?)
  *
  * Turns sparse daily totals from the API into a fixed-length series with
  * zero-filled gaps so the sparkline renders a continuous shape.
- * `mtd` fills from the 1st of this month through today.
+ * `mtd` fills from periodStart (or 1st of month) through todayIso (or local today).
  */
-export function fillSpendingSeries(sparseSeries = [], range = '30d') {
+export function fillSpendingSeries(sparseSeries = [], range = '30d', options = {}) {
   const byDate = buildDateMap(sparseSeries)
-  const end = new Date()
-  end.setHours(12, 0, 0, 0)
+  const todayIso =
+    typeof options.todayIso === 'string' && /^\d{4}-\d{2}-\d{2}/.test(options.todayIso)
+      ? options.todayIso.slice(0, 10)
+      : toLocalDateKey(new Date())
 
   const result = []
 
   if (range === 'mtd') {
-    const start = new Date(end.getFullYear(), end.getMonth(), 1, 12, 0, 0, 0)
-    for (let cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
-      const key = toLocalDateKey(cursor)
+    const startIso =
+      typeof options.periodStart === 'string' && /^\d{4}-\d{2}-\d{2}/.test(options.periodStart)
+        ? options.periodStart.slice(0, 10)
+        : `${todayIso.slice(0, 8)}01`
+
+    for (const key of eachIsoDayInclusive(startIso, todayIso)) {
       result.push({
         date: key,
         amount: byDate.get(key) ?? 0,
@@ -74,10 +96,7 @@ export function fillSpendingSeries(sparseSeries = [], range = '30d') {
   const dayCount = RANGE_DAY_COUNTS[range] ?? RANGE_DAY_COUNTS['30d']
 
   for (let offset = dayCount - 1; offset >= 0; offset -= 1) {
-    const day = new Date(end)
-    day.setDate(day.getDate() - offset)
-    const key = toLocalDateKey(day)
-
+    const key = addDaysIso(todayIso, -offset)
     result.push({
       date: key,
       amount: byDate.get(key) ?? 0,

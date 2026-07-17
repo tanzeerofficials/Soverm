@@ -1,23 +1,28 @@
-import { useState } from 'react'
 import Skeleton from './Skeleton.jsx'
-import ChatPanel from './ChatPanel.jsx'
 import ChatBubbleIcon from './ChatBubbleIcon.jsx'
+import ChatWithCfoButton from './ChatWithCfoButton.jsx'
+import { useAskSoverm } from '../context/AskSovermContext.jsx'
 import { buildExpenseAnalyzerSuggestedPrompts } from '../lib/chatSuggestedPrompts.js'
-import { GENERAL_CHAT_KEY } from '../lib/queryKeys.js'
 import {
   formatCurrency,
   formatGeneratedAt,
   useExpenseAnalyzerNarrative,
 } from '../lib/useExpenseAnalyzerNarrative.js'
 
+const EA_CHAT_CONTEXT_LABEL =
+  'Your ongoing Ask Soverm chat — using Expense Analyzer categories, recurring charges, and your connected accounts.'
+
+/*
+ * Expense Analyzer summary + Ask Soverm entry.
+ * Chat opens the shared FAB thread (same history as Home / weekly review),
+ * not a separate insight-scoped conversation.
+ */
 function ExpenseAnalyzerNarrativeSection({
   templateSummary,
   narrativeMeta,
   totalRecurringMonthly,
-  latestInsightId,
-  onChatError,
 }) {
-  const [chatExpanded, setChatExpanded] = useState(false)
+  const { openChat } = useAskSoverm()
   const fingerprint = narrativeMeta?.fingerprint
   const confirmedRecurring =
     narrativeMeta?.confirmedRecurringMonthly ?? totalRecurringMonthly ?? 0
@@ -41,6 +46,15 @@ function ExpenseAnalyzerNarrativeSection({
   const suggestedPrompts = buildExpenseAnalyzerSuggestedPrompts({ totalRecurringMonthly })
   const hasNarrativeContent =
     showPersonalized || displayTemplate || awaitingCacheCheck || isGenerating
+
+  function handleOpenChat(prompt = '') {
+    openChat({
+      prompt,
+      autoSend: Boolean(prompt),
+      suggestedPrompts,
+      contextLabel: EA_CHAT_CONTEXT_LABEL,
+    })
+  }
 
   if (!hasNarrativeContent && !fingerprint) {
     return null
@@ -145,20 +159,30 @@ function ExpenseAnalyzerNarrativeSection({
         <div className="mt-6 border-t border-border-default pt-5">
           <div className="mb-3 flex items-center gap-2">
             <ChatBubbleIcon className="h-4 w-4 text-ai" />
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-ai">
-              Ask Soverm
-            </h3>
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-ai">
+                Ask Soverm
+              </h3>
+              <p className="text-[11px] text-fg-subtle">
+                Opens your ongoing money chat (same thread as Home)
+              </p>
+            </div>
           </div>
 
-          <ChatPanel
-            threadId={latestInsightId || GENERAL_CHAT_KEY}
-            insightId={latestInsightId}
-            expanded={chatExpanded}
-            onExpandedChange={setChatExpanded}
-            onError={onChatError}
-            suggestedPrompts={suggestedPrompts}
-            contextLabel="Uses your synced transactions, recurring charges, and category breakdown."
-          />
+          <ChatWithCfoButton onClick={() => handleOpenChat()} />
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {suggestedPrompts.slice(0, 3).map((prompt) => (
+              <button
+                key={prompt}
+                type="button"
+                onClick={() => handleOpenChat(prompt)}
+                className="max-w-full rounded-full bg-app px-3 py-2 text-left text-xs leading-snug text-fg-muted transition hover:bg-surface-elevated hover:text-fg sm:py-1.5"
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </section>

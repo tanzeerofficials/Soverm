@@ -46,6 +46,11 @@ import {
   isCashFlowIncomeRow,
   isCashFlowSpendingRow,
 } from './transactionFilters.js'
+import {
+  getAppTodayIso,
+  isWithinAppDaysAgo,
+  isWithinAppPriorPeriod,
+} from './calendarMonth.js'
 
 export const NON_PENDING_FILTER = 'AND (pending IS NOT TRUE)'
 const RECURRING_LOOKBACK_INTERVAL = '3 months'
@@ -678,17 +683,11 @@ export function detectBorderlineRecurringCandidates(transactions, acceptedMercha
 }
 
 function isWithinDaysAgo(dateInput, days) {
-  const today = parseDateOnly(new Date())
-  const target = parseDateOnly(dateInput)
-  const diff = Math.round((today - target) / MS_PER_DAY)
-  return diff >= 0 && diff <= days
+  return isWithinAppDaysAgo(dateInput, days)
 }
 
 function isWithinPriorPeriod(dateInput) {
-  const today = parseDateOnly(new Date())
-  const target = parseDateOnly(dateInput)
-  const diff = Math.round((today - target) / MS_PER_DAY)
-  return diff > 30 && diff <= 60
+  return isWithinAppPriorPeriod(dateInput, 30, 60)
 }
 
 function buildCategoryTotals(rows) {
@@ -956,7 +955,7 @@ export function buildExpenseAnalyzerPayload(comparison, recurringLookbackRows, o
     oneTimeTotal: recurringOneTimeSplit.totalOneTime,
   }
 
-  const todayIso = new Date().toISOString().slice(0, 10)
+  const todayIso = getAppTodayIso()
   const billDefense = buildBillDefenseFindings({
     recurringCharges,
     reviewCharges,

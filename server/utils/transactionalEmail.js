@@ -5,18 +5,24 @@
  * Without RESEND_API_KEY + MAIL_FROM, logs a dry-run and returns dryRun: true.
  */
 
+import { isTransactionalEmailConfigured } from './integrationConfig.js'
+
+export { isTransactionalEmailConfigured }
+
 export async function sendTransactionalEmail({ to, subject, text, html, logLabel = 'email' }) {
   if (!to) {
     return { sent: false, reason: 'missing_recipient' }
   }
 
-  const resendKey = process.env.RESEND_API_KEY
-  const mailFrom = process.env.MAIL_FROM
-
-  if (!resendKey || !mailFrom) {
-    console.info(`[${logLabel}] dry-run to=${to} subject="${subject}"`)
+  if (!isTransactionalEmailConfigured()) {
+    console.info(
+      `[${logLabel}] dry-run to=${to} subject="${subject}" (RESEND_API_KEY / MAIL_FROM not set)`
+    )
     return { sent: false, reason: 'email_not_configured', dryRun: true }
   }
+
+  const resendKey = process.env.RESEND_API_KEY
+  const mailFrom = process.env.MAIL_FROM
 
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',

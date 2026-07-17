@@ -7,7 +7,7 @@
  */
 
 import { getCurrentProgressMonth as getZonedCurrentProgressMonth } from './calendarMonth.js'
-import { formatIsoDate, roundCurrency } from './safeToSpend.js'
+import { roundCurrency } from './safeToSpend.js'
 
 export const TRACK_TYPES = ['spending', 'saving']
 export const TRACK_PURPOSE_TYPES = ['debt', 'purchase', 'future']

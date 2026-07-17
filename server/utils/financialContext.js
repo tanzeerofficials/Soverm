@@ -114,31 +114,27 @@ export function computeSpendingDelta(current, prior) {
 }
 
 /**
- * Human comparison line for prompts and narrative: times + dollars, not "787%".
+ * Human comparison line for prompts and narrative.
+ * Prefer calm dollar context: "$842 this period (was $712 before)" — not "1.2×" scare framing.
  */
 export function formatComparisonPhrase(current, prior, delta, { vsLabel = 'vs prior 30 days' } = {}) {
   const currentTotal = roundMoney(current)
   const priorTotal = roundMoney(prior)
 
   if (!delta || delta.direction === 'flat') {
-    return `flat ${vsLabel} (${formatMoneyAmount(currentTotal)} vs ${formatMoneyAmount(priorTotal)})`
+    return `about even ${vsLabel} (${formatMoneyAmount(currentTotal)} vs ${formatMoneyAmount(priorTotal)})`
   }
 
   if (delta.isNewCategory) {
     return `new this period (${formatMoneyAmount(currentTotal)} now, $0 in the prior period)`
   }
 
-  const timesLabel = formatTimesMultiplier(delta.times ?? currentTotal / priorTotal)
   const signedChange =
     delta.direction === 'up'
       ? `+${formatMoneyAmount(delta.absoluteChange ?? Math.abs(currentTotal - priorTotal))}`
       : `−${formatMoneyAmount(delta.absoluteChange ?? Math.abs(currentTotal - priorTotal))}`
 
-  if (timesLabel) {
-    return `about ${timesLabel} ${vsLabel} — ${formatMoneyAmount(currentTotal)} vs ${formatMoneyAmount(priorTotal)} (${signedChange})`
-  }
-
-  return `${formatMoneyAmount(currentTotal)} vs ${formatMoneyAmount(priorTotal)} (${signedChange}) ${vsLabel}`
+  return `${formatMoneyAmount(currentTotal)} this period (was ${formatMoneyAmount(priorTotal)} before, ${signedChange})`
 }
 
 export function isSignificantCategoryDelta(delta) {

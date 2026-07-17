@@ -5,7 +5,10 @@
  */
 
 import db from '../db/index.js'
-import { CONNECTED_ACCOUNT_TRANSACTION_JOINS } from '../utils/connectedAccountTransactions.js'
+import {
+  CONNECTED_ACCOUNT_TRANSACTION_JOINS,
+  EXPENSE_ANALYZER_TRANSACTION_SELECT,
+} from '../utils/connectedAccountTransactions.js'
 import { getCalendarWeekWindow } from '../utils/calendarWeek.js'
 import { roundCurrency } from '../utils/safeToSpend.js'
 import {
@@ -28,6 +31,11 @@ import {
   EXCLUDE_INTERNAL_MOVES_FILTER,
   NON_PENDING_FILTER,
 } from '../utils/transactionFilters.js'
+import {
+  classifyCashFlowTransaction,
+  MONEY_OUT_KINDS,
+} from '../utils/cashFlowClassification.js'
+import { resolveSpendingCategoryLabel } from '../utils/plaidCategory.js'
 
 async function sumSpendingInRange(userId, startIso, endExclusiveIso) {
   const result = await db.query(
@@ -47,26 +55,30 @@ async function sumSpendingInRange(userId, startIso, endExclusiveIso) {
 
 async function topCategoriesInRange(userId, startIso, endExclusiveIso, limit = 2) {
   const result = await db.query(
-    `SELECT COALESCE(t.category, 'Uncategorized') AS category,
-            COALESCE(SUM(t.amount), 0) AS amount
+    `SELECT ${EXPENSE_ANALYZER_TRANSACTION_SELECT}
      FROM transactions t
      ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
      WHERE t.user_id = $1
-       AND t.amount > 0
        ${NON_PENDING_FILTER}
-       ${EXCLUDE_INTERNAL_MOVES_FILTER}
        AND t.date >= $2::date
-       AND t.date < $3::date
-     GROUP BY 1
-     ORDER BY amount DESC
-     LIMIT $4`,
-    [userId, startIso, endExclusiveIso, limit]
+       AND t.date < $3::date`,
+    [userId, startIso, endExclusiveIso]
   )
 
-  return result.rows.map((row) => ({
-    category: row.category,
-    amount: roundCurrency(row.amount),
-  }))
+  const byCategory = new Map()
+  for (const row of result.rows) {
+    const kind = classifyCashFlowTransaction(row)
+    if (!MONEY_OUT_KINDS.has(kind)) {
+      continue
+    }
+    const category = resolveSpendingCategoryLabel(row)
+    byCategory.set(category, (byCategory.get(category) ?? 0) + Math.abs(Number(row.amount) || 0))
+  }
+
+  return [...byCategory.entries()]
+    .map(([category, amount]) => ({ category, amount: roundCurrency(amount) }))
+    .sort((left, right) => right.amount - left.amount)
+    .slice(0, limit)
 }
 
 async function earliestTransactionDate(userId) {

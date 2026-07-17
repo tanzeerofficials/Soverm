@@ -91,12 +91,17 @@ function FloatingCfoChatModal({
         aria-labelledby="floating-cfo-chat-title"
       >
         <div className="flex shrink-0 items-center justify-between border-b border-border-default bg-app px-4 py-3 sm:rounded-t-xl">
-          <h2
-            id="floating-cfo-chat-title"
-            className="text-sm font-semibold text-fg"
-          >
-            Ask Soverm
-          </h2>
+          <div className="min-w-0">
+            <h2
+              id="floating-cfo-chat-title"
+              className="text-sm font-semibold text-fg"
+            >
+              Ask Soverm
+            </h2>
+            <p className="truncate text-[11px] text-fg-subtle">
+              Your ongoing money chat — same thread everywhere
+            </p>
+          </div>
           <button
             type="button"
             onClick={onClose}
@@ -123,9 +128,7 @@ function FloatingCfoChatModal({
             suggestedPrompts={prompts}
             contextLabel={
               contextLabel ||
-              (insightId
-                ? 'Uses your accounts, recent transactions, and Expense Analyzer — plus this week’s check-in when available.'
-                : 'Uses your accounts and spending — plus this week’s check-in and what’s left when available.')
+              'Your ongoing Ask Soverm chat — using your accounts, spending, and this week’s check-in when available.'
             }
             onExpandedChange={(expanded) => {
               if (!expanded) {

@@ -14,16 +14,23 @@ import {
   computeSpendingDelta,
   formatComparisonPhrase,
   formatMoneyAmount,
-  formatTimesMultiplier,
 } from '../utils/financialContext.js'
 import { buildExpenseAnalyzerChatContextFromPayload } from '../utils/expenseAnalyzerChatContext.js'
 import { classifyCashFlowTransaction } from '../utils/transactionFilters.js'
+import {
+  CHAT_LOOKUP_TOOLS,
+  buildChatToolsPromptHint,
+  executeChatLookupTool,
+  formatChatLookupStatus,
+} from '../utils/chatLookupTools.js'
 
 export { buildExpenseAnalyzerChatContextFromPayload }
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
+
+const CHAT_MAX_TOOL_ROUNDS = 3
 
 const SYSTEM_PROMPT = `You are Soverm, a personal AI CFO who genuinely cares about this person — not a report generator. You analyze financial data and respond ONLY with valid JSON, nothing else — no markdown code blocks, no explanation text before or after, just the raw JSON object.
 
@@ -32,7 +39,7 @@ Accuracy first: every dollar amount, percentage, merchant, and recommendation mu
 TONE — caring advisor, still honest:
 - Product goal: help people track money and take useful next steps. Leave them informed and capable — never shamed or panicked.
 - When the picture is genuinely concerning (tight cash, a real spending jump, rising debt), open fullSummary paragraph 1 by acknowledging that human reality in one plain, warm sentence ("Things are tight right now" / "This jumped vs last month — let's see why") before the analysis. Skip that acknowledgment for routine or positive check-ins — do not manufacture drama.
-- Avoid clinical or dramatic framing of numbers. Prefer "your medical spending is higher this month — about $887 vs $100 before" over scare multipliers or "surged 787%." Lead with plain language and dollars; use multipliers only as quiet support, never as the headline.
+- Avoid clinical or dramatic framing of numbers. Prefer "your medical spending is higher this month — about $887 vs $100 before" over scare multipliers ("9×") or "surged 787%." Lead with plain language and dollars; never headline with multipliers or percent drama.
 - Hard news stays direct — never sugarcoat — but pair it with capability, not alarm: "you're capable of fixing this, here's exactly how," not "here's how bad this is."
 - Avoid panic words: crisis, dug a hole, spending spike (as scare), fastest-growing. Prefer: worth a quick look, needs attention, here's one next step.
 - End fullSummary paragraph 3 on forward motion: after the concrete recommendation, close with a brief note of encouragement or perspective so they feel relieved and capable, not lectured.
@@ -181,7 +188,7 @@ Respond with ONLY this exact JSON structure, no other text:
   ]
 }
 
-Each stat object must include "statType" and a "delta" field. Set statType to "income" for income/paycheck/deposit stats, "neutral" for cash balances, debt ratios, or other non-spend metrics, and "spending" for expense categories and overall spending. Use the pre-computed delta values provided above when the stat matches overall spending or a listed category; otherwise set "delta": null. Do not calculate percentages yourself. In narrative copy, prefer times-multipliers and dollar amounts (e.g. "about 1.2× — $842 vs $700") over percentage headlines.
+Each stat object must include "statType" and a "delta" field. Set statType to "income" for income/paycheck/deposit stats, "neutral" for cash balances, debt ratios, or other non-spend metrics, and "spending" for expense categories and overall spending. Use the pre-computed delta values provided above when the stat matches overall spending or a listed category; otherwise set "delta": null. Do not calculate percentages yourself. In narrative copy, prefer calm dollar framing (e.g. "$842 this period (was $700 before)") — never lead with times-multipliers or percent scare headlines.
 
 fullSummary must be an array of exactly 3 strings. Each string is a complete standalone paragraph. Do not use line breaks within a single string — each paragraph is its own array element. Write like a caring advisor: plain language first, real numbers as support, tone matched to severity, and a capable forward close in paragraph 3.${monthOverMonthInstruction}${expenseAnalyzerInstruction}
 
@@ -800,7 +807,7 @@ No month-over-month comparison is available for this user. Do not reference any 
 
 Pre-computed month-over-month spending and income changes (30-day windows — use these exact figures, do not recalculate).
 These totals already exclude Self transfers between the user's own accounts and credit-card/loan payments.
-Describe changes with times-multipliers and dollar amounts (e.g. "about 1.2× — $842 vs $700"), not percentage headlines like "up 18%":
+Describe changes with calm dollar context (e.g. "$842 this period (was $700 before)"), not "1.2×" or "up 18%" headlines:
 ${lines.join('\n')}
 
 When a stat corresponds to overall spending, overall income, or one of the spending categories above, include a "delta" object using the matching pre-computed values:
@@ -808,7 +815,7 @@ ${statDeltaExamples.join('\n')}
 For stats with no month-over-month match (e.g. liquid cash), set "delta": null.`,
     instruction: `
 
-When month-over-month data is available, naturally reference the pre-computed figures in fullSummary where relevant (e.g. "dining is about $842 vs $700 in the prior 30 days — roughly 1.2×"). Prefer times and dollars over percentages. Use only the exact figures provided above — do not invent or recalculate them from the transaction list. Do not say "last month" — the comparison is a rolling 30-day window, not a calendar month. For new spending categories, describe them as new rather than giving a multiplier.`,
+When month-over-month data is available, naturally reference the pre-computed figures in fullSummary where relevant (e.g. "dining is about $842 this period — was $700 in the prior 30 days"). Prefer dollars and plain language over times-multipliers or percentage headlines. Use only the exact figures provided above — do not invent or recalculate them from the transaction list. Do not say "last month" — the comparison is a rolling 30-day window, not a calendar month. For new spending categories, describe them as new rather than giving a multiplier.`,
   }
 }
 
@@ -983,7 +990,7 @@ You are also a practical money coach for everyday life. When the user asks how-t
 2) SPENDING PLANS (night out with friends, weekend trip, birthday gift, dinner date):
 - First check weeklyReview.whatsLeft / bills until payday / soft limits / spendingCap
 - Propose 2–3 budget tiers (lean / comfortable / stretch) with dollar caps grounded in what's left
-- Break the plan into: total budget, per-person or per-activity split, what to cut if they overspend, and a hard stop amount
+- Break the plan into: total budget, per-person or per-activity split, what to cut if they overspend, and a clear ceiling amount
 - If they can't afford it this week, say so plainly and offer a cheaper alternative or "wait until payday" option — never guilt-trip
 
 3) MAXIMIZE SAVINGS / GET AHEAD:
@@ -1003,38 +1010,37 @@ You are also a practical money coach for everyday life. When the user asks how-t
 
 /*
  * Shared conversation-style rules for both general and insight-scoped chat.
- * Tone is layered on top of accuracy — never trade real numbers for warmth.
+ * Voice first, accuracy always — keep the policy short so replies sound human.
  */
 function buildChatConversationStyleBlock({ insightScoped = false } = {}) {
   const lengthRule = insightScoped
-    ? 'Match answer length to the question: quick questions get 2-4 sentences; complex ones can use paragraphs, bullets, or numbered steps — but for money decisions (afford, cancel, cut) and common life questions (taxes, night out, savings), always include usable steps or dollars and one next step'
-    : 'Match answer length to the question — but for money decisions (afford, cancel, cut) and common life questions (taxes, night out, savings), always include usable steps or dollars and one next step'
+    ? 'Match length to the question: quick asks get 2–4 sentences; money decisions and how-tos get real steps or dollars and one next step'
+    : 'Match length to the question — money decisions and how-tos always get usable steps or dollars and one next step'
 
-  return `CONVERSATION STYLE:
+  return `VOICE — talk like a calm, sharp friend who knows their numbers (not a dashboard bot or a policy manual):
+- Use "I" naturally. Prefer short, spoken sentences over corporate phrasing.
+- Lead with the answer or the one useful takeaway; numbers support the sentence — they are not the headline.
+- If prior turns already covered something, reference it in one clause ("like we said about dining…") and do not re-explain.
+- Skip stacked openings: do not always do acknowledge → analysis → encouragement → closing question. Pick what the moment needs.
+- Mild opinions are fine when grounded in their data ("I'd cancel X first because it frees ~$Y/mo with the least pain").
+- Prefer dollar context over scare multipliers: say "$525 this period (was $25 before)" not "21×" or "spending spike."
+- Hard news: honest and direct, paired with one concrete next step — never shame, never panic theater.
+- Match severity: light when things are fine; warm and direct when cash is tight. No false cheer.
+- Warmth doesn't mean vagueness — every dollar, merchant, and category you cite must come from the live data.
+
+CONVERSATION STYLE:
 - Natural back-and-forth — if a key fact is missing mid-answer, ask at most one clarifying question; otherwise assume and proceed
 - ${lengthRule}
 - Everyday / how-to / planning questions: answer completely first, then connect to their live numbers when relevant — never brush them off with "I only answer about your transactions"
 - Use markdown when it improves readability (bold key numbers, numbered steps, short lists)
-- Be honest but constructive — never shame
 - Not a licensed advisor — brief disclaimer when the question needs licensed advice (tax, legal, investments, insurance); still share clear general knowledge
 
-TONE — you are a financial advisor who genuinely cares about this person, not a report generator:
-- Before diving into analysis, briefly acknowledge the human reality of the situation in one sentence when relevant — e.g. if their cash is tight, a spending spike is significant, or debt is accumulating, start by acknowledging that plainly and warmly ("Things are tight right now" or "This is a real spike, let's look at why") before the numbers. Skip this acknowledgment for routine/positive check-ins where nothing is concerning — don't manufacture drama where none exists.
-- Avoid clinical or dramatic framing of numbers. Say "your medical spending jumped a lot this month — about $887 vs $100 before (roughly 9×)" not "medical costs surged 787%." Lead with plain language; use dollar amounts and times-multipliers to support the sentence, not percentages as the headline.
-- When giving hard news (overspending, low balance, rising debt), be honest and direct — never sugarcoat — but pair directness with reassurance about capability, not alarm. The goal is "you're capable of fixing this, here's exactly how" not "here's how bad this is."
-- End responses on forward motion, not just a list of instructions. After giving advice, close with a brief note of encouragement or perspective — e.g. "You're not in trouble, just tight for a bit — this gets you breathing room fastest" — so the person feels relieved and capable, not lectured at. When you also use an engagement hook (below), put the encouraging note before that closing question.
-- Match your tone to the actual severity of the situation. Don't be uniformly cheerful when things are genuinely concerning, and don't be alarmist about normal, healthy financial behavior. Read the real picture and respond accordingly — someone with a healthy cash cushion asking a routine question gets a light, easy tone; someone in a genuine cash crunch gets warmth and directness, not either panic or false reassurance.
-- When something is ambiguous (e.g. is a subscription worth keeping, is a large transfer intentional), prefer the engagement-hook closing question to invite that clarification — this creates real conversation instead of one-directional reporting.
-- This is about HOW you communicate, not WHAT you communicate — every number, percentage, and specific recommendation must remain exactly as accurate and grounded in real data as before. Warmth doesn't mean vagueness.
-
-ENGAGEMENT HOOK — end most chat responses with a natural follow-up question that invites the conversation to continue, the way a genuinely curious advisor would:
-- The question must be specific and tied to what was just discussed — never a generic filler like "What do you think?" or "Does that help?"
-- Good examples: after explaining a spending spike, ask "Want me to break down which specific purchases drove that?" — after flagging a subscription, ask "Is Replit something you're actively using right now, or has it become autopilot spending?" — after a debt-payoff recommendation, ask "Want me to map out how fast that debt disappears if you put an extra $200/month toward it?"
-- The question should offer a genuinely useful next step, not just prompt small talk — the person should feel like saying "yes" gets them something real.
-- Skip the closing question when it would feel forced — a short factual answer to a simple direct question (e.g. "what's my balance") doesn't need one. Use judgment: reserve the hook for responses involving analysis, a recommendation, or something with a natural next layer of exploration.
-- Never use the same closing question twice in a row within one conversation thread — vary the phrasing and the actual follow-up angle each time.
-- Keep it to exactly one closing question when you use a hook. Do not stack multiple CTA questions at the end.
-- Place the engagement hook as the final sentence of the reply (after any encouragement note).
+ENGAGEMENT HOOK — use a closing question only when it earns its place:
+- Use it after analysis, a recommendation, or when a natural next layer exists (break down merchants, cancel vs keep, map a payoff).
+- Skip it for yes/no afford answers, simple balance/fact questions, and when the user just wants a short plan they can act on.
+- Never generic fillers ("What do you think?", "Does that help?"). One specific question tied to what you just said.
+- Never repeat the same closing question twice in a row. At most one closing question — put any encouragement before it.
+${buildChatToolsPromptHint()}
 ${COMMON_LIFE_QUESTIONS_PLAYBOOK}`
 }
 
@@ -1110,7 +1116,7 @@ BEFORE YOU SPEND RULES:
    * Why: users should be able to ask Soverm before generating their first insight.
    */
   if (insightBody == null) {
-    return `You are Soverm, a personal AI CFO for paycheck-to-paycheck users — a knowledgeable financial advisor who genuinely cares about this person, in an ongoing chat. They have not opened a weekly insight thread yet. Answer using their live synced financial data below. Be thorough when the question needs depth, concise when it doesn't. This should feel like talking with someone who has your back and knows your numbers — not reading a report.
+    return `You are Soverm — their personal money person for paycheck-to-paycheck life. Chat like a real advisor who already knows their accounts: warm, direct, specific. Not a report reader, not a chatbot script. They have not opened a weekly insight thread yet. Answer from live synced data below. Thorough when needed, brief when not.
 
 DEFAULT JOB (unless they clearly ask something else):
 - Ground answers in this week's remaining money (weeklyReview.whatsLeft / runwayCoach), the one risk + one move, openActions, and this month's condition grade (monthCondition).
@@ -1139,14 +1145,13 @@ ${liveCapturedLabel ? `- Live financial snapshot refreshed ${liveCapturedLabel}.
 ${liveContextBlock.block}
 ${liveContextBlock.instruction}
 
-Prior messages in this thread are in the messages array — maintain continuity and refer back when relevant.
+Prior messages in this thread are in the messages array — maintain continuity and refer back when relevant. Do not restart from zero each turn.
 
 FORMATTING:
-- Write conversationally, like a caring advisor who knows their numbers
-- Dollar amounts written naturally ($1,072.80 not 1072.8 in prose)
-- Short paragraphs beat walls of text; structure longer answers clearly
-- Lead with plain language; let specific numbers support the sentence rather than headline it
-- For analysis or recommendation replies, end with one specific engagement-hook question (see ENGAGEMENT HOOK). For simple factual replies, end after the answer — no forced CTA.
+- Conversational prose; dollar amounts written naturally ($1,072.80 not 1072.8)
+- Short paragraphs; structure longer answers clearly
+- Lead with plain language; numbers support the sentence
+- Closing engagement-hook question only when it earns it (see ENGAGEMENT HOOK) — never force a CTA after a simple fact or clear yes/no
 - For ranked plans (night out budgets, savings steps, tax how-tos with 2+ steps), after your markdown answer append a fenced block:
 \`\`\`soverm-plan
 {"title":"short plan title","summary":"one line","cards":[{"title":"...","detail":"...","tone":"fine|warning|danger|neutral","amount":"$40","label":"lean"}]}
@@ -1163,7 +1168,7 @@ FORMATTING:
     ? `Insight snapshot month-over-month figures were captured on ${snapshotCapturedAt}.`
     : 'Insight snapshot month-over-month figures come from when the insight was generated.'
 
-  return `You are Soverm, a personal AI CFO for paycheck-to-paycheck users — a knowledgeable financial advisor who genuinely cares about this person, in an ongoing chat. You have access to their real synced financial data below. Be thorough when the question needs depth, concise when it doesn't. This should feel like talking with someone who has your back and knows your numbers — not reading a report.
+  return `You are Soverm — their personal money person for paycheck-to-paycheck life. Chat like a real advisor who already knows their accounts: warm, direct, specific. Not a report reader, not a chatbot script. You have their live synced data and this week's insight snapshot. Thorough when needed, brief when not.
 
 DEFAULT JOB (unless they clearly ask something else):
 - Ground answers in this week's remaining money (weeklyReview.whatsLeft / runwayCoach), the one risk + one move, openActions, and this month's condition grade (monthCondition).
@@ -1200,14 +1205,13 @@ ${liveContextBlock.block}
 
 ${snapshotTimingNote}${momContext.instruction}${liveContextBlock.instruction}
 
-Prior messages in this thread are in the messages array — maintain continuity and refer back when relevant.
+Prior messages in this thread are in the messages array — maintain continuity and refer back when relevant. Do not restart from zero each turn.
 
 FORMATTING:
-- Write conversationally, like a caring advisor who knows their numbers
-- Dollar amounts written naturally ($1,072.80 not 1072.8 in prose)
-- Short paragraphs beat walls of text; structure longer answers clearly
-- Lead with plain language; let specific numbers support the sentence rather than headline it
-- For analysis or recommendation replies, end with one specific engagement-hook question (see ENGAGEMENT HOOK). For simple factual replies, end after the answer — no forced CTA.
+- Conversational prose; dollar amounts written naturally ($1,072.80 not 1072.8)
+- Short paragraphs; structure longer answers clearly
+- Lead with plain language; numbers support the sentence
+- Closing engagement-hook question only when it earns it (see ENGAGEMENT HOOK) — never force a CTA after a simple fact or clear yes/no
 - For ranked plans (night out budgets, savings steps, tax how-tos with 2+ steps), after your markdown answer append a fenced block:
 \`\`\`soverm-plan
 {"title":"short plan title","summary":"one line","cards":[{"title":"...","detail":"...","tone":"fine|warning|danger|neutral","amount":"$40","label":"lean"}]}
@@ -1218,10 +1222,117 @@ FORMATTING:
 export const CHAT_HISTORY_MESSAGE_LIMIT = 30
 export const CHAT_MAX_OUTPUT_TOKENS = 2048
 
+function extractAssistantText(contentBlocks = []) {
+  return contentBlocks
+    .filter((block) => block.type === 'text' && block.text)
+    .map((block) => block.text)
+    .join('\n')
+    .trim()
+}
+
+function collectToolUses(contentBlocks = []) {
+  return contentBlocks.filter((block) => block.type === 'tool_use')
+}
+
+async function buildToolResultBlocks(userId, toolUses) {
+  const results = []
+
+  for (const toolUse of toolUses) {
+    let payload
+    try {
+      payload = await executeChatLookupTool(userId, toolUse.name, toolUse.input || {})
+    } catch (err) {
+      payload = { error: err.message || 'Lookup failed' }
+    }
+
+    results.push({
+      type: 'tool_result',
+      tool_use_id: toolUse.id,
+      content: JSON.stringify(payload),
+    })
+  }
+
+  return results
+}
+
+/*
+ * Agentic chat loop: Claude may call get_category_transactions /
+ * get_merchant_history, we run the lookups, then continue until a text answer.
+ */
+async function runChatWithOptionalTools({
+  systemPrompt,
+  messages,
+  userId = null,
+  onDelta = null,
+}) {
+  let workingMessages = [...messages]
+  const toolsEnabled = Boolean(userId)
+
+  for (let round = 0; round < CHAT_MAX_TOOL_ROUNDS; round += 1) {
+    const allowTools = toolsEnabled && round < CHAT_MAX_TOOL_ROUNDS
+    const request = {
+      model: 'claude-sonnet-4-6',
+      max_tokens: CHAT_MAX_OUTPUT_TOKENS,
+      temperature: 0.6,
+      system: systemPrompt,
+      messages: workingMessages,
+      ...(allowTools ? { tools: CHAT_LOOKUP_TOOLS } : {}),
+    }
+
+    const response = await anthropic.messages.create(request)
+    const toolUses = collectToolUses(response.content)
+
+    if (toolUses.length === 0 || !allowTools) {
+      const text = extractAssistantText(response.content)
+      if (onDelta && text) {
+        onDelta(text, text)
+      }
+      return text
+    }
+
+    workingMessages = [
+      ...workingMessages,
+      { role: 'assistant', content: response.content },
+      { role: 'user', content: await buildToolResultBlocks(userId, toolUses) },
+    ]
+  }
+
+  const finalStreamOrCreate = onDelta
+    ? anthropic.messages.stream({
+        model: 'claude-sonnet-4-6',
+        max_tokens: CHAT_MAX_OUTPUT_TOKENS,
+        temperature: 0.6,
+        system: systemPrompt,
+        messages: workingMessages,
+      })
+    : null
+
+  if (finalStreamOrCreate) {
+    let fullText = ''
+    finalStreamOrCreate.on('text', (_delta, snapshot) => {
+      fullText = snapshot
+      onDelta?.(snapshot, snapshot)
+    })
+    await finalStreamOrCreate.finalMessage()
+    return fullText
+  }
+
+  const finalResponse = await anthropic.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: CHAT_MAX_OUTPUT_TOKENS,
+    temperature: 0.6,
+    system: systemPrompt,
+    messages: workingMessages,
+  })
+
+  return extractAssistantText(finalResponse.content)
+}
+
 /*
  * askFinancialQuestion(originalInsight, chatHistory, newQuestion, options)
  *
  * Conversational follow-up — plain text, grounded in live financial data + insight snapshot.
+ * May call lookup tools when userId is provided.
  */
 export async function askFinancialQuestion(
   originalInsight,
@@ -1235,6 +1346,7 @@ export async function askFinancialQuestion(
     expenseAnalyzerContext = null,
     insightActions = [],
     beforeYouSpendVerdict = null,
+    userId = null,
   } = options
 
   const { systemPrompt, messages } = buildChatCompletionPayload(
@@ -1251,15 +1363,11 @@ export async function askFinancialQuestion(
   )
 
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: CHAT_MAX_OUTPUT_TOKENS,
-      temperature: 0.4,
-      system: systemPrompt,
+    return await runChatWithOptionalTools({
+      systemPrompt,
       messages,
+      userId,
     })
-
-    return response.content[0].text
   } catch (err) {
     console.error('Failed to answer financial question:', err.message)
     throw new Error(`Claude chat response failed: ${err.message}`)
@@ -1269,14 +1377,15 @@ export async function askFinancialQuestion(
 /*
  * What this does: streams Claude tokens for Ask Soverm.
  * Why: long answers feel fast on mobile when text appears as it generates.
- * How: yields text deltas via onDelta; returns the full reply when done.
+ * How: tool rounds run first (if needed); onStatus keeps the UI honest during
+ * lookups; then text is emitted via onDelta.
  */
 export async function askFinancialQuestionStream(
   originalInsight,
   chatHistory,
   newQuestion,
   options = {},
-  { onDelta } = {}
+  { onDelta, onStatus } = {}
 ) {
   const {
     generatedAt,
@@ -1284,6 +1393,7 @@ export async function askFinancialQuestionStream(
     expenseAnalyzerContext = null,
     insightActions = [],
     beforeYouSpendVerdict = null,
+    userId = null,
   } = options
 
   const { systemPrompt, messages } = buildChatCompletionPayload(
@@ -1299,22 +1409,103 @@ export async function askFinancialQuestionStream(
     }
   )
 
+  const emitStatus = (status) => {
+    if (status && typeof onStatus === 'function') {
+      onStatus(status)
+    }
+  }
+
   try {
+    emitStatus({
+      phase: 'thinking',
+      title: 'Soverm is thinking…',
+      detail: null,
+    })
+
+    /*
+     * When tools may run, complete tool rounds with create(), then stream only
+     * the final text turn so the UI still gets progressive tokens when possible.
+     */
+    if (!userId) {
+      emitStatus({
+        phase: 'writing',
+        title: 'Soverm is writing…',
+        detail: null,
+      })
+      const stream = anthropic.messages.stream({
+        model: 'claude-sonnet-4-6',
+        max_tokens: CHAT_MAX_OUTPUT_TOKENS,
+        temperature: 0.6,
+        system: systemPrompt,
+        messages,
+      })
+
+      let fullText = ''
+      stream.on('text', (_delta, snapshot) => {
+        fullText = snapshot
+        onDelta?.(snapshot, snapshot)
+      })
+      await stream.finalMessage()
+      return fullText
+    }
+
+    let workingMessages = [...messages]
+
+    for (let round = 0; round < CHAT_MAX_TOOL_ROUNDS; round += 1) {
+      const response = await anthropic.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: CHAT_MAX_OUTPUT_TOKENS,
+        temperature: 0.6,
+        system: systemPrompt,
+        messages: workingMessages,
+        tools: CHAT_LOOKUP_TOOLS,
+      })
+
+      const toolUses = collectToolUses(response.content)
+      if (toolUses.length === 0) {
+        const text = extractAssistantText(response.content)
+        if (text) {
+          emitStatus({
+            phase: 'writing',
+            title: 'Soverm is writing…',
+            detail: null,
+          })
+          onDelta?.(text, text)
+        }
+        return text
+      }
+
+      emitStatus(formatChatLookupStatus(toolUses))
+      workingMessages = [
+        ...workingMessages,
+        { role: 'assistant', content: response.content },
+        { role: 'user', content: await buildToolResultBlocks(userId, toolUses) },
+      ]
+      emitStatus({
+        phase: 'thinking',
+        title: 'Putting that together…',
+        detail: 'Almost ready with an answer',
+      })
+    }
+
+    emitStatus({
+      phase: 'writing',
+      title: 'Soverm is writing…',
+      detail: null,
+    })
     const stream = anthropic.messages.stream({
       model: 'claude-sonnet-4-6',
       max_tokens: CHAT_MAX_OUTPUT_TOKENS,
-      temperature: 0.4,
+      temperature: 0.6,
       system: systemPrompt,
-      messages,
+      messages: workingMessages,
     })
 
     let fullText = ''
-
     stream.on('text', (_delta, snapshot) => {
       fullText = snapshot
       onDelta?.(snapshot, snapshot)
     })
-
     await stream.finalMessage()
     return fullText
   } catch (err) {

@@ -74,6 +74,8 @@ Copy `client/.env.example` to `client/.env`. Only `VITE_*` variables are exposed
 | `VITE_POSTHOG_SESSION_RECORDING` | No | Set to `true` to enable session replay |
 | `VITE_SENTRY_DSN` | No | Sentry browser DSN (omit to disable) |
 
+**Content-Security-Policy (CSP)** is enabled on the Vercel frontend (`client/vercel.json`). The allowlist lives in `client/src/lib/contentSecurityPolicy.js` (Clerk, Plaid, Stripe, fonts, Sentry, PostHog, Railway API). After editing it, run `cd client && npm run csp:sync`. If your API uses a custom domain, sync with `VITE_API_URL=https://your-api.example.com npm run csp:sync`. Local Vite `npm run dev` does not use this header (HMR would break); it applies in production on Vercel.
+
 There are **no client-side Plaid env vars** — Plaid credentials live on the server.
 
 ### Server (`server/.env`)

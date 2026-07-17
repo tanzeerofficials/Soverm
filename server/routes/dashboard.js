@@ -18,7 +18,7 @@ import {
 import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
 import { reportServerError } from '../utils/sentry.js'
 import { buildCashFlowForecastForUser } from '../services/cashFlowForecast.js'
-import { calendarMonthSqlBounds } from '../utils/calendarMonth.js'
+import { calendarMonthSqlBounds, getAppTodayIso } from '../utils/calendarMonth.js'
 
 const router = Router()
 
@@ -86,7 +86,7 @@ router.get('/summary', async (req, res) => {
     const appliedRange = resolveRange(req.query.range)
     const useMonthToDate = appliedRange === 'mtd'
     const interval = useMonthToDate ? null : RANGE_INTERVALS[appliedRange]
-    const monthBounds = useMonthToDate ? calendarMonthSqlBounds() : null
+    const monthBounds = calendarMonthSqlBounds()
 
     const dateFilterSql = useMonthToDate
       ? `AND t.date >= $2::date AND t.date < $3::date`
@@ -204,12 +204,9 @@ router.get('/summary', async (req, res) => {
       latestInsight,
       lastSyncedAt,
       appliedRange,
-      ...(useMonthToDate
-        ? {
-            periodStart: monthBounds.startIso,
-            periodEndExclusive: monthBounds.endExclusiveIso,
-          }
-        : {}),
+      todayIso: getAppTodayIso(),
+      periodStart: monthBounds.startIso,
+      periodEndExclusive: monthBounds.endExclusiveIso,
     })
   } catch (err) {
     reportServerError('to load dashboard summary', err, { userId, req })

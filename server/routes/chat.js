@@ -12,6 +12,7 @@ import {
   askFinancialQuestion,
   askFinancialQuestionStream,
   resolveInsightGeneratedAt,
+  CHAT_HISTORY_MESSAGE_LIMIT,
 } from '../services/claude.js'
 import { evaluateBeforeYouSpendForUser } from '../services/beforeYouSpend.js'
 import { loadChatFinancialContext, loadInsightActionsForChat } from '../utils/chatFinancialContext.js'
@@ -121,6 +122,7 @@ async function respondWithChatAnswer(req, res, {
     chatFinancialContext,
     insightActions,
     beforeYouSpendVerdict,
+    userId,
   }
 
   if (wantsStream(req)) {
@@ -140,6 +142,14 @@ async function respondWithChatAnswer(req, res, {
         {
           onDelta: (_delta, fullText) => {
             writeSse(res, { type: 'delta', text: fullText })
+          },
+          onStatus: (status) => {
+            writeSse(res, {
+              type: 'status',
+              phase: status.phase,
+              title: status.title ?? null,
+              detail: status.detail ?? null,
+            })
           },
         }
       )
@@ -257,7 +267,7 @@ router.post('/general', chatRateLimitMiddleware(), async (req, res) => {
            FROM chat_messages
            WHERE user_id = $1 AND insight_id IS NULL
            ORDER BY created_at DESC
-           LIMIT 30
+           LIMIT ${CHAT_HISTORY_MESSAGE_LIMIT}
          ) recent
          ORDER BY created_at ASC`,
         [userId]
@@ -351,7 +361,7 @@ router.post('/:insightId', chatRateLimitMiddleware(), async (req, res) => {
              FROM chat_messages
              WHERE insight_id = $1 AND user_id = $2
              ORDER BY created_at DESC
-             LIMIT 30
+             LIMIT ${CHAT_HISTORY_MESSAGE_LIMIT}
            ) recent
            ORDER BY created_at ASC`,
           [insightId, userId]

@@ -21,12 +21,22 @@ export function buildExpenseAnalyzerSuggestedPrompts({
   return prompts.slice(0, 4)
 }
 
+export function buildEverydayMoneySuggestedPrompts() {
+  return [
+    'How do I file my taxes online — walk me through it?',
+    'Plan a night out with friends on what I can actually spend',
+    'How can I maximize my savings with what I’m spending now?',
+    'What’s the simplest way to start an emergency fund?',
+  ]
+}
+
 export function buildDashboardSuggestedPrompts() {
+  const everyday = buildEverydayMoneySuggestedPrompts()
   return [
     'Will I make it to payday at this week’s pace?',
     'What’s left after known bills, and what’s my one move?',
-    'Plan a night out with friends on what I can actually spend',
-    'How can I maximize my savings with what I’m spending now?',
+    everyday[1],
+    everyday[2],
   ]
 }
 
@@ -54,7 +64,7 @@ export function resolveAskSovermPageContext(pathname = '') {
     return {
       suggestedPrompts: buildWeeklyReviewSuggestedPrompts(),
       contextLabel:
-        'Using this week’s review, what’s left until payday, and your connected accounts.',
+        'Your ongoing Ask Soverm chat — using this week’s review, what’s left until payday, and your connected accounts.',
     }
   }
 
@@ -62,7 +72,7 @@ export function resolveAskSovermPageContext(pathname = '') {
     return {
       suggestedPrompts: buildMonthLetterSuggestedPrompts(),
       contextLabel:
-        'Using this month’s condition letter and your connected accounts.',
+        'Your ongoing Ask Soverm chat — using this month’s condition letter and your connected accounts.',
     }
   }
 
@@ -70,24 +80,15 @@ export function resolveAskSovermPageContext(pathname = '') {
     return {
       suggestedPrompts: buildExpenseAnalyzerSuggestedPrompts(),
       contextLabel:
-        'Using Expense Analyzer categories, recurring charges, and your connected accounts.',
+        'Your ongoing Ask Soverm chat — using Expense Analyzer categories, recurring charges, and your connected accounts.',
     }
   }
 
   return {
     suggestedPrompts: buildDashboardSuggestedPrompts(),
     contextLabel:
-      'Using your accounts and spending — plus this week’s check-in and what’s left when available.',
+      'Your ongoing Ask Soverm chat — using your accounts, spending, and what’s left when available.',
   }
-}
-
-export function buildEverydayMoneySuggestedPrompts() {
-  return [
-    'How do I file my taxes online — walk me through it?',
-    'Plan a night out with friends on what I can actually spend',
-    'How can I maximize my savings with what I’m spending now?',
-    'What’s the simplest way to start an emergency fund?',
-  ]
 }
 
 /*

@@ -47,8 +47,9 @@ try {
     'chat.js must pass chatFinancialContext to askFinancialQuestion'
   )
   assert(
-    chatRouteSource.includes('LIMIT 30'),
-    'chat history should include 30 messages'
+    chatRouteSource.includes('CHAT_HISTORY_MESSAGE_LIMIT') &&
+      chatRouteSource.includes('LIMIT ${CHAT_HISTORY_MESSAGE_LIMIT}'),
+    'chat history should use CHAT_HISTORY_MESSAGE_LIMIT'
   )
   assert(CHAT_MAX_OUTPUT_TOKENS >= 1024, 'chat max output tokens should allow longer answers')
   assert(CHAT_HISTORY_MESSAGE_LIMIT >= 20, 'chat history limit should be generous')
@@ -115,7 +116,10 @@ try {
   })
 
   assert(prompt.includes('Live financial snapshot'), 'system prompt must include live data section')
-  assert(prompt.includes('genuinely cares'), 'system prompt should set caring advisor tone')
+  assert(
+    prompt.includes('personal money person') || prompt.includes('genuinely cares'),
+    'system prompt should set human advisor tone'
+  )
   assert(
     prompt.includes('Warmth doesn\'t mean vagueness') ||
       prompt.includes("Warmth doesn't mean vagueness"),
@@ -123,11 +127,18 @@ try {
   )
   assert(prompt.includes('ENGAGEMENT HOOK'), 'system prompt should include engagement hook rules')
   assert(
-    prompt.includes('Never use the same closing question twice'),
+    prompt.includes('LOOKUP TOOLS') && prompt.includes('get_category_transactions'),
+    'system prompt should document category/merchant lookup tools'
+  )
+  assert(
+    prompt.includes('Never repeat the same closing question') ||
+      prompt.includes('Never use the same closing question twice'),
     'engagement hook must ban repeated closing questions'
   )
   assert(
-    prompt.includes("what's my balance") || prompt.includes('whats my balance'),
+    prompt.includes('yes/no afford') ||
+      prompt.includes("what's my balance") ||
+      prompt.includes('whats my balance'),
     'engagement hook must allow skipping on simple factual questions'
   )
   assert(

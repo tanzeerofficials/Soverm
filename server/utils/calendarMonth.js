@@ -158,3 +158,51 @@ export function calendarMonthSqlBounds(referenceDate = new Date(), timeZone = ge
     endExclusiveIso: window.endExclusiveIso,
   }
 }
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000
+
+/**
+ * Whole calendar days between two YYYY-MM-DD strings (UTC noon math — DST-safe).
+ * Positive when laterIso is after earlierIso.
+ */
+export function daysBetweenIsoDates(laterIso, earlierIso) {
+  const [y1, m1, d1] = String(laterIso).slice(0, 10).split('-').map(Number)
+  const [y2, m2, d2] = String(earlierIso).slice(0, 10).split('-').map(Number)
+  return Math.round(
+    (Date.UTC(y1, m1 - 1, d1) - Date.UTC(y2, m2 - 1, d2)) / MS_PER_DAY
+  )
+}
+
+function toIsoDateInput(dateInput) {
+  if (typeof dateInput === 'string') {
+    return dateInput.slice(0, 10)
+  }
+  return formatIsoDateInAppTz(dateInput instanceof Date ? dateInput : new Date(dateInput))
+}
+
+/**
+ * True when dateInput falls in [today − days, today] in the app timezone.
+ * Why: Analyzer / drill-down windows must not use host-local or UTC "today"
+ * (Railway is often UTC; users live in APP_TIMEZONE).
+ */
+export function isWithinAppDaysAgo(dateInput, days, referenceDate = new Date()) {
+  const todayIso = getAppTodayIso(referenceDate)
+  const targetIso = toIsoDateInput(dateInput)
+  const diff = daysBetweenIsoDates(todayIso, targetIso)
+  return diff >= 0 && diff <= days
+}
+
+/**
+ * True when dateInput falls in the prior window (e.g. 31–60 days ago) in app TZ.
+ */
+export function isWithinAppPriorPeriod(
+  dateInput,
+  recentDays = 30,
+  lookbackDays = 60,
+  referenceDate = new Date()
+) {
+  const todayIso = getAppTodayIso(referenceDate)
+  const targetIso = toIsoDateInput(dateInput)
+  const diff = daysBetweenIsoDates(todayIso, targetIso)
+  return diff > recentDays && diff <= lookbackDays
+}

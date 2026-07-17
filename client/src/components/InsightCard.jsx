@@ -3,21 +3,24 @@
  *
  * Displays a structured AI financial insight with headline,
  * stat cards, and an expandable full summary (progressive disclosure).
+ * Ask Soverm always opens the shared ongoing FAB chat (one history).
  */
 
 import { useState } from 'react'
 import HeadlineTypeBadge from './HeadlineTypeBadge.jsx'
 import ActionChecklist from './ActionChecklist.jsx'
-import ChatPanel from './ChatPanel.jsx'
 import ChatWithCfoButton from './ChatWithCfoButton.jsx'
 import InsightQuickQuestions from './InsightQuickQuestions.jsx'
 import StatDeltaBadge from './StatDeltaBadge.jsx'
-import { buildDashboardSuggestedPrompts } from '../lib/chatSuggestedPrompts.js'
+import { useAskSoverm } from '../context/AskSovermContext.jsx'
 import {
   formatInsightSnapshotFootnote,
   normalizePeriodCopy,
   resolveStatType,
 } from '../lib/insightDisplay.js'
+
+const INSIGHT_CHAT_CONTEXT_LABEL =
+  'Your ongoing Ask Soverm chat — grounded in this check-in and your live accounts when available.'
 
 function formatTimestamp(createdAt) {
   if (!createdAt) return null
@@ -54,17 +57,30 @@ function headlineColorClass(headlineType) {
 
 function InsightCard({
   insight,
-  onChatError,
-  chatExpanded: controlledChatExpanded,
-  onChatExpandedChange,
   onOpenFloatingChat = null,
   showActions = true,
 }) {
   const [expanded, setExpanded] = useState(false)
-  const [internalChatExpanded, setInternalChatExpanded] = useState(false)
-  const chatExpanded = controlledChatExpanded ?? internalChatExpanded
-  const setChatExpanded = onChatExpandedChange ?? setInternalChatExpanded
-  const useFloatingChat = typeof onOpenFloatingChat === 'function'
+  const { openChat } = useAskSoverm()
+
+  /*
+   * Opens the one shared Ask Soverm thread (FAB).
+   * History used to mount a separate insight-scoped ChatPanel — users lost
+   * continuity with Home. Optional onOpenFloatingChat lets parents customize;
+   * otherwise we open the global chat ourselves.
+   */
+  function handleOpenChat(prompt = '') {
+    if (typeof onOpenFloatingChat === 'function') {
+      onOpenFloatingChat(prompt)
+      return
+    }
+
+    openChat({
+      prompt,
+      autoSend: Boolean(prompt),
+      contextLabel: INSIGHT_CHAT_CONTEXT_LABEL,
+    })
+  }
 
   if (!insight) {
     return (
@@ -185,35 +201,15 @@ function InsightCard({
         <ActionChecklist actions={insight.actions} />
       )}
       {insight.id && (
-        useFloatingChat ? (
-          <>
-            <section id="insight-chat" className="mt-4 scroll-mt-28">
-              <ChatWithCfoButton onClick={() => onOpenFloatingChat()} />
-            </section>
-            <InsightQuickQuestions
-              insightId={insight.id}
-              insight={insight}
-              onError={onChatError}
-              onAskQuestion={(question) => onOpenFloatingChat(question)}
-            />
-          </>
-        ) : (
-          <>
-            <ChatPanel
-              insightId={insight.id}
-              onError={onChatError}
-              expanded={chatExpanded}
-              onExpandedChange={setChatExpanded}
-              suggestedPrompts={buildDashboardSuggestedPrompts()}
-            />
-            <InsightQuickQuestions
-              insightId={insight.id}
-              insight={insight}
-              onError={onChatError}
-              onExpandChat={() => setChatExpanded(true)}
-            />
-          </>
-        )
+        <>
+          <section id="insight-chat" className="mt-4 scroll-mt-28">
+            <ChatWithCfoButton onClick={() => handleOpenChat()} />
+          </section>
+          <InsightQuickQuestions
+            insight={insight}
+            onAskQuestion={(question) => handleOpenChat(question)}
+          />
+        </>
       )}
     </>
   )

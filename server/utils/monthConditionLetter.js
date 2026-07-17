@@ -103,10 +103,11 @@ export function buildBufferPosture({ netBalance = 0, spent = 0, dayOfMonth = 1 }
   let summary
   if (balance <= 0) {
     posture = 'critical'
-    summary = 'Balance is at or below zero — you’re one surprise away from a hard stop.'
+    summary =
+      'Connected balances are at or below zero — worth pausing new spending and reviewing what’s due next.'
   } else if (runwayDays != null && runwayDays < 7) {
     posture = 'fragile'
-    summary = `About ${runwayDays} days of runway at this month’s spend pace. A single unexpected bill could hurt.`
+    summary = `About ${runwayDays} days of runway at this month’s spend pace. Worth keeping a close eye on upcoming bills.`
   } else if (runwayDays != null && runwayDays < 21) {
     posture = 'thin'
     summary = `Roughly ${runwayDays} days of runway at this month’s pace. Thin, but not empty.`

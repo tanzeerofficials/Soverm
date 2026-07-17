@@ -253,8 +253,12 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
 })
 
-const server = app.listen(port, '0.0.0.0', () => {
+const server = app.listen(port, '0.0.0.0', async () => {
   console.log(`CFO Agent API listening on port ${port}`)
+
+  const { logIntegrationConfigStatus } = await import('./utils/integrationConfig.js')
+  logIntegrationConfigStatus()
+
   startSyncJob()
   console.log('Auto-sync job scheduled (every 4 hours)')
   startWeeklyDigestJob()

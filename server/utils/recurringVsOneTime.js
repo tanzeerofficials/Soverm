@@ -1,32 +1,8 @@
 import { normalizeMerchantName } from './merchantNormalize.js'
-
-const MS_PER_DAY = 24 * 60 * 60 * 1000
-
-function parseDateOnly(dateInput) {
-  if (typeof dateInput === 'string') {
-    const [year, month, day] = dateInput.slice(0, 10).split('-').map(Number)
-    return new Date(year, month - 1, day)
-  }
-
-  const date = new Date(dateInput)
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
-}
-
-function isWithinDaysAgo(dateInput, days) {
-  const today = parseDateOnly(new Date())
-  const target = parseDateOnly(dateInput)
-  const diff = Math.round((today - target) / MS_PER_DAY)
-  return diff >= 0 && diff <= days
-}
-
-function isPostedSpendingRow(row) {
-  const amount = Number(row.amount)
-  return Number.isFinite(amount) && amount > 0 && row.date && row.pending !== true
-}
-
-function roundCurrency(amount) {
-  return Math.round(amount * 100) / 100
-}
+import { isWithinAppDaysAgo } from './calendarMonth.js'
+import { isCashFlowSpendingRow } from './cashFlowClassification.js'
+import { resolveSpendingCategoryLabel } from './plaidCategory.js'
+import { roundCurrency } from './safeToSpend.js'
 
 function recurringMerchantKey(charge) {
   return charge.merchantKey ?? normalizeMerchantName(charge.merchant)
@@ -42,6 +18,12 @@ export function buildRecurringMerchantKeySet(recurringCharges) {
   return keys
 }
 
+/*
+ * Split recent spending into recurring vs one-time using the same cash-flow
+ * classifier and category remapping as Expense Analyzer / Cash Flow.
+ * Why: raw amount>0 + stored category inflated one-time with transfers/card
+ * payments and mismatched category labels users see elsewhere.
+ */
 export function computeRecurringVsOneTimeSplit(transactions, recurringCharges) {
   const recurringMerchantKeys = buildRecurringMerchantKeySet(recurringCharges)
   const recurringMonthlyByCategory = new Map()
@@ -58,12 +40,12 @@ export function computeRecurringVsOneTimeSplit(transactions, recurringCharges) {
   }
 
   for (const row of transactions) {
-    if (!isPostedSpendingRow(row) || !isWithinDaysAgo(row.date, 30)) {
+    if (!isCashFlowSpendingRow(row) || !isWithinAppDaysAgo(row.date, 30)) {
       continue
     }
 
-    const category = row.category || 'Uncategorized'
-    const amount = Number(row.amount)
+    const category = resolveSpendingCategoryLabel(row)
+    const amount = Math.abs(Number(row.amount) || 0)
     const isRecurringTransaction = recurringMerchantKeys.has(normalizeMerchantName(row.name))
 
     if (isRecurringTransaction) {

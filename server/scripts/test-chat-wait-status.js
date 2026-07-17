@@ -1,44 +1,41 @@
 /**
  * Offline unit checks for chat wait / network copy helpers.
  *
- * Usage: node --experimental-vm-modules  (or plain node if package type module)
- * From client: node --input-type=module won't resolve easily — mirror under server
- * or run via vite-node. Kept as a tiny pure copy for CI in server scripts.
+ * Usage: node scripts/test-chat-wait-status.js
  */
 
 import assert from 'node:assert/strict'
-
-const CHAT_STILL_WORKING_MS = 4_000
-const CHAT_SLOW_MS = 12_000
-
-function getChatWaitPhase(elapsedMs, { hasTokens = false } = {}) {
-  if (elapsedMs >= CHAT_SLOW_MS) return 'slow'
-  if (elapsedMs >= CHAT_STILL_WORKING_MS) return 'still'
-  return hasTokens ? 'writing' : 'thinking'
-}
-
-function classifyChatNetworkError(err, { timedOut = false } = {}) {
-  if (timedOut) {
-    return 'That took too long. Check your connection and retry.'
-  }
-  const name = err?.name || ''
-  const message = String(err?.message || '')
-  if (name === 'AbortError' || /aborted|abort/i.test(message)) {
-    return 'Request cancelled.'
-  }
-  if (/failed to fetch|networkerror|network request failed|load failed/i.test(message)) {
-    return "Couldn't reach Soverm. Check your connection and retry."
-  }
-  if (/stream ended without a reply/i.test(message)) {
-    return 'The reply got cut off. Retry to get a full answer.'
-  }
-  return message || "Couldn't send that message. Try again."
-}
+import {
+  getChatWaitCopy,
+  getChatWaitPhase,
+  classifyChatNetworkError,
+  CHAT_STILL_WORKING_MS,
+  CHAT_SLOW_MS,
+} from '../../client/src/lib/chatWaitStatus.js'
 
 assert.equal(getChatWaitPhase(0), 'thinking')
 assert.equal(getChatWaitPhase(1000, { hasTokens: true }), 'writing')
-assert.equal(getChatWaitPhase(5_000), 'still')
-assert.equal(getChatWaitPhase(15_000), 'slow')
+assert.equal(getChatWaitPhase(CHAT_STILL_WORKING_MS + 100), 'still')
+assert.equal(getChatWaitPhase(CHAT_SLOW_MS + 100), 'slow')
+assert.equal(
+  getChatWaitPhase(2_000, { activity: 'looking_up' }),
+  'looking_up',
+  'tool lookup should show looking_up before slow threshold'
+)
+assert.equal(
+  getChatWaitPhase(CHAT_SLOW_MS + 100, { activity: 'looking_up' }),
+  'slow',
+  'long lookups still escalate so Retry appears'
+)
+
+const lookupCopy = getChatWaitCopy('looking_up', {
+  phase: 'looking_up',
+  title: 'Checking your transactions…',
+  detail: 'Reviewing Food and Drink charges',
+})
+assert.equal(lookupCopy.title, 'Checking your transactions…')
+assert.match(lookupCopy.detail, /Food and Drink/)
+
 assert.match(
   classifyChatNetworkError(new Error('Failed to fetch')),
   /Couldn't reach Soverm/
@@ -52,4 +49,4 @@ assert.equal(
   'Request cancelled.'
 )
 
-console.log('chatWaitStatus mirror tests passed.')
+console.log('chatWaitStatus tests passed.')

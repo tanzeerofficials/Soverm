@@ -9,7 +9,7 @@ import { useEffect, useRef } from 'react'
 import InsightCard from './InsightCard.jsx'
 import { useFocusTrap } from '../hooks/useFocusTrap.js'
 
-function HistoryInsightModal({ isOpen, insight, onClose, onChatError }) {
+function HistoryInsightModal({ isOpen, insight, onClose }) {
   const dialogRef = useRef(null)
   useFocusTrap(isOpen && Boolean(insight), dialogRef)
 
@@ -73,7 +73,6 @@ function HistoryInsightModal({ isOpen, insight, onClose, onChatError }) {
           <InsightCard
             key={insight.id}
             insight={insight}
-            onChatError={onChatError}
           />
         </div>
       </div>

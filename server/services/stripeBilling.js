@@ -9,15 +9,12 @@
 import Stripe from 'stripe'
 import db from '../db/index.js'
 import { PRO_MONTHLY_PRICE } from '../shared/usageLimits.js'
+import { isStripeConfigured } from '../utils/integrationConfig.js'
 
 let stripeClient = null
 
 export function isStripeBillingConfigured() {
-  return Boolean(
-    process.env.STRIPE_SECRET_KEY &&
-      process.env.STRIPE_PRICE_ID &&
-      process.env.STRIPE_WEBHOOK_SECRET
-  )
+  return isStripeConfigured()
 }
 
 export function getStripeClient() {

@@ -1,4 +1,5 @@
 import { formatAccountLabel } from './accountLabel.js'
+import { isWithinAppDaysAgo } from './calendarMonth.js'
 import { normalizeMerchantName } from './merchantNormalize.js'
 import { resolveSpendingCategoryLabel } from './plaidCategory.js'
 import {
@@ -7,7 +8,6 @@ import {
   resolveCashFlowBadge,
 } from './transactionFilters.js'
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000
 const TOP_MERCHANTS_LIMIT = 5
 const RECENT_TRANSACTIONS_LIMIT = 8
 
@@ -22,10 +22,7 @@ function parseDateOnly(dateInput) {
 }
 
 function isWithinDaysAgo(dateInput, days) {
-  const today = parseDateOnly(new Date())
-  const target = parseDateOnly(dateInput)
-  const diff = Math.round((today - target) / MS_PER_DAY)
-  return diff >= 0 && diff <= days
+  return isWithinAppDaysAgo(dateInput, days)
 }
 
 function isPostedSpendingRow(row) {

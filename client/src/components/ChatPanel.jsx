@@ -118,7 +118,12 @@ function CopyMessageButton({ content, disabled = false }) {
   )
 }
 
-function AssistantMessageBody({ content, streaming = false, waitPhase = 'writing' }) {
+function AssistantMessageBody({
+  content,
+  streaming = false,
+  waitPhase = 'writing',
+  serverStatus = null,
+}) {
   /*
    * While tokens are still arriving, hide a half-written ```soverm-plan fence
    * so users don't see raw JSON. Once complete, split into markdown + cards.
@@ -129,19 +134,25 @@ function AssistantMessageBody({ content, streaming = false, waitPhase = 'writing
   const { markdown, plan } = streaming
     ? { markdown: visibleContent, plan: null }
     : splitAssistantContent(content)
-  const waitCopy = getChatWaitCopy(waitPhase)
+  const waitCopy = getChatWaitCopy(waitPhase, serverStatus)
+  const showWaitState = streaming && !markdown
 
   return (
     <div>
       <div className="prose prose-invert prose-sm max-w-none">
         {markdown ? (
           <ReactMarkdown components={assistantMarkdownComponents}>{markdown}</ReactMarkdown>
-        ) : streaming ? (
-          <div>
+        ) : showWaitState ? (
+          <div aria-live="polite">
             <p className="text-xs text-fg-muted">{waitCopy.title}</p>
             {waitCopy.detail ? (
               <p className="mt-1 text-[11px] leading-relaxed text-fg-subtle">{waitCopy.detail}</p>
             ) : null}
+            <div className="mt-2 flex gap-1" aria-hidden="true">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-ai" />
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-ai [animation-delay:150ms]" />
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-ai [animation-delay:300ms]" />
+            </div>
           </div>
         ) : null}
         {!streaming && plan ? <SovermPlanCards plan={plan} /> : null}
@@ -157,8 +168,8 @@ function AssistantMessageBody({ content, streaming = false, waitPhase = 'writing
   )
 }
 
-function ChatSendingStatus({ phase, onRetry, onCancel }) {
-  const copy = getChatWaitCopy(phase)
+function ChatSendingStatus({ phase, serverStatus = null, onRetry, onCancel }) {
+  const copy = getChatWaitCopy(phase, serverStatus)
   const showActions = phase === 'slow'
 
   return (
@@ -257,9 +268,19 @@ function ChatPanel({
   const streamingMessage = messages.find((message) => message.streaming)
   const hasStreamingReply = Boolean(streamingMessage)
   const hasStreamingTokens = Boolean(streamingMessage?.content)
+  const serverStatus = streamingMessage
+    ? {
+        phase: streamingMessage.statusPhase || null,
+        title: streamingMessage.statusTitle || null,
+        detail: streamingMessage.statusDetail || null,
+      }
+    : null
   const showSuggestedPrompts =
     !isPending && !isError && messages.length === 0 && !isSending && !hasStreamingReply
-  const waitPhase = getChatWaitPhase(waitElapsedMs, { hasTokens: hasStreamingTokens })
+  const waitPhase = getChatWaitPhase(waitElapsedMs, {
+    hasTokens: hasStreamingTokens,
+    activity: serverStatus?.phase,
+  })
   const isWaitingOnReply = isSending || hasStreamingReply
 
   useEffect(() => {
@@ -660,6 +681,15 @@ function ChatPanel({
                   content={message.content}
                   streaming={Boolean(message.streaming)}
                   waitPhase={message.streaming ? waitPhase : 'writing'}
+                  serverStatus={
+                    message.streaming
+                      ? {
+                          phase: message.statusPhase || null,
+                          title: message.statusTitle || null,
+                          detail: message.statusDetail || null,
+                        }
+                      : null
+                  }
                 />
               )}
             </div>
@@ -668,6 +698,7 @@ function ChatPanel({
         {isSending && !hasStreamingReply && (
           <ChatSendingStatus
             phase={waitPhase}
+            serverStatus={serverStatus}
             onRetry={retryInFlightOrFailed}
             onCancel={() => cancelInFlightSend({ restoreDraft: true })}
           />
@@ -678,7 +709,9 @@ function ChatPanel({
               <p className="text-[11px] text-fg-subtle">
                 {hasStreamingTokens
                   ? 'Reply is taking longer than usual — you can keep waiting or retry.'
-                  : 'Still waiting for the first words — you can keep waiting or retry.'}
+                  : serverStatus?.phase === 'looking_up'
+                    ? 'Still checking your transactions — you can keep waiting or retry.'
+                    : 'Still waiting for the first words — you can keep waiting or retry.'}
               </p>
               <div className="mt-2 flex gap-3">
                 <button

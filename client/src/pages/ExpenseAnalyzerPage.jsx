@@ -393,7 +393,6 @@ function ExpenseAnalyzerPage() {
   const overallSpending = data?.overallSpending ?? null
   const narrativeSummary = data?.narrativeSummary ?? null
   const narrativeMeta = data?.narrativeMeta ?? null
-  const latestInsightId = data?.latestInsightId ?? null
   const overallSpendingLine = formatOverallSpendingLine(overallSpending)
   const overallRecurringLine = formatOverallRecurringLine(
     overallSpending?.recurringMonthly ?? totalRecurringMonthly
@@ -510,8 +509,6 @@ function ExpenseAnalyzerPage() {
                   templateSummary={narrativeSummary}
                   narrativeMeta={narrativeMeta}
                   totalRecurringMonthly={totalRecurringMonthly}
-                  latestInsightId={latestInsightId}
-                  onChatError={(message) => showToast(message, 'error')}
                 />
               ) : (
                 <div className="rounded-xl border border-border-default bg-surface px-6 py-12 text-center">

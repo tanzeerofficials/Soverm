@@ -2,14 +2,25 @@
  * getHealthCheck
  *
  * What it does:
- * - Sends back a simple JSON message saying the API is running.
+ * - Confirms the API is up
+ * - Reports whether optional Email (Resend) and Stripe are configured
+ *   (booleans only — never secrets)
  *
  * Why we need it:
- * - Fast way to test the server without needing login, Plaid, or database writes.
- *
- * How it fits the app:
- * - GET / (through health route) is the first sanity check when debugging.
+ * - Uptime monitors + pre-launch checks: "is email actually wired?"
+ *   without digging through Railway env UI.
  */
+
+import { getIntegrationConfigStatus } from '../utils/integrationConfig.js'
+
 export function getHealthCheck(_req, res) {
-  res.json({ message: 'CFO Agent API is running' })
+  const integrations = getIntegrationConfigStatus()
+
+  res.json({
+    message: 'CFO Agent API is running',
+    integrations: {
+      email: integrations.email.configured,
+      stripe: integrations.stripe.configured,
+    },
+  })
 }

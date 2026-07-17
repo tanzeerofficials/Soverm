@@ -101,8 +101,9 @@ export function pickOneRisk({
     return {
       id: 'runway-at-risk',
       tone: 'danger',
-      title: 'Runway to payday looks at risk',
-      detail: 'At this week’s spend pace (or after known bills), you may not make it comfortably to payday.',
+      title: 'Runway to payday needs attention',
+      detail:
+        'At this week’s spend pace (or after known bills), cash looks tight before payday. Worth reviewing what’s left and one bill or category to ease pressure.',
     }
   }
 

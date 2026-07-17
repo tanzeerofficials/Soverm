@@ -3,11 +3,15 @@
  *
  * Helmet sets safe HTTP response headers. Rate limiters throttle abuse
  * without leaking internal threshold numbers to clients.
+ *
+ * CSP note:
+ * - The React app (Vercel) has the real browser CSP — see client/src/lib/contentSecurityPolicy.js
+ * - This API policy is intentionally strict (JSON only): default-src 'none'
  */
 
-import helmet from 'helmet'
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit'
 import { getAuth } from '@clerk/express'
+import { createSecurityHeaders } from '../utils/contentSecurityPolicy.js'
 
 const RATE_LIMIT_MESSAGE = 'Too many requests. Please try again later.'
 
@@ -68,6 +72,4 @@ export const narrativeRateLimiter = createUserRateLimiter({
   max: 15,
 })
 
-export const securityHeaders = helmet({
-  contentSecurityPolicy: false,
-})
+export const securityHeaders = createSecurityHeaders()

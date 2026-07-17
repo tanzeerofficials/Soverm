@@ -242,9 +242,13 @@ function DashboardQuickTools({
 
   return (
     <section id="dashboard-quick-tools" className="rounded-xl border border-border-default bg-surface p-4 sm:p-5">
-      <p className="text-sm text-fg-muted">
-        Recent activity, trackers, forecast, and “Can I afford it?”
-      </p>
+      <div>
+        <h2 className="text-sm font-semibold text-fg">Quick tools</h2>
+        <p className="mt-1 text-sm text-fg-muted">
+          Recent activity, <span className="font-medium text-fg">Tracker</span> (spending caps &amp;
+          savings), forecast, and “Can I afford it?”
+        </p>
+      </div>
       <div className="mt-4">
         <QuickToolsTabBar activeTab={activeTab} onChange={handleTabChange} />
       </div>

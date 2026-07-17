@@ -85,15 +85,17 @@ async function loadTopCategories(userId, startIso, endExclusiveIso, limit = 3) {
     byCategory.set(category, (byCategory.get(category) ?? 0) + Math.abs(Number(row.amount) || 0))
   }
 
-  const rows = [...byCategory.entries()]
+  const allRows = [...byCategory.entries()]
     .map(([category, amount]) => ({ category, amount: roundCurrency(amount) }))
     .sort((left, right) => right.amount - left.amount)
-    .slice(0, limit)
 
-  const total = rows.reduce((sum, row) => sum + row.amount, 0)
-  return rows.map((row) => ({
+  // Percent is share of ALL external spending this month — not of the top-N slice.
+  // Otherwise a top driver at $100 of $1000 spend can show as "100%" and confuse users.
+  const totalSpend = allRows.reduce((sum, row) => sum + row.amount, 0)
+  return allRows.slice(0, limit).map((row) => ({
     ...row,
-    percentOfTotal: total > 0 ? Math.round((row.amount / total) * 1000) / 10 : null,
+    percentOfTotal:
+      totalSpend > 0 ? Math.round((row.amount / totalSpend) * 1000) / 10 : null,
   }))
 }
 

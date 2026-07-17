@@ -48,6 +48,8 @@ function DashboardHero({
   spent = 0,
   cashFlow = null,
   spendingSeries = [],
+  periodStart = null,
+  todayIso = null,
   trackerSnapshot = null,
   trackerLoading = false,
 }) {
@@ -57,8 +59,12 @@ function DashboardHero({
   const animatedWhatsLeft = useAnimatedNumber(whatsLeft?.amount ?? 0)
   const animatedSafeToSpend = useAnimatedNumber(trackerSnapshot?.safeToSpend ?? 0)
   const filledSpendingSeries = useMemo(
-    () => fillSpendingSeries(spendingSeries, selectedRange),
-    [spendingSeries, selectedRange]
+    () =>
+      fillSpendingSeries(spendingSeries, selectedRange, {
+        periodStart,
+        todayIso,
+      }),
+    [spendingSeries, selectedRange, periodStart, todayIso]
   )
   const hasSpendingTracker =
     trackerSnapshot?.spendingTracker != null || trackerSnapshot?.configured === true

@@ -80,6 +80,8 @@ function rethrowAsChatError(err) {
 /*
  * What this does: POSTs a chat message and reads Server-Sent Events as Claude
  * generates tokens. Calls onDelta(fullTextSoFar) so the UI can show a growing bubble.
+ * onStatus({ phase, title, detail }) covers tool-lookup pauses so the UI can
+ * show "Checking your transactions…" instead of looking frozen.
  *
  * Why: waiting for the full reply makes long answers feel broken on mobile.
  * signal: optional AbortSignal so the UI can cancel a hung/slow request.
@@ -88,7 +90,7 @@ export async function sendChatMessageStreaming(
   getToken,
   threadId,
   message,
-  { onDelta, signal } = {}
+  { onDelta, onStatus, signal } = {}
 ) {
   const token = await getAuthToken(getToken)
 
@@ -160,7 +162,13 @@ export async function sendChatMessageStreaming(
           continue
         }
 
-        if (payload.type === 'delta' && typeof payload.text === 'string') {
+        if (payload.type === 'status') {
+          onStatus?.({
+            phase: payload.phase || 'thinking',
+            title: payload.title || null,
+            detail: payload.detail || null,
+          })
+        } else if (payload.type === 'delta' && typeof payload.text === 'string') {
           finalReply = payload.text
           onDelta?.(finalReply)
         } else if (payload.type === 'done' && typeof payload.reply === 'string') {
@@ -205,6 +213,9 @@ export async function sendChatMessageAndRefresh(
     content: '',
     created_at: new Date().toISOString(),
     streaming: true,
+    statusPhase: 'thinking',
+    statusTitle: 'Soverm is thinking…',
+    statusDetail: null,
   }
 
   await queryClient.cancelQueries({ queryKey: chatQueryKey(threadId) })
@@ -215,6 +226,20 @@ export async function sendChatMessageAndRefresh(
     assistantPlaceholder,
   ])
 
+  function patchStreamingAssistant(patch) {
+    queryClient.setQueryData(chatQueryKey(threadId), (old) => {
+      const messages = [...(old ?? [])]
+      const last = messages[messages.length - 1]
+      if (last?.role === 'assistant' && last.streaming) {
+        messages[messages.length - 1] = {
+          ...last,
+          ...patch,
+        }
+      }
+      return messages
+    })
+  }
+
   try {
     const { reply, chatLimit } = await sendChatMessageStreaming(
       getToken,
@@ -222,17 +247,19 @@ export async function sendChatMessageAndRefresh(
       trimmed,
       {
         signal,
+        onStatus: (status) => {
+          patchStreamingAssistant({
+            statusPhase: status.phase || 'thinking',
+            statusTitle: status.title || null,
+            statusDetail: status.detail || null,
+          })
+        },
         onDelta: (fullText) => {
-          queryClient.setQueryData(chatQueryKey(threadId), (old) => {
-            const messages = [...(old ?? [])]
-            const last = messages[messages.length - 1]
-            if (last?.role === 'assistant' && last.streaming) {
-              messages[messages.length - 1] = {
-                ...last,
-                content: fullText,
-              }
-            }
-            return messages
+          patchStreamingAssistant({
+            content: fullText,
+            statusPhase: 'writing',
+            statusTitle: 'Soverm is writing…',
+            statusDetail: null,
           })
         },
       }

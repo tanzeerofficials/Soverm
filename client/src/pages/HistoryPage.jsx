@@ -330,7 +330,6 @@ function HistoryPage() {
         isOpen={selectedInsight !== null}
         insight={selectedInsight}
         onClose={handleCloseModal}
-        onChatError={(message) => showToast(message, 'error')}
       />
     </div>
   )
