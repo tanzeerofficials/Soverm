@@ -28,6 +28,7 @@ import {
   SELF_DEPOSIT_CATEGORY_LABEL,
   SELF_TRANSFER_CATEGORY_LABEL,
 } from '../utils/plaidCategory.js'
+import { invalidateChatFinancialSnapshot } from '../utils/chatFinancialSnapshotCache.js'
 
 function formatBackfillDate(date) {
   const year = date.getFullYear()
@@ -503,9 +504,12 @@ export async function syncAllAccountsForUser(userId) {
       )
     }
 
+    // Bank data changed — drop Ask Soverm's cached finance snapshot.
+    invalidateChatFinancialSnapshot(userId)
     return counts
   } catch (err) {
     console.error(`Failed to sync accounts for user ${userId}:`, err.message)
+    invalidateChatFinancialSnapshot(userId)
     throw err
   }
 }

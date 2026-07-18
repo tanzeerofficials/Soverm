@@ -270,16 +270,16 @@ router.post('/general', chatRateLimitMiddleware(), async (req, res) => {
   const streaming = wantsStream(req)
 
   /*
-   * Open the SSE stream before loading finance context so the UI gets a
-   * "Loading your finances…" status instead of sitting silent for 10–30s.
+   * Open the SSE stream before loading context so the UI gets an immediate
+   * "Thinking…" status instead of sitting silent for 10–30s.
    */
   if (streaming) {
     beginChatSse(res)
     writeSse(res, {
       type: 'status',
       phase: 'thinking',
-      title: 'Loading your finances…',
-      detail: 'Pulling subscriptions, categories, and recent activity.',
+      title: 'Thinking…',
+      detail: null,
     })
   }
 
@@ -384,8 +384,8 @@ router.post('/:insightId', chatRateLimitMiddleware(), async (req, res) => {
     writeSse(res, {
       type: 'status',
       phase: 'thinking',
-      title: 'Loading your finances…',
-      detail: 'Pulling subscriptions, categories, and recent activity.',
+      title: 'Thinking…',
+      detail: null,
     })
   }
 

@@ -17,6 +17,7 @@ import {
   resolveSpendingCategoryLabel,
 } from '../utils/plaidCategory.js'
 import { NON_PENDING_FILTER } from '../utils/transactionFilters.js'
+import { invalidateChatFinancialSnapshot } from '../utils/chatFinancialSnapshotCache.js'
 
 const MAX_LIMITS_PER_USER = 5
 
@@ -227,6 +228,7 @@ export async function upsertCategorySoftLimit(userId, { category, monthlyLimit, 
   }
 
   const spentByCategory = await loadSpentByCategory(userId, [normalizedCategory])
+  invalidateChatFinancialSnapshot(userId)
   return mapLimitRow(row, spentByCategory.get(normalizedCategory) ?? 0)
 }
 
@@ -242,6 +244,10 @@ export async function deleteCategorySoftLimit(userId, limitId) {
      RETURNING id`,
     [limitId, userId]
   )
+
+  if (result.rows.length > 0) {
+    invalidateChatFinancialSnapshot(userId)
+  }
 
   return { deleted: result.rows.length > 0 }
 }

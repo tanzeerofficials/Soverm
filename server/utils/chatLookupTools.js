@@ -228,10 +228,10 @@ export function formatChatLookupStatus(toolUses = []) {
     const merchant = String(merchantTool.input?.merchant || '').trim()
     return {
       phase: 'looking_up',
-      title: 'Checking your transactions…',
+      title: 'Researching…',
       detail: merchant
         ? `Looking up ${merchant}`
-        : 'Looking up that merchant in your recent activity',
+        : 'Looking up that merchant',
     }
   }
 
@@ -239,16 +239,16 @@ export function formatChatLookupStatus(toolUses = []) {
     const category = String(categoryTool.input?.category || '').trim()
     return {
       phase: 'looking_up',
-      title: 'Checking your transactions…',
+      title: 'Researching…',
       detail: category
-        ? `Reviewing ${category} charges`
-        : 'Reviewing that category in your recent activity',
+        ? `Reviewing ${category}`
+        : 'Reviewing that category',
     }
   }
 
   return {
     phase: 'looking_up',
-    title: 'Checking your transactions…',
-    detail: 'Pulling a few details so the answer stays accurate',
+    title: 'Researching…',
+    detail: null,
   }
 }

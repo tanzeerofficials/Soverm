@@ -17,6 +17,7 @@ import {
   EXCLUDE_INTERNAL_MOVES_FILTER,
   NON_PENDING_FILTER,
 } from '../utils/transactionFilters.js'
+import { invalidateChatFinancialSnapshot } from '../utils/chatFinancialSnapshotCache.js'
 
 let lifecycleCache = null
 let lifecycleCheckedAt = 0
@@ -111,6 +112,7 @@ export async function createAction(
        RETURNING id, description, completed, created_at, insight_id`,
       [userId, insightId, text, completed]
     )
+    invalidateChatFinancialSnapshot(userId)
     return mapActionRow(result.rows[0])
   }
 
@@ -139,6 +141,7 @@ export async function createAction(
     ]
   )
 
+  invalidateChatFinancialSnapshot(userId)
   return mapActionRow(result.rows[0])
 }
 
@@ -178,7 +181,11 @@ export async function updateActionStatus(userId, actionId, { status, completed }
        RETURNING id, description, completed, created_at, insight_id`,
       [nextCompleted, actionId, userId]
     )
-    return result.rows[0] ? mapActionRow(result.rows[0]) : null
+    if (result.rows[0]) {
+      invalidateChatFinancialSnapshot(userId)
+      return mapActionRow(result.rows[0])
+    }
+    return null
   }
 
   const result = await db.query(
@@ -194,7 +201,11 @@ export async function updateActionStatus(userId, actionId, { status, completed }
     [nextStatus, nextCompleted, acceptedAt, resolvedAt, actionId, userId]
   )
 
-  return result.rows[0] ? mapActionRow(result.rows[0]) : null
+  if (result.rows[0]) {
+    invalidateChatFinancialSnapshot(userId)
+    return mapActionRow(result.rows[0])
+  }
+  return null
 }
 
 async function sumCategorySpend(userId, category, startIso, endExclusiveIso) {

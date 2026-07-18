@@ -17,6 +17,7 @@ import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
 import { reportServerError } from '../utils/sentry.js'
 import { plaidRateLimiter, syncRateLimiter } from '../middleware/security.js'
 import { validatePublicToken, validateUuidParam } from '../utils/validation.js'
+import { invalidateChatFinancialSnapshot } from '../utils/chatFinancialSnapshotCache.js'
 
 const router = Router()
 
@@ -250,6 +251,8 @@ router.delete('/accounts/:accountId', async (req, res) => {
     }
 
     await client.query('COMMIT')
+
+    invalidateChatFinancialSnapshot(userId)
 
     if (isLastAccountOnItem && accessToken) {
       try {

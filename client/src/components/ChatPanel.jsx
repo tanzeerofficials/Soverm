@@ -15,6 +15,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '@clerk/clerk-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import ChatWithCfoButton from './ChatWithCfoButton.jsx'
 import SovermPlanCards from './SovermPlanCards.jsx'
 import { chatQueryKey, chatLimitsQueryKey, GENERAL_CHAT_KEY } from '../lib/queryKeys.js'
@@ -58,6 +59,21 @@ const assistantMarkdownComponents = {
   ),
   code: ({ children }) => (
     <code className="rounded bg-app/60 px-1 text-xs text-fg">{children}</code>
+  ),
+  // Wide comparison tables: scroll sideways in the narrow chat bubble.
+  table: ({ children }) => (
+    <div className="my-3 -mx-0.5 overflow-x-auto rounded-lg border border-border-default/80">
+      <table className="min-w-full border-collapse text-left text-xs">{children}</table>
+    </div>
+  ),
+  thead: ({ children }) => <thead className="bg-app/70 text-fg-subtle">{children}</thead>,
+  tbody: ({ children }) => <tbody className="divide-y divide-border-default/60">{children}</tbody>,
+  tr: ({ children }) => <tr className="align-top">{children}</tr>,
+  th: ({ children }) => (
+    <th className="whitespace-nowrap px-2.5 py-2 font-semibold text-fg-muted">{children}</th>
+  ),
+  td: ({ children }) => (
+    <td className="px-2.5 py-2 text-fg leading-snug">{children}</td>
   ),
 }
 
@@ -141,7 +157,9 @@ function AssistantMessageBody({
     <div>
       <div className="prose prose-invert prose-sm max-w-none">
         {markdown ? (
-          <ReactMarkdown components={assistantMarkdownComponents}>{markdown}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={assistantMarkdownComponents}>
+            {markdown}
+          </ReactMarkdown>
         ) : showWaitState ? (
           <div aria-live="polite">
             <p className="text-xs text-fg-muted">{waitCopy.title}</p>
@@ -311,7 +329,7 @@ function ChatPanel({
 
   /*
    * Any SSE status or first tokens count as activity so we keep showing
-   * "Loading your finances…" / "thinking" instead of a false stall alarm.
+   * Thinking / Researching / Generating instead of a false stall alarm.
    */
   useEffect(() => {
     if (!isWaitingOnReply) {

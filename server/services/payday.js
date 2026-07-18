@@ -15,6 +15,7 @@ import {
   isValidPayCadence,
 } from '../utils/paydayInference.js'
 import { EXCLUDE_INTERNAL_MOVES_FILTER } from '../utils/transactionFilters.js'
+import { invalidateChatFinancialSnapshot } from '../utils/chatFinancialSnapshotCache.js'
 
 function mapProfile(row, referenceDate = new Date()) {
   if (!row) {
@@ -146,5 +147,6 @@ export async function upsertPayday(
     throw error
   }
 
+  invalidateChatFinancialSnapshot(userId)
   return mapProfile(result.rows[0])
 }

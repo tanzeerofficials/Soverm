@@ -82,8 +82,8 @@ export function getChatWaitPhase(
 export function getChatWaitCopy(phase, serverStatus = null) {
   /*
    * Prefer live server work copy whenever we have it. Even on "slow", keep
-   * the work title so we never imply the connection is broken while Soverm
-   * is loading finances / looking up / thinking.
+   * the work title so we never imply the connection is broken while the
+   * model is still thinking / researching / generating.
    */
   if (serverStatus?.title) {
     if (phase === 'slow') {
@@ -102,11 +102,7 @@ export function getChatWaitCopy(phase, serverStatus = null) {
     ) {
       return {
         title: serverStatus.title,
-        detail:
-          serverStatus.detail ??
-          (serverStatus.phase === 'looking_up'
-            ? 'Pulling a few details so the answer stays accurate.'
-            : null),
+        detail: serverStatus.detail ?? null,
       }
     }
   }
@@ -114,8 +110,8 @@ export function getChatWaitCopy(phase, serverStatus = null) {
   switch (phase) {
     case 'looking_up':
       return {
-        title: 'Checking your transactions…',
-        detail: 'Pulling a few details so the answer stays accurate.',
+        title: 'Researching…',
+        detail: null,
       }
     case 'slow':
       return {
@@ -124,18 +120,18 @@ export function getChatWaitCopy(phase, serverStatus = null) {
       }
     case 'still':
       return {
-        title: 'Still working…',
-        detail: 'Pulling your finances together.',
+        title: 'Still thinking…',
+        detail: null,
       }
     case 'writing':
       return {
-        title: 'Soverm is writing…',
+        title: 'Generating…',
         detail: null,
       }
     case 'thinking':
     default:
       return {
-        title: 'Soverm is thinking…',
+        title: 'Thinking…',
         detail: null,
       }
   }

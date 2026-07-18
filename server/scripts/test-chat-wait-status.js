@@ -45,38 +45,33 @@ assert.equal(
     msSinceActivity: 3_000,
   }),
   'still',
-  'loading/thinking with recent activity stays on work phases'
+  'thinking with recent activity stays on work phases'
 )
 
 const lookupCopy = getChatWaitCopy('looking_up', {
   phase: 'looking_up',
-  title: 'Checking your transactions…',
-  detail: 'Reviewing Food and Drink charges',
+  title: 'Researching…',
+  detail: 'Looking up Netflix',
 })
-assert.equal(lookupCopy.title, 'Checking your transactions…')
-assert.match(lookupCopy.detail, /Food and Drink/)
+assert.equal(lookupCopy.title, 'Researching…')
+assert.match(lookupCopy.detail, /Netflix/)
 
-const loadingCopy = getChatWaitCopy('still', {
+const thinkingCopy = getChatWaitCopy('thinking', {
   phase: 'thinking',
-  title: 'Loading your finances…',
-  detail: 'Pulling subscriptions, categories, and recent activity.',
+  title: 'Thinking…',
+  detail: null,
 })
-assert.equal(loadingCopy.title, 'Loading your finances…')
-assert.doesNotMatch(loadingCopy.title, /longer than usual/i)
-assert.doesNotMatch(String(loadingCopy.detail || ''), /connection may be slow/i)
+assert.equal(thinkingCopy.title, 'Thinking…')
+assert.doesNotMatch(thinkingCopy.title, /financ/i)
+assert.doesNotMatch(thinkingCopy.title, /longer than usual/i)
 
-const slowWithWork = getChatWaitCopy('slow', {
-  phase: 'thinking',
-  title: 'Loading your finances…',
-  detail: 'Pulling subscriptions, categories, and recent activity.',
-})
-assert.equal(slowWithWork.title, 'Loading your finances…')
-assert.doesNotMatch(slowWithWork.title, /longer than usual/i)
-assert.doesNotMatch(String(slowWithWork.detail || ''), /connection may be slow/i)
+const generatingCopy = getChatWaitCopy('writing')
+assert.equal(generatingCopy.title, 'Generating…')
 
 const slowDefault = getChatWaitCopy('slow')
 assert.doesNotMatch(slowDefault.title, /longer than usual/i)
 assert.doesNotMatch(String(slowDefault.detail || ''), /connection may be slow/i)
+assert.doesNotMatch(slowDefault.title, /financ/i)
 
 assert.match(
   classifyChatNetworkError(new Error('Failed to fetch')),

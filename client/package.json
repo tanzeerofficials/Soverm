@@ -24,7 +24,6 @@
     "test:quick-tools": "node scripts/test-quick-tools.js",
     "test:badge-tone-logic": "node scripts/test-badge-tone-logic.js",
     "test:expense-teaser": "node scripts/test-expense-teaser.js",
-    "test:csp": "node scripts/test-content-security-policy.js",
     "test:all": "npm run test:insight-display && npm run test:category-display-names && npm run test:expense-analyzer-charts && npm run test:recurring-annual && npm run test:spending-visual-utils && npm run test:spending-sparkline && npm run test:cash-flow-summary && npm run test:dashboard-attention && npm run test:bill-calendar && npm run test:notification-navigation && npm run test:quick-tools && npm run test:badge-tone-logic && npm run test:expense-teaser && npm run test:csp"
   },
   "dependencies": {
@@ -40,6 +39,7 @@
     "react-markdown": "^10.1.0",
     "react-plaid-link": "^4.1.1",
     "react-router-dom": "^7.17.0",
+    "remark-gfm": "^4.0.1",
     "tailwindcss": "^4.3.1"
   },
   "devDependencies": {

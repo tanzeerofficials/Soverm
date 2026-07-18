@@ -19,6 +19,11 @@ import {
 } from './connectedAccountTransactions.js'
 import { loadExpenseAnalyzerChatContext } from './expenseAnalyzerChatContext.js'
 import { loadChatPmfContext } from './chatPmfContext.js'
+import {
+  getChatFinancialSnapshot,
+  setChatFinancialSnapshot,
+  withChatFinancialSnapshotInflight,
+} from './chatFinancialSnapshotCache.js'
 
 const RECENT_TRANSACTION_LIMIT = 20
 const TOP_MERCHANT_LIMIT = 10
@@ -232,19 +237,18 @@ async function loadLastSyncedAt(userId) {
 }
 
 /*
- * loadChatFinancialContext(userId)
+ * buildChatFinancialContext(userId, lastSyncedAt)
  *
- * Live financial snapshot for Ask Soverm — accounts, recent activity,
- * Expense Analyzer, plus PMF loop (weekly / month / memory / open actions).
+ * Heavy DB aggregation for Ask Soverm. Prefer loadChatFinancialContext so
+ * callers get the snapshot cache automatically.
  */
-export async function loadChatFinancialContext(userId) {
+async function buildChatFinancialContext(userId, lastSyncedAt) {
   const [
     expenseAnalyzer,
     liveMonthOverMonth,
     connectedTransactions,
     accountsResult,
     disconnectedTransactionCount,
-    lastSyncedAt,
   ] = await Promise.all([
     loadExpenseAnalyzerChatContext(userId),
     loadMonthOverMonthComparison(userId),
@@ -256,7 +260,6 @@ export async function loadChatFinancialContext(userId) {
       [userId]
     ),
     loadDisconnectedTransactionStats(userId),
-    loadLastSyncedAt(userId),
   ])
 
   const liveMomSnapshot = buildLiveMonthOverMonthSnapshot(liveMonthOverMonth)
@@ -291,6 +294,35 @@ export async function loadChatFinancialContext(userId) {
     openActions: pmf.openActions ?? [],
     userMemory: pmf.userMemory,
   }
+}
+
+/*
+ * loadChatFinancialContext(userId)
+ *
+ * Live financial snapshot for Ask Soverm — accounts, recent activity,
+ * Expense Analyzer, plus PMF loop (weekly / month / memory / open actions).
+ *
+ * Uses an in-memory snapshot cache keyed by last bank sync so back-to-back
+ * chat turns reuse the same pack until money data actually changes.
+ */
+export async function loadChatFinancialContext(userId) {
+  const lastSyncedAt = await loadLastSyncedAt(userId)
+  const cached = getChatFinancialSnapshot(userId, lastSyncedAt)
+  if (cached) {
+    return cached
+  }
+
+  return withChatFinancialSnapshotInflight(userId, async () => {
+    // Another request may have finished while we waited for the inflight lock.
+    const again = getChatFinancialSnapshot(userId, lastSyncedAt)
+    if (again) {
+      return again
+    }
+
+    const snapshot = await buildChatFinancialContext(userId, lastSyncedAt)
+    setChatFinancialSnapshot(userId, lastSyncedAt, snapshot)
+    return snapshot
+  })
 }
 
 export async function loadInsightActionsForChat(userId, insightId) {

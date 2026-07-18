@@ -18,6 +18,7 @@ import {
   parseUpdateTrackerInput,
 } from '../utils/monthlyTrackers.js'
 import { getCurrentProgressMonth } from '../utils/calendarMonth.js'
+import { invalidateChatFinancialSnapshot } from '../utils/chatFinancialSnapshotCache.js'
 
 const BASE_TRACKER_SELECT_COLUMNS = `id, user_id, track_type, name, purpose_type, monthly_amount,
             target_total, progress_amount, active, created_at, updated_at`
@@ -185,6 +186,7 @@ export async function createTracker(userId, body) {
       insertValues
     )
 
+    invalidateChatFinancialSnapshot(userId)
     return mapTrackerRow(result.rows[0])
   } catch (err) {
     // Race: two spending-cap creates at once — unique index enforces one active row.
@@ -353,6 +355,7 @@ export async function updateTracker(userId, trackerId, body) {
     values
   )
 
+  invalidateChatFinancialSnapshot(userId)
   return mapTrackerRow(result.rows[0])
 }
 
@@ -375,5 +378,6 @@ export async function deleteTracker(userId, trackerId) {
     throw error
   }
 
+  invalidateChatFinancialSnapshot(userId)
   return { id: trackerId }
 }

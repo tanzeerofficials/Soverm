@@ -7,6 +7,7 @@
 import { Router } from 'express'
 import { clerkClient, getAuth, requireAuth } from '@clerk/express'
 import { deleteAllUserData } from '../utils/deleteUserData.js'
+import { invalidateChatFinancialSnapshot } from '../utils/chatFinancialSnapshotCache.js'
 import { reportServerError } from '../utils/sentry.js'
 
 const router = Router()
@@ -26,6 +27,7 @@ router.delete('/', async (req, res) => {
 
   try {
     await deleteAllUserData(userId)
+    invalidateChatFinancialSnapshot(userId)
     await clerkClient.users.deleteUser(userId)
 
     res.json({ success: true })

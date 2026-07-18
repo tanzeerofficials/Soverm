@@ -80,8 +80,8 @@ function rethrowAsChatError(err) {
 /*
  * What this does: POSTs a chat message and reads Server-Sent Events as Claude
  * generates tokens. Calls onDelta(fullTextSoFar) so the UI can show a growing bubble.
- * onStatus({ phase, title, detail }) covers tool-lookup pauses so the UI can
- * show "Checking your transactions…" instead of looking frozen.
+ * onStatus({ phase, title, detail }) covers research pauses so the UI can
+ * show "Researching…" instead of looking frozen.
  *
  * Why: waiting for the full reply makes long answers feel broken on mobile.
  * signal: optional AbortSignal so the UI can cancel a hung/slow request.
@@ -214,7 +214,7 @@ export async function sendChatMessageAndRefresh(
     created_at: new Date().toISOString(),
     streaming: true,
     statusPhase: 'thinking',
-    statusTitle: 'Soverm is thinking…',
+    statusTitle: 'Thinking…',
     statusDetail: null,
   }
 
@@ -258,7 +258,7 @@ export async function sendChatMessageAndRefresh(
           patchStreamingAssistant({
             content: fullText,
             statusPhase: 'writing',
-            statusTitle: 'Soverm is writing…',
+            statusTitle: 'Generating…',
             statusDetail: null,
           })
         },

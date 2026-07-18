@@ -1034,6 +1034,7 @@ CONVERSATION STYLE:
 - ${lengthRule}
 - Everyday / how-to / planning questions: answer completely first, then connect to their live numbers when relevant — never brush them off with "I only answer about your transactions"
 - Use markdown when it improves readability (bold key numbers, numbered steps, short lists)
+- Comparisons (tools, plans, options): prefer a short bullet list — one option per line with the key tradeoff and price — over wide markdown tables. Tables are hard to read in a chat bubble; use them only when 3+ columns are truly needed
 - Not a licensed advisor — brief disclaimer when the question needs licensed advice (tax, legal, investments, insurance); still share clear general knowledge
 
 ENGAGEMENT HOOK — use a closing question only when it earns its place:
@@ -1256,7 +1257,7 @@ async function streamClaudeTextReply({
 }) {
   emitStatus?.({
     phase: 'writing',
-    title: 'Soverm is writing…',
+    title: 'Generating…',
     detail: null,
   })
 
@@ -1477,7 +1478,7 @@ export async function askFinancialQuestionStream(
   try {
     emitStatus({
       phase: 'thinking',
-      title: 'Soverm is thinking…',
+      title: 'Thinking…',
       detail: null,
     })
 
@@ -1505,8 +1506,8 @@ export async function askFinancialQuestionStream(
     for (let round = 0; round < CHAT_MAX_TOOL_ROUNDS; round += 1) {
       emitStatus({
         phase: 'thinking',
-        title: round === 0 ? 'Soverm is thinking…' : 'Putting that together…',
-        detail: round === 0 ? null : 'Almost ready with an answer',
+        title: round === 0 ? 'Thinking…' : 'Thinking…',
+        detail: round === 0 ? null : 'Putting the pieces together',
       })
 
       const response = await anthropic.messages.create({
@@ -1524,7 +1525,7 @@ export async function askFinancialQuestionStream(
         if (text) {
           emitStatus({
             phase: 'writing',
-            title: 'Soverm is writing…',
+            title: 'Generating…',
             detail: null,
           })
           onDelta?.(text, text)
