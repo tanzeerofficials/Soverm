@@ -30,7 +30,7 @@ import {
   notificationsQueryKey,
   usageQueryKey,
 } from '../lib/queryKeys.js'
-import { getDisplayBalance } from '../lib/balanceHelpers.js'
+import AccountBalanceDisplay from '../components/AccountBalanceDisplay.jsx'
 import { trackUpgradeProClick } from '../lib/analytics.js'
 import {
   checkoutErrorToastMessage,
@@ -40,13 +40,6 @@ import {
   reactivateProSubscription,
   startProCheckout,
 } from '../lib/startProCheckout.js'
-
-function formatCurrency(amount) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount)
-}
 
 function SettingsAccountSkeleton() {
   return (
@@ -495,9 +488,9 @@ function SettingsPage() {
                         <p className="mt-1 truncate text-sm font-medium text-fg">
                           {account.account_name}
                         </p>
-                        <p className="mt-2 font-mono text-sm tabular-nums text-brand-soft">
-                          {formatCurrency(getDisplayBalance(account))}
-                        </p>
+                        <div className="mt-2">
+                          <AccountBalanceDisplay account={account} align="left" />
+                        </div>
                       </div>
                       <button
                         type="button"

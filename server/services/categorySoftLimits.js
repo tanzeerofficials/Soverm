@@ -12,7 +12,10 @@ import {
 import { calendarMonthSqlBounds } from '../utils/calendarMonth.js'
 import { roundCurrency } from '../utils/safeToSpend.js'
 import { isCashFlowSpendingRow } from '../utils/cashFlowClassification.js'
-import { resolveSpendingCategoryLabel } from '../utils/plaidCategory.js'
+import {
+  canonicalizeSpendingCategoryLabel,
+  resolveSpendingCategoryLabel,
+} from '../utils/plaidCategory.js'
 import { NON_PENDING_FILTER } from '../utils/transactionFilters.js'
 
 const MAX_LIMITS_PER_USER = 5
@@ -44,7 +47,7 @@ function mapLimitRow(row, spent = 0) {
 
   return {
     id: row.id,
-    category: row.category,
+    category: canonicalizeSpendingCategoryLabel(row.category),
     monthlyLimit,
     alertWarningPercent: warningPercent,
     spentThisMonth: spentAmount,
@@ -56,6 +59,28 @@ function mapLimitRow(row, spent = 0) {
 }
 
 /*
+ * Match remapped spend to a stored soft-limit key, including Medical ↔ Healthcare aliases.
+ */
+function matchStoredCategoryKey(remapped, raw, categories) {
+  const categorySet = new Set(categories)
+  if (categorySet.has(remapped)) {
+    return remapped
+  }
+  if (categorySet.has(raw)) {
+    return raw
+  }
+
+  const remappedCanon = canonicalizeSpendingCategoryLabel(remapped)
+  for (const stored of categories) {
+    if (canonicalizeSpendingCategoryLabel(stored) === remappedCanon) {
+      return stored
+    }
+  }
+
+  return null
+}
+
+/*
  * Sum spend per soft-limit category using remapped labels + cash-flow classifier
  * so caps match what users see in Expenses / the month letter.
  */
@@ -64,7 +89,6 @@ async function loadSpentByCategory(userId, categories) {
     return new Map()
   }
 
-  const categorySet = new Set(categories)
   const spent = new Map(categories.map((category) => [category, 0]))
   const { startIso, endExclusiveIso } = calendarMonthSqlBounds()
   const result = await db.query(
@@ -84,11 +108,7 @@ async function loadSpentByCategory(userId, categories) {
     }
     const remapped = resolveSpendingCategoryLabel(row)
     const raw = row.category || 'Uncategorized'
-    const key = categorySet.has(remapped)
-      ? remapped
-      : categorySet.has(raw)
-        ? raw
-        : null
+    const key = matchStoredCategoryKey(remapped, raw, categories)
     if (!key) {
       continue
     }
@@ -118,9 +138,18 @@ export async function listCategorySoftLimits(userId) {
     result.rows.map((row) => row.category)
   )
 
-  return result.rows.map((row) =>
-    mapLimitRow(row, spentByCategory.get(row.category) ?? 0)
-  )
+  const seenCanonical = new Set()
+  const limits = []
+  for (const row of result.rows) {
+    const canonical = canonicalizeSpendingCategoryLabel(row.category)
+    if (seenCanonical.has(canonical)) {
+      continue
+    }
+    seenCanonical.add(canonical)
+    limits.push(mapLimitRow(row, spentByCategory.get(row.category) ?? 0))
+  }
+
+  return limits
 }
 
 export async function upsertCategorySoftLimit(userId, { category, monthlyLimit, alertWarningPercent }) {
@@ -130,9 +159,9 @@ export async function upsertCategorySoftLimit(userId, { category, monthlyLimit, 
     throw error
   }
 
-  const normalizedCategory = String(category || '').trim()
+  const normalizedCategory = canonicalizeSpendingCategoryLabel(String(category || '').trim())
   const amount = Number(monthlyLimit)
-  if (!normalizedCategory || !Number.isFinite(amount) || amount < 1) {
+  if (!normalizedCategory || normalizedCategory === 'Uncategorized' || !Number.isFinite(amount) || amount < 1) {
     const error = new Error('category and monthlyLimit (>= 1) are required')
     error.statusCode = 400
     throw error
@@ -145,37 +174,46 @@ export async function upsertCategorySoftLimit(userId, { category, monthlyLimit, 
     throw error
   }
 
-  const existingCount = await db.query(
-    `SELECT COUNT(*)::int AS count
+  const activeLimits = await db.query(
+    `SELECT id, category
      FROM category_soft_limits
      WHERE user_id = $1 AND active = true`,
     [userId]
   )
 
-  const existing = await db.query(
-    `SELECT id
-     FROM category_soft_limits
-     WHERE user_id = $1 AND category = $2 AND active = true
-     LIMIT 1`,
-    [userId, normalizedCategory]
+  const matchingRows = activeLimits.rows.filter(
+    (row) => canonicalizeSpendingCategoryLabel(row.category) === normalizedCategory
   )
+  const primaryMatch = matchingRows[0] ?? null
 
-  if (!existing.rows[0] && existingCount.rows[0].count >= MAX_LIMITS_PER_USER) {
+  if (!primaryMatch && activeLimits.rows.length >= MAX_LIMITS_PER_USER) {
     const error = new Error(`You can set up to ${MAX_LIMITS_PER_USER} category limits`)
     error.statusCode = 400
     throw error
   }
 
+  // Collapse duplicate alias rows (e.g. Medical + Healthcare) into one canonical key.
+  if (matchingRows.length > 1) {
+    const duplicateIds = matchingRows.slice(1).map((row) => row.id)
+    await db.query(
+      `UPDATE category_soft_limits
+       SET active = false, updated_at = NOW()
+       WHERE user_id = $1 AND id = ANY($2::uuid[])`,
+      [userId, duplicateIds]
+    )
+  }
+
   let row
-  if (existing.rows[0]) {
+  if (primaryMatch) {
     const updated = await db.query(
       `UPDATE category_soft_limits
-       SET monthly_limit = $3,
-           alert_warning_percent = $4,
+       SET category = $3,
+           monthly_limit = $4,
+           alert_warning_percent = $5,
            updated_at = NOW()
        WHERE id = $1 AND user_id = $2
        RETURNING id, category, monthly_limit, alert_warning_percent`,
-      [existing.rows[0].id, userId, amount, warning]
+      [primaryMatch.id, userId, normalizedCategory, amount, warning]
     )
     row = updated.rows[0]
   } else {

@@ -959,7 +959,7 @@ LIVE DATA RULES — use this block for spending, subscriptions, categories, acco
 - userMemory.spendingCap is the monthly spending tracker (safeToSpend) when configured
 - dataScope.disconnectedAccountPolicy explains why old charges from disconnected banks disappear from recurring/category views
 - If dataScope.disconnectedOrphanedTransactionCountLast90Days > 0, mention disconnected-account filtering when user asks why old merchants/subscriptions vanished
-- accounts.items: credit cards (isCredit true) show balance owed; checking/savings show available cash; netTotalBalance nets them
+- accounts.items: credit cards (isCredit true) show balance owed; when present, spent + availableCredit are remaining credit; checking/savings show available cash; netTotalBalance nets them
 - For discretionary purchases, prefer checking/savings cash — not netTotalBalance (which includes credit debt)
 - recentActivity is connected accounts only — use for merchant-specific purchase questions
 - openActions / insightActions are the user's to-dos — reference when they ask what to do next
@@ -969,6 +969,7 @@ LIVE DATA RULES — use this block for spending, subscriptions, categories, acco
 ANSWER SHAPE (paycheck-to-paycheck users — make advice usable today):
 - For "can I afford $X?": cite whatsLeft.amount, billsUntilPaydayTotal, daysUntilPayday; give yes / no / caution with dollars remaining after the purchase. If a soft limit isOver/isWarning for that category, say so.
 - For subscription/bill questions: check billDefense + confirmedRecurring first; when recommending cancel, cite monthly AND annual savings ($Y/mo, $Z/yr)
+- For "walk me through my subscriptions / keep vs cancel" portfolio reviews: answer from expenseAnalyzer.confirmedRecurring (+ billDefense) only — do not call lookup tools unless a named merchant is missing from that list
 - End actionable answers with ONE specific next step the user can do today (under 15 words), tied to an openAction when one exists, then a brief encouraging close when the topic was stressful, then (when the answer involved analysis or a recommendation) one specific engagement-hook question that offers a useful next layer — skip that question for simple factual lookups
 - If weeklyReview.sparse is true or payday is not configured, say what setup unlocks better answers (set payday on Your week)
 - Do not recommend payday loans, cash advances, or skipping rent/mortgage/utilities. Prefer concrete cuts from their recurring charges and open actions.
@@ -1132,7 +1133,7 @@ TRUST AND ACCURACY:
 - Only cite dollar amounts, merchants, and categories that appear in the data below — never invent figures
 - For recurring charges: cite merchant, monthly cost, annual cost, confidenceLabel (Confirmed/Likely/Uncertain), and sourceLabel
 - Review-tier recurring (expenseAnalyzer.reviewRecurring) is uncertain — not counted in confirmed totals
-- Credit card balances in accounts.items are debt owed; checking/savings are spendable cash
+- Credit card balances in accounts.items are debt owed (spent); use availableCredit when present for remaining limit; checking/savings are spendable cash
 - If data is missing, say so plainly instead of guessing
 - When giving opinions, ground them in their actual numbers
 
@@ -1187,7 +1188,7 @@ TRUST AND ACCURACY:
 - For recurring charges: cite merchant, monthly cost, annual cost, confidenceLabel (Confirmed/Likely/Uncertain), and sourceLabel
 - Review-tier recurring (expenseAnalyzer.reviewRecurring) is uncertain — not counted in confirmed totals; explain detectionReason if asked why something is under review
 - Disconnected bank accounts: charges from disconnected accounts are excluded from recurring and category views — explain using dataScope.disconnectedAccountPolicy when user asks why old subscriptions/rides vanished
-- Credit card balances in accounts.items are debt owed; checking/savings are spendable cash — netTotalBalance nets them for overall liquidity
+- Credit card balances in accounts.items are debt owed (spent); use availableCredit when present for remaining limit; checking/savings are spendable cash — netTotalBalance nets them for overall liquidity
 - If data is missing (e.g. no income synced), say so plainly instead of guessing
 - When giving opinions ("is this too high?"), ground them in their actual numbers and explain your reasoning
 
@@ -1221,6 +1222,60 @@ FORMATTING:
 
 export const CHAT_HISTORY_MESSAGE_LIMIT = 30
 export const CHAT_MAX_OUTPUT_TOKENS = 2048
+
+/*
+ * What this does: detects "review all my subscriptions" questions that the
+ * Expense Analyzer snapshot already answers.
+ * Why: tool rounds (one lookup per merchant) make Review subscriptions hang
+ * for 30–90s with no tokens. confirmedRecurring already has the list.
+ */
+export function shouldSkipLookupToolsForQuestion(question, chatFinancialContext) {
+  const text = String(question || '').toLowerCase()
+  const recurringCount =
+    chatFinancialContext?.expenseAnalyzer?.confirmedRecurring?.length ??
+    chatFinancialContext?.expenseAnalyzer?.totals?.confirmedCount ??
+    0
+
+  if (recurringCount < 1) {
+    return false
+  }
+
+  const isPortfolioReview =
+    /walk me through my subscriptions/.test(text) ||
+    /worth keeping vs cancel/.test(text) ||
+    /review (all |my )?subscriptions/.test(text)
+
+  return isPortfolioReview
+}
+
+async function streamClaudeTextReply({
+  systemPrompt,
+  messages,
+  onDelta,
+  emitStatus,
+}) {
+  emitStatus?.({
+    phase: 'writing',
+    title: 'Soverm is writing…',
+    detail: null,
+  })
+
+  const stream = anthropic.messages.stream({
+    model: 'claude-sonnet-4-6',
+    max_tokens: CHAT_MAX_OUTPUT_TOKENS,
+    temperature: 0.6,
+    system: systemPrompt,
+    messages,
+  })
+
+  let fullText = ''
+  stream.on('text', (_delta, snapshot) => {
+    fullText = snapshot
+    onDelta?.(snapshot, snapshot)
+  })
+  await stream.finalMessage()
+  return fullText
+}
 
 function extractAssistantText(contentBlocks = []) {
   return contentBlocks
@@ -1363,10 +1418,14 @@ export async function askFinancialQuestion(
   )
 
   try {
+    const skipTools =
+      !userId ||
+      shouldSkipLookupToolsForQuestion(newQuestion, chatFinancialContext)
+
     return await runChatWithOptionalTools({
       systemPrompt,
       messages,
-      userId,
+      userId: skipTools ? null : userId,
     })
   } catch (err) {
     console.error('Failed to answer financial question:', err.message)
@@ -1422,36 +1481,34 @@ export async function askFinancialQuestionStream(
       detail: null,
     })
 
+    const skipTools =
+      !userId ||
+      shouldSkipLookupToolsForQuestion(newQuestion, chatFinancialContext)
+
     /*
      * When tools may run, complete tool rounds with create(), then stream only
      * the final text turn so the UI still gets progressive tokens when possible.
+     * Subscription portfolio reviews skip tools — confirmedRecurring is enough
+     * and per-merchant lookups made "Review subscriptions" hang with no words.
      */
-    if (!userId) {
-      emitStatus({
-        phase: 'writing',
-        title: 'Soverm is writing…',
-        detail: null,
-      })
-      const stream = anthropic.messages.stream({
-        model: 'claude-sonnet-4-6',
-        max_tokens: CHAT_MAX_OUTPUT_TOKENS,
-        temperature: 0.6,
-        system: systemPrompt,
+    if (skipTools) {
+      return await streamClaudeTextReply({
+        systemPrompt,
         messages,
+        onDelta,
+        emitStatus,
       })
-
-      let fullText = ''
-      stream.on('text', (_delta, snapshot) => {
-        fullText = snapshot
-        onDelta?.(snapshot, snapshot)
-      })
-      await stream.finalMessage()
-      return fullText
     }
 
     let workingMessages = [...messages]
 
     for (let round = 0; round < CHAT_MAX_TOOL_ROUNDS; round += 1) {
+      emitStatus({
+        phase: 'thinking',
+        title: round === 0 ? 'Soverm is thinking…' : 'Putting that together…',
+        detail: round === 0 ? null : 'Almost ready with an answer',
+      })
+
       const response = await anthropic.messages.create({
         model: 'claude-sonnet-4-6',
         max_tokens: CHAT_MAX_OUTPUT_TOKENS,
@@ -1481,33 +1538,14 @@ export async function askFinancialQuestionStream(
         { role: 'assistant', content: response.content },
         { role: 'user', content: await buildToolResultBlocks(userId, toolUses) },
       ]
-      emitStatus({
-        phase: 'thinking',
-        title: 'Putting that together…',
-        detail: 'Almost ready with an answer',
-      })
     }
 
-    emitStatus({
-      phase: 'writing',
-      title: 'Soverm is writing…',
-      detail: null,
-    })
-    const stream = anthropic.messages.stream({
-      model: 'claude-sonnet-4-6',
-      max_tokens: CHAT_MAX_OUTPUT_TOKENS,
-      temperature: 0.6,
-      system: systemPrompt,
+    return await streamClaudeTextReply({
+      systemPrompt,
       messages: workingMessages,
+      onDelta,
+      emitStatus,
     })
-
-    let fullText = ''
-    stream.on('text', (_delta, snapshot) => {
-      fullText = snapshot
-      onDelta?.(snapshot, snapshot)
-    })
-    await stream.finalMessage()
-    return fullText
   } catch (err) {
     console.error('Failed to stream financial question:', err.message)
     throw new Error(`Claude chat response failed: ${err.message}`)

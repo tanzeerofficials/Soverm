@@ -210,7 +210,8 @@ LOOKUP TOOLS — use when the snapshot is not enough:
 - get_merchant_history: dig into a specific merchant or payee
 - Call a tool instead of guessing transaction-level detail. After results arrive, answer in plain language with those real dollars.
 - Do not invent merchants or amounts that are not in the tool result or the live snapshot.
-- Prefer one focused lookup over many. Cap yourself at a couple of tool calls unless the user asks for more.`
+- Prefer one focused lookup over many. Cap yourself at a couple of tool calls unless the user asks for more.
+- Subscription keep/cancel portfolio reviews: if expenseAnalyzer.confirmedRecurring lists the subscriptions, answer from that list — do not call tools for every merchant.`
 }
 
 /*

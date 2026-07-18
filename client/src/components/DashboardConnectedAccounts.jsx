@@ -6,22 +6,7 @@
  */
 
 import { Link } from 'react-router-dom'
-import { getDisplayBalance, isLiabilityAccount } from '../lib/balanceHelpers.js'
-
-function formatCurrency(amount) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount)
-}
-
-function balanceTone(account) {
-  const balance = getDisplayBalance(account)
-  if (isLiabilityAccount(account)) {
-    return balance > 0 ? 'text-danger' : 'text-brand-soft'
-  }
-  return balance < 0 ? 'text-danger' : 'text-brand-soft'
-}
+import AccountBalanceDisplay from './AccountBalanceDisplay.jsx'
 
 function DashboardConnectedAccounts({ accounts = [] }) {
   if (accounts.length === 0) {
@@ -62,11 +47,7 @@ function DashboardConnectedAccounts({ accounts = [] }) {
                 {account.account_type ? ` · ${account.account_type}` : ''}
               </p>
             </div>
-            <p
-              className={`shrink-0 font-mono text-sm font-semibold tabular-nums ${balanceTone(account)}`}
-            >
-              {formatCurrency(getDisplayBalance(account))}
-            </p>
+            <AccountBalanceDisplay account={account} />
           </li>
         ))}
       </ul>

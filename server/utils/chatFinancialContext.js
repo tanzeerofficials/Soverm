@@ -1,5 +1,12 @@
 import db from '../db/index.js'
-import { calculateTotalBalance, getDisplayBalance, isLiabilityAccount } from './balanceHelpers.js'
+import {
+  calculateTotalBalance,
+  getCreditAvailable,
+  getCreditSpent,
+  getDisplayBalance,
+  isCreditAccount,
+  isLiabilityAccount,
+} from './balanceHelpers.js'
 import {
   buildCategoryBreakdownFromComparison,
   COMPARISON_PERIOD_INTERVAL,
@@ -130,17 +137,29 @@ function buildLiveMonthOverMonthSnapshot(comparison) {
 function buildAccountsSnapshot(rows) {
   const items = rows.map((account) => {
     const isLiability = isLiabilityAccount(account)
-
-    return {
+    const isCredit = isCreditAccount(account)
+    const item = {
       bankName: account.bank_name,
       name: account.account_name,
       type: account.account_type,
       balance: roundCurrency(getDisplayBalance(account)),
       isCredit: isLiability,
-      balanceMeaning: isLiability
-        ? 'liability balance owed (higher = more debt)'
-        : 'available cash (checking/savings) or investment value',
+      balanceMeaning: isCredit
+        ? 'credit card: balance is amount spent/owed; spent + availableCredit when present'
+        : isLiability
+          ? 'liability balance owed (higher = more debt)'
+          : 'available cash (checking/savings) or investment value',
     }
+
+    if (isCredit) {
+      item.spent = roundCurrency(getCreditSpent(account) ?? 0)
+      const available = getCreditAvailable(account)
+      if (available != null) {
+        item.availableCredit = roundCurrency(available)
+      }
+    }
+
+    return item
   })
 
   return {

@@ -15,6 +15,8 @@ import {
 } from '../utils/transactionFilters.js'
 import {
   calculateTotalBalance,
+  getCreditAvailable,
+  getCreditSpent,
   getDisplayBalance,
   isLiabilityAccount,
 } from '../utils/balanceHelpers.js'
@@ -389,6 +391,10 @@ const loan = {
 assert(getDisplayBalance(checking) === 2000, 'checking uses available')
 assert(getDisplayBalance(card) === 400, 'credit uses current owed')
 assert(getDisplayBalance(loan) === 5000, 'loan uses current owed')
+assert(getCreditSpent(card) === 400, 'credit spent is current owed')
+assert(getCreditAvailable(card) === 3000, 'credit available is remaining credit')
+assert(getCreditSpent(checking) === null, 'checking is not credit spent')
+assert(getCreditAvailable(loan) === null, 'loan has no available credit')
 assert(
   calculateTotalBalance([checking, card, loan]) === 2000 - 400 - 5000,
   'net balance subtracts all liabilities'

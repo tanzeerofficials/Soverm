@@ -1,23 +1,6 @@
-import { getDisplayBalance, isLiabilityAccount } from '../lib/balanceHelpers.js'
-
-function formatCurrency(amount) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount)
-}
-
-function isBalanceWarning(account) {
-  const balance = getDisplayBalance(account)
-  if (isLiabilityAccount(account)) {
-    return balance > 0
-  }
-  return balance < 0
-}
+import AccountBalanceDisplay from './AccountBalanceDisplay.jsx'
 
 function DashboardAccountCard({ account, onDisconnect }) {
-  const balanceIsWarning = isBalanceWarning(account)
-
   return (
     <article className="relative min-w-0 rounded-xl border border-border-default bg-surface p-4 transition hover:border-brand/40 hover:bg-surface-elevated sm:p-5">
       <button
@@ -37,13 +20,9 @@ function DashboardAccountCard({ account, onDisconnect }) {
       <span className="mt-2 inline-block max-w-full truncate rounded-full border border-border-default bg-surface-elevated px-2.5 py-0.5 text-xs capitalize text-fg-muted">
         {account.account_type}
       </span>
-      <p
-        className={`mt-4 break-all font-mono text-xl font-semibold tabular-nums sm:text-2xl ${
-          balanceIsWarning ? 'text-danger' : 'text-brand-soft'
-        }`}
-      >
-        {formatCurrency(getDisplayBalance(account))}
-      </p>
+      <div className="mt-4">
+        <AccountBalanceDisplay account={account} align="left" size="lg" />
+      </div>
     </article>
   )
 }

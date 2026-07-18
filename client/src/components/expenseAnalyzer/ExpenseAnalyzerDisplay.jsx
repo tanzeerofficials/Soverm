@@ -1,4 +1,4 @@
-import { formatCategoryDisplayName } from '../../lib/categoryDisplayNames.js'
+import { formatCategoryDisplayName, getCategoryExamples } from '../../lib/categoryDisplayNames.js'
 import {
   formatCategoryAccountSources,
   formatRecurringAccountSource,
@@ -72,6 +72,7 @@ export function CategoryRecurringLine({ recurringMonthly }) {
 
 export {
   formatCategoryDisplayName,
+  getCategoryExamples,
   formatCategoryAccountSources,
   formatRecurringAccountSource,
   formatCurrency,

@@ -25,6 +25,27 @@ export const PEER_TRANSFER_CATEGORY_LABEL = 'Peer transfer'
 export const SELF_DEPOSIT_CATEGORY_LABEL = 'Self deposit'
 export const SELF_TRANSFER_CATEGORY_LABEL = 'Self transfer'
 export const CASH_OUT_CATEGORY_LABEL = 'Cash out'
+/** Plaid MEDICAL + legacy Healthcare / Health → one spending bucket. */
+export const HEALTHCARE_CATEGORY_LABEL = 'Healthcare'
+
+const SPENDING_CATEGORY_ALIASES = {
+  medical: HEALTHCARE_CATEGORY_LABEL,
+  healthcare: HEALTHCARE_CATEGORY_LABEL,
+  health: HEALTHCARE_CATEGORY_LABEL,
+}
+
+/*
+ * What this does: collapses known duplicate category labels into one canonical name.
+ * Why: Plaid PFC "Medical" and legacy "Healthcare" are the same life category.
+ */
+export function canonicalizeSpendingCategoryLabel(category) {
+  const trimmed = String(category ?? '').trim()
+  if (!trimmed) {
+    return 'Uncategorized'
+  }
+  const alias = SPENDING_CATEGORY_ALIASES[trimmed.toLowerCase()]
+  return alias ?? trimmed
+}
 
 function formatPersonalFinanceCategoryPrimary(primary) {
   return primary
@@ -150,8 +171,10 @@ export function resolveSpendingCategoryLabel(row) {
   }
 
   if (lower === 'atm' || lower.includes('atm')) {
-    return amount > 0 ? CASH_OUT_CATEGORY_LABEL : category
+    return amount > 0
+      ? CASH_OUT_CATEGORY_LABEL
+      : canonicalizeSpendingCategoryLabel(category)
   }
 
-  return category
+  return canonicalizeSpendingCategoryLabel(category)
 }

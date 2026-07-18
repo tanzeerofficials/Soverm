@@ -144,6 +144,33 @@ try {
   console.log('  pass: peer, self deposit, self transfer, cash out overrides')
   passed++
 
+  assert(
+    resolveSpendingCategoryLabel({
+      name: 'CVS Pharmacy',
+      category: 'Medical',
+      amount: 24,
+    }) === 'Healthcare',
+    'Medical aliases to Healthcare'
+  )
+  assert(
+    resolveSpendingCategoryLabel({
+      name: 'Kaiser',
+      category: 'Healthcare',
+      amount: 50,
+    }) === 'Healthcare',
+    'Healthcare stays Healthcare'
+  )
+  assert(
+    resolveSpendingCategoryLabel({
+      name: 'Clinic',
+      category: 'Health',
+      amount: 80,
+    }) === 'Healthcare',
+    'Health aliases to Healthcare'
+  )
+  console.log('  pass: Medical / Healthcare / Health alias to Healthcare')
+  passed++
+
   console.log(`\n${passed}/${passed} tests passed`)
 } catch (err) {
   console.error(`\nFAIL: ${err.message}`)

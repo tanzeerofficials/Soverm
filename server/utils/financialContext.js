@@ -1,5 +1,10 @@
 import db from '../db/index.js'
-import { getDisplayBalance } from './balanceHelpers.js'
+import {
+  getCreditAvailable,
+  getCreditSpent,
+  getDisplayBalance,
+  isCreditAccount,
+} from './balanceHelpers.js'
 import { CONNECTED_ACCOUNT_TRANSACTION_JOINS } from './connectedAccountTransactions.js'
 import {
   EXCLUDE_INTERNAL_MOVES_FILTER,
@@ -397,10 +402,17 @@ export async function loadFinancialContextForUser(userId) {
   ])
 
   const accountSummary = accountsResult.rows
-    .map(
-      (a) =>
-        `${a.account_name} (${a.account_type}): $${getDisplayBalance(a)}`
-    )
+    .map((a) => {
+      const type = a.account_type || 'account'
+      if (isCreditAccount(a)) {
+        const spent = getCreditSpent(a) ?? 0
+        const available = getCreditAvailable(a)
+        const availablePart =
+          available != null ? `, $${available} available` : ''
+        return `${a.account_name} (${type}): $${spent} spent${availablePart}`
+      }
+      return `${a.account_name} (${type}): $${getDisplayBalance(a)}`
+    })
     .join('\n')
 
   return {

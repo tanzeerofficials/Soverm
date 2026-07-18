@@ -35,6 +35,7 @@ import {
   CategoryMetaBadges,
   CategoryRecurringLine,
   formatCategoryDisplayName,
+  getCategoryExamples,
   formatCategoryAccountSources,
   formatRecurringAccountSource,
   formatCurrency,
@@ -554,6 +555,7 @@ function ExpenseAnalyzerPage() {
                       const recentTransactions = entry.recentTransactions ?? []
                       const accountSources = formatCategoryAccountSources(entry.accountBreakdown)
                       const displayCategory = formatCategoryDisplayName(entry.category)
+                      const categoryExamples = getCategoryExamples(entry.category)
                       const isExpandable = categoryHasDrillDown(entry)
                       const isExpanded = expandedCategory === entry.category
 
@@ -586,6 +588,9 @@ function ExpenseAnalyzerPage() {
                                   <p className="text-base font-semibold text-fg">
                                     {displayCategory}
                                   </p>
+                                  {categoryExamples ? (
+                                    <p className="mt-0.5 text-xs text-fg-subtle">{categoryExamples}</p>
+                                  ) : null}
                                   <CategoryMetaBadges
                                     percentOfTotal={entry.percentOfTotal}
                                     recurringCount={matchingCharges.length}

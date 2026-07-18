@@ -231,6 +231,7 @@ function ChatPanel({
   const autoSendRef = useRef(false)
   const abortRef = useRef(null)
   const sendStartedAtRef = useRef(0)
+  const lastActivityAtRef = useRef(0)
   const pendingRetryRef = useRef(null)
   const userCancelledRef = useRef(false)
   const [inputValue, setInputValue] = useState(autoSendInitialDraft ? '' : initialDraft)
@@ -238,6 +239,7 @@ function ChatPanel({
   const [sendError, setSendError] = useState(null)
   const [showJumpToLatest, setShowJumpToLatest] = useState(false)
   const [waitElapsedMs, setWaitElapsedMs] = useState(0)
+  const [msSinceActivity, setMsSinceActivity] = useState(0)
 
   const { data, isPending, isError, refetch } = useQuery({
     queryKey: chatQueryKey(resolvedThreadId),
@@ -280,24 +282,56 @@ function ChatPanel({
   const waitPhase = getChatWaitPhase(waitElapsedMs, {
     hasTokens: hasStreamingTokens,
     activity: serverStatus?.phase,
+    msSinceActivity,
   })
   const isWaitingOnReply = isSending || hasStreamingReply
 
   useEffect(() => {
     if (!isWaitingOnReply) {
       setWaitElapsedMs(0)
+      setMsSinceActivity(0)
       return
     }
 
     sendStartedAtRef.current = sendStartedAtRef.current || Date.now()
-    setWaitElapsedMs(Date.now() - sendStartedAtRef.current)
+    if (!lastActivityAtRef.current) {
+      lastActivityAtRef.current = sendStartedAtRef.current
+    }
 
-    const intervalId = window.setInterval(() => {
-      setWaitElapsedMs(Date.now() - sendStartedAtRef.current)
-    }, 500)
+    const tick = () => {
+      const now = Date.now()
+      setWaitElapsedMs(now - sendStartedAtRef.current)
+      setMsSinceActivity(now - lastActivityAtRef.current)
+    }
+    tick()
 
+    const intervalId = window.setInterval(tick, 500)
     return () => window.clearInterval(intervalId)
   }, [isWaitingOnReply])
+
+  /*
+   * Any SSE status or first tokens count as activity so we keep showing
+   * "Loading your finances…" / "thinking" instead of a false stall alarm.
+   */
+  useEffect(() => {
+    if (!isWaitingOnReply) {
+      return
+    }
+    if (
+      streamingMessage?.statusPhase ||
+      streamingMessage?.statusTitle ||
+      streamingMessage?.content
+    ) {
+      lastActivityAtRef.current = Date.now()
+      setMsSinceActivity(0)
+    }
+  }, [
+    isWaitingOnReply,
+    streamingMessage?.statusPhase,
+    streamingMessage?.statusTitle,
+    streamingMessage?.statusDetail,
+    streamingMessage?.content,
+  ])
 
   useEffect(() => {
     return () => {
@@ -443,6 +477,7 @@ function ChatPanel({
     abortRef.current = null
     active?.abort()
     sendStartedAtRef.current = 0
+    lastActivityAtRef.current = 0
     setIsSending(false)
     if (restoreDraft && pendingRetryRef.current) {
       setInputValue(pendingRetryRef.current)
@@ -477,7 +512,9 @@ function ChatPanel({
     userCancelledRef.current = false
     pendingRetryRef.current = trimmed
     sendStartedAtRef.current = Date.now()
+    lastActivityAtRef.current = sendStartedAtRef.current
     setWaitElapsedMs(0)
+    setMsSinceActivity(0)
 
     setInputValue('')
     setSendError(null)
@@ -532,6 +569,7 @@ function ChatPanel({
       if (abortRef.current === controller) {
         abortRef.current = null
         sendStartedAtRef.current = 0
+        lastActivityAtRef.current = 0
         setIsSending(false)
         requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }))
       }
@@ -708,10 +746,10 @@ function ChatPanel({
             <div className="rounded-lg border border-border-default bg-app/50 px-3 py-2">
               <p className="text-[11px] text-fg-subtle">
                 {hasStreamingTokens
-                  ? 'Reply is taking longer than usual — you can keep waiting or retry.'
-                  : serverStatus?.phase === 'looking_up'
-                    ? 'Still checking your transactions — you can keep waiting or retry.'
-                    : 'Still waiting for the first words — you can keep waiting or retry.'}
+                  ? 'Still writing — you can keep waiting or retry.'
+                  : serverStatus?.title
+                    ? 'Still working on this — you can keep waiting or retry.'
+                    : 'Still working on your answer — you can keep waiting or retry.'}
               </p>
               <div className="mt-2 flex gap-3">
                 <button

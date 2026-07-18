@@ -37,6 +37,20 @@ function wantsStream(req) {
 
 function writeSse(res, payload) {
   res.write(`data: ${JSON.stringify(payload)}\n\n`)
+  // Flush when available so proxies / browsers see status before Claude returns.
+  if (typeof res.flush === 'function') {
+    res.flush()
+  }
+}
+
+function beginChatSse(res) {
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
+  res.setHeader('Cache-Control', 'no-cache, no-transform')
+  res.setHeader('Connection', 'keep-alive')
+  res.setHeader('X-Accel-Buffering', 'no')
+  if (typeof res.flushHeaders === 'function') {
+    res.flushHeaders()
+  }
 }
 
 function chatLimitPayload(status) {
@@ -111,6 +125,7 @@ async function respondWithChatAnswer(req, res, {
   insightActions,
   trimmedMessage,
   errorLabel,
+  streamAlreadyStarted = false,
 }) {
   const beforeYouSpendVerdict = await loadBeforeYouSpendForMessage(
     userId,
@@ -126,11 +141,8 @@ async function respondWithChatAnswer(req, res, {
   }
 
   if (wantsStream(req)) {
-    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
-    res.setHeader('Cache-Control', 'no-cache, no-transform')
-    res.setHeader('Connection', 'keep-alive')
-    if (typeof res.flushHeaders === 'function') {
-      res.flushHeaders()
+    if (!streamAlreadyStarted) {
+      beginChatSse(res)
     }
 
     try {
@@ -254,10 +266,25 @@ router.post('/general', chatRateLimitMiddleware(), async (req, res) => {
     return res.status(400).json({ error: messageCheck.error })
   }
 
+  const trimmedMessage = messageCheck.value
+  const streaming = wantsStream(req)
+
+  /*
+   * Open the SSE stream before loading finance context so the UI gets a
+   * "Loading your finances…" status instead of sitting silent for 10–30s.
+   */
+  if (streaming) {
+    beginChatSse(res)
+    writeSse(res, {
+      type: 'status',
+      phase: 'thinking',
+      title: 'Loading your finances…',
+      detail: 'Pulling subscriptions, categories, and recent activity.',
+    })
+  }
+
   try {
     await ensureUserExists(userId)
-
-    const trimmedMessage = messageCheck.value
 
     const [historyResult, chatFinancialContext] = await Promise.all([
       db.query(
@@ -285,9 +312,15 @@ router.post('/general', chatRateLimitMiddleware(), async (req, res) => {
       insightActions: chatFinancialContext?.openActions ?? [],
       trimmedMessage,
       errorLabel: 'to send general chat message',
+      streamAlreadyStarted: streaming,
     })
   } catch (err) {
     reportServerError('to send general chat message', err, { userId, req })
+    if (streaming) {
+      writeSse(res, { type: 'error', message: GENERIC_ERROR_MESSAGE })
+      res.end()
+      return
+    }
     if (!res.headersSent) {
       res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
     }
@@ -342,11 +375,22 @@ router.post('/:insightId', chatRateLimitMiddleware(), async (req, res) => {
     return res.status(400).json({ error: messageCheck.error })
   }
 
+  const { insightId } = req.params
+  const trimmedMessage = messageCheck.value
+  const streaming = wantsStream(req)
+
+  if (streaming) {
+    beginChatSse(res)
+    writeSse(res, {
+      type: 'status',
+      phase: 'thinking',
+      title: 'Loading your finances…',
+      detail: 'Pulling subscriptions, categories, and recent activity.',
+    })
+  }
+
   try {
     await ensureUserExists(userId)
-
-    const { insightId } = req.params
-    const trimmedMessage = messageCheck.value
 
     const [insightResult, historyResult, chatFinancialContext, insightActionsResult] =
       await Promise.all([
@@ -371,6 +415,11 @@ router.post('/:insightId', chatRateLimitMiddleware(), async (req, res) => {
       ])
 
     if (insightResult.rows.length === 0) {
+      if (streaming) {
+        writeSse(res, { type: 'error', message: 'Insight not found' })
+        res.end()
+        return
+      }
       return res.status(404).json({ error: 'Insight not found' })
     }
 
@@ -389,9 +438,15 @@ router.post('/:insightId', chatRateLimitMiddleware(), async (req, res) => {
       insightActions: insightActionsResult,
       trimmedMessage,
       errorLabel: 'to send chat message',
+      streamAlreadyStarted: streaming,
     })
   } catch (err) {
     reportServerError('to send chat message', err, { userId, req })
+    if (streaming) {
+      writeSse(res, { type: 'error', message: GENERIC_ERROR_MESSAGE })
+      res.end()
+      return
+    }
     if (!res.headersSent) {
       res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
     }

@@ -13,10 +13,9 @@ import { DEFAULT_SPENDING_CAP_WARNING_PERCENT } from '../lib/spendingAlertThresh
 export const MAX_CATEGORY_SOFT_LIMITS = 5
 
 export const CATEGORY_SOFT_LIMIT_HELP_ITEMS = [
-  'A category cap is a monthly target for one spending area — separate from your overall spending cap on the dashboard.',
-  'We total spending in that category for the current calendar month and compare it to your limit.',
-  `You’ll see a warning in Needs Attention when you reach ${DEFAULT_SPENDING_CAP_WARNING_PERCENT}% of the limit (default).`,
-  `You can track up to ${MAX_CATEGORY_SOFT_LIMITS} categories at a time. Limits reset at the start of each month.`,
+  'One category, one monthly limit — separate from your overall spending cap.',
+  `We warn you in Needs Attention at ${DEFAULT_SPENDING_CAP_WARNING_PERCENT}% of the limit.`,
+  `Up to ${MAX_CATEGORY_SOFT_LIMITS} categories. Resets each month.`,
 ]
 
 function limitStatusBadge(limit) {
@@ -50,25 +49,19 @@ function progressBarClassName(limit) {
 }
 
 export function CategorySoftLimitsIntro({ activeCount = 0 }) {
-  const slotsLeft = Math.max(MAX_CATEGORY_SOFT_LIMITS - activeCount, 0)
-
   return (
     <div className="mb-4 rounded-xl border border-border-default bg-surface px-4 py-4 sm:px-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-fg">Category caps</p>
           <p className="mt-1 text-sm leading-relaxed text-fg-muted">
-            Set optional monthly targets for specific categories. They’re independent from your
-            overall spending cap and help you catch overspending in one area before month-end.
+            Set a monthly limit for Dining, Shopping, or other categories — separate from your
+            overall spending cap.
           </p>
-          <HowCalculatedDisclosure
-            title="How category limits work"
-            items={CATEGORY_SOFT_LIMIT_HELP_ITEMS}
-          />
+          <HowCalculatedDisclosure title="How it works" items={CATEGORY_SOFT_LIMIT_HELP_ITEMS} />
         </div>
         <p className="shrink-0 rounded-full border border-border-default bg-app/60 px-3 py-1 text-xs text-fg-muted">
-          {activeCount} of {MAX_CATEGORY_SOFT_LIMITS} used
-          {slotsLeft > 0 ? ` · ${slotsLeft} slot${slotsLeft === 1 ? '' : 's'} left` : ''}
+          {activeCount} of {MAX_CATEGORY_SOFT_LIMITS}
         </p>
       </div>
     </div>

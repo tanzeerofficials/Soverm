@@ -4,7 +4,7 @@
  * Usage: node scripts/test-category-display-names.js
  */
 
-import { formatCategoryDisplayName } from '../src/lib/categoryDisplayNames.js'
+import { formatCategoryDisplayName, getCategoryExamples } from '../src/lib/categoryDisplayNames.js'
 import {
   formatCategoryAccountSources,
   formatRecurringAccountSource,
@@ -46,6 +46,21 @@ assert(
   'Unknown category title-cased'
 )
 console.log('  pass: unknown category falls back to title case')
+passed++
+
+assert(formatCategoryDisplayName('Medical') === 'Healthcare', 'Medical -> Healthcare')
+assert(formatCategoryDisplayName('Healthcare') === 'Healthcare', 'Healthcare stays Healthcare')
+assert(formatCategoryDisplayName('Health') === 'Healthcare', 'Health -> Healthcare')
+console.log('  pass: Medical / Healthcare / Health display as Healthcare')
+passed++
+
+assert(
+  getCategoryExamples('Medical') === 'Doctors, pharmacy, insurance',
+  'Healthcare examples'
+)
+assert(getCategoryExamples('Food And Drink') === 'Restaurants, coffee, delivery', 'Dining examples')
+assert(getCategoryExamples('Custom Plaid Label') === null, 'Unknown category has no examples')
+console.log('  pass: category examples')
 passed++
 
 const singleSource = formatCategoryAccountSources([

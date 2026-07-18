@@ -8,7 +8,13 @@
 import { Router } from 'express'
 import { getAuth, requireAuth } from '@clerk/express'
 import db from '../db/index.js'
-import { calculateTotalBalance, getDisplayBalance } from '../utils/balanceHelpers.js'
+import {
+  calculateTotalBalance,
+  getCreditAvailable,
+  getCreditSpent,
+  getDisplayBalance,
+  isCreditAccount,
+} from '../utils/balanceHelpers.js'
 import { CONNECTED_ACCOUNT_TRANSACTION_JOINS, EXPENSE_ANALYZER_TRANSACTION_SELECT } from '../utils/connectedAccountTransactions.js'
 import {
   EXCLUDE_INTERNAL_MOVES_FILTER,
@@ -152,10 +158,21 @@ router.get('/summary', async (req, res) => {
       ),
     ])
 
-    const accounts = accountsResult.rows.map((account) => ({
-      ...account,
-      displayBalance: getDisplayBalance(account),
-    }))
+    const accounts = accountsResult.rows.map((account) => {
+      const enriched = {
+        ...account,
+        displayBalance: getDisplayBalance(account),
+      }
+
+      // Credit cards: expose spent (owed) + available credit for the account list UI.
+      // Loans/mortgages stay displayBalance-only — available is not "credit left".
+      if (isCreditAccount(account)) {
+        enriched.creditSpent = getCreditSpent(account)
+        enriched.creditAvailable = getCreditAvailable(account)
+      }
+
+      return enriched
+    })
     const totalBalance = calculateTotalBalance(accounts)
 
     // One classifier for the whole ledger window: Money in/out are external

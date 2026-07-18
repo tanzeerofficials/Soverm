@@ -43,6 +43,25 @@ export function getDisplayBalance(account) {
   return Number(account.balance_current) || 0
 }
 
+/**
+ * Credit cards only: amount owed / drawn on the card (Plaid current).
+ * Returns null for non-credit accounts so callers can gate UI.
+ */
+export function getCreditSpent(account) {
+  if (!isCreditAccount(account)) return null
+  return Number(account.balance_current) || 0
+}
+
+/**
+ * Credit cards only: remaining credit to spend (Plaid available).
+ * Null when the institution does not report available credit.
+ */
+export function getCreditAvailable(account) {
+  if (!isCreditAccount(account)) return null
+  if (account.balance_available == null) return null
+  return Number(account.balance_available) || 0
+}
+
 export function calculateTotalBalance(accounts) {
   return accounts.reduce((total, account) => {
     const balance = getDisplayBalance(account)
