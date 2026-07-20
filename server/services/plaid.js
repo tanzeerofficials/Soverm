@@ -28,7 +28,9 @@ import {
   SELF_DEPOSIT_CATEGORY_LABEL,
   SELF_TRANSFER_CATEGORY_LABEL,
 } from '../utils/plaidCategory.js'
+import { decryptAccessToken } from '../utils/tokenCrypto.js'
 import { invalidateChatFinancialSnapshot } from '../utils/chatFinancialSnapshotCache.js'
+import { withUserPlaidSyncLock } from '../utils/userPlaidSyncLock.js'
 
 function formatBackfillDate(date) {
   const year = date.getFullYear()
@@ -273,7 +275,7 @@ export async function syncTransactionsForAccount(accessToken, cursor) {
  * syncAllAccountsForUser(userId)
  *
  * What it does:
- * - Groups DB account rows by plaid_access_token (one Plaid Item per token)
+ * - Groups DB account rows by plaid_item_id (one Plaid Item per link)
  * - Syncs transactions once per Item, not once per sub-account row
  * - Applies added, modified, and removed changes for all sub-accounts in that Item
  * - Refreshes balances via one accountsBalanceGet call per Item
@@ -290,11 +292,16 @@ function groupAccountsByPlaidItem(accounts) {
   const groups = new Map()
 
   for (const account of accounts) {
-    const itemKey = account.plaid_item_id ?? account.plaid_access_token
+    const itemKey = account.plaid_item_id
+    if (!itemKey) {
+      continue
+    }
     if (!groups.has(itemKey)) {
       groups.set(itemKey, {
         plaidItemId: account.plaid_item_id,
-        accessToken: account.plaid_access_token,
+        accessToken: account.plaid_access_token
+          ? decryptAccessToken(account.plaid_access_token)
+          : null,
         cursor: account.plaid_cursor,
         accounts: [],
       })
@@ -306,16 +313,20 @@ function groupAccountsByPlaidItem(accounts) {
 }
 
 export async function syncAllAccountsForUser(userId) {
+  return withUserPlaidSyncLock(userId, () => runSyncAllAccountsForUser(userId))
+}
+
+async function runSyncAllAccountsForUser(userId) {
   const counts = { added: 0, modified: 0, removed: 0, categoriesBackfilled: 0 }
 
   try {
     const accountsResult = await db.query(
       `SELECT a.id, a.plaid_account_id,
-              COALESCE(pi.plaid_access_token, a.plaid_access_token) AS plaid_access_token,
+              pi.plaid_access_token AS plaid_access_token,
               COALESCE(pi.plaid_cursor, a.plaid_cursor) AS plaid_cursor,
               pi.id AS plaid_item_id
        FROM accounts a
-       LEFT JOIN plaid_items pi ON a.plaid_item_id = pi.id
+       INNER JOIN plaid_items pi ON a.plaid_item_id = pi.id
        WHERE a.user_id = $1`,
       [userId]
     )
@@ -433,14 +444,14 @@ export async function syncAllAccountsForUser(userId) {
              WHERE id = $2 AND user_id = $3`,
             [syncResult.nextCursor, plaidItemId, userId]
           )
-        }
 
-        await db.query(
-          `UPDATE accounts
-           SET plaid_cursor = $1, last_synced_at = NOW()
-           WHERE user_id = $2 AND plaid_access_token = $3`,
-          [syncResult.nextCursor, userId, accessToken]
-        )
+          await db.query(
+            `UPDATE accounts
+             SET plaid_cursor = $1, last_synced_at = NOW()
+             WHERE user_id = $2 AND plaid_item_id = $3`,
+            [syncResult.nextCursor, userId, plaidItemId]
+          )
+        }
 
         try {
           counts.categoriesBackfilled += await backfillMissingCategoriesForItem(

@@ -84,7 +84,7 @@ function InsightCard({
 
   if (!insight) {
     return (
-      <div className="rounded-xl border border-border-default bg-surface px-6 py-10 text-center">
+      <div className="rounded-xl border border-border-default bg-surface px-6 py-10 text-center card-shadow">
         <p className="text-sm leading-relaxed text-fg-muted">
           No insight generated yet. Go to the Insight tab, sync your accounts if needed, then tap
           Generate Insights.
@@ -101,7 +101,7 @@ function InsightCard({
 
   return (
     <>
-      <article className="overflow-hidden rounded-xl border border-border-default border-l-4 border-l-ai bg-surface transition hover:bg-surface-elevated/40">
+      <article className="overflow-hidden rounded-xl border border-border-default border-l-4 border-l-ai bg-surface card-shadow transition hover:bg-surface-elevated/40">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border-default bg-app/50 px-4 py-3 sm:px-6">
           <span className="text-xs font-semibold uppercase tracking-wide text-ai">
             Soverm Insight

@@ -86,7 +86,17 @@ try {
       ],
     },
     sampleComparison,
-    [{ direction: 'up', percent: 18, vsLabel: 'vs prior 30 days' }]
+    [
+      {
+        direction: 'up',
+        percent: 18,
+        times: 1.18,
+        absoluteChange: 490,
+        currentTotal: 3287,
+        priorTotal: 2797,
+        vsLabel: 'vs prior 30 days',
+      },
+    ]
   )
   passed++
 
@@ -103,7 +113,17 @@ try {
       ],
     },
     sampleComparison,
-    [{ direction: 'up', percent: 18, vsLabel: 'vs prior 30 days' }]
+    [
+      {
+        direction: 'up',
+        percent: 18,
+        times: 1.18,
+        absoluteChange: 130,
+        currentTotal: 842,
+        priorTotal: 712,
+        vsLabel: 'vs prior 30 days',
+      },
+    ]
   )
   passed++
 
@@ -120,7 +140,17 @@ try {
       ],
     },
     sampleComparison,
-    [{ direction: 'up', percent: 8, vsLabel: 'vs prior 30 days' }]
+    [
+      {
+        direction: 'up',
+        percent: 8,
+        times: 1.08,
+        absoluteChange: 400,
+        currentTotal: 5200,
+        priorTotal: 4800,
+        vsLabel: 'vs prior 30 days',
+      },
+    ]
   )
   passed++
 
@@ -178,7 +208,15 @@ try {
     },
     sampleComparison,
     [
-      { direction: 'up', percent: 18, vsLabel: 'vs prior 30 days' },
+      {
+        direction: 'up',
+        percent: 18,
+        times: 1.18,
+        absoluteChange: 95,
+        currentTotal: 615,
+        priorTotal: 520,
+        vsLabel: 'vs prior 30 days',
+      },
       null,
     ]
   )

@@ -18,7 +18,7 @@ function DashboardConnectedAccounts({ accounts = [] }) {
   return (
     <section
       aria-labelledby="connected-accounts-heading"
-      className="rounded-xl border border-border-default bg-surface p-4 sm:p-5"
+      className="rounded-xl border border-border-default bg-surface p-4 sm:p-5 card-shadow"
     >
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>

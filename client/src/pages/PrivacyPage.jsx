@@ -57,9 +57,10 @@ function PrivacyPage() {
       <Section title="Analytics">
         <p>
           If enabled, we use PostHog for product analytics (for example: page views, connect bank,
-          upgrade clicks, weekly review / month letter views, and activation checklist steps). We do
-          not send balances, transaction lists, or chat message contents to PostHog. You can ask us
-          to disable analytics for your account by contacting privacy@soverm.com.
+          upgrade clicks, weekly review / month letter views, activation checklist steps, and
+          welcome intro modal views/dismissals). We do not send balances, transaction lists, or chat
+          message contents to PostHog. You can ask us to disable analytics for your account by
+          contacting privacy@soverm.com.
         </p>
       </Section>
 

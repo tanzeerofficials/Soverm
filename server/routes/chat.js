@@ -20,6 +20,7 @@ import { extractSpendIntent } from '../utils/extractSpendIntent.js'
 import {
   chatRateLimitMiddleware,
   getChatRateLimitStatus,
+  reserveChatSlot,
 } from '../utils/rateLimit.js'
 import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
 import { reportServerError } from '../utils/sentry.js'
@@ -83,16 +84,22 @@ async function loadBeforeYouSpendForMessage(userId, message) {
   }
 }
 
-async function persistChatExchange({
-  userId,
-  insightId,
-  userMessage,
-  assistantMessage,
-}) {
+/*
+ * What this does: under a user-row lock, confirms a chat slot is free and
+ * inserts the user message immediately so concurrent requests cannot both
+ * pass the count check and both call Claude.
+ */
+async function reserveChatExchange({ userId, insightId, userMessage }) {
   const client = await db.connect()
 
   try {
     await client.query('BEGIN')
+
+    const reservation = await reserveChatSlot(client, userId)
+    if (!reservation.allowed) {
+      await client.query('ROLLBACK')
+      return { allowed: false, status: reservation.status }
+    }
 
     await client.query(
       `INSERT INTO chat_messages (id, user_id, insight_id, role, content)
@@ -100,19 +107,22 @@ async function persistChatExchange({
       [userId, insightId, userMessage]
     )
 
-    await client.query(
-      `INSERT INTO chat_messages (id, user_id, insight_id, role, content)
-       VALUES (gen_random_uuid(), $1, $2, 'assistant', $3)`,
-      [userId, insightId, assistantMessage]
-    )
-
     await client.query('COMMIT')
+    return { allowed: true, status: reservation.status }
   } catch (dbErr) {
     await client.query('ROLLBACK')
     throw dbErr
   } finally {
     client.release()
   }
+}
+
+async function persistAssistantReply({ userId, insightId, assistantMessage }) {
+  await db.query(
+    `INSERT INTO chat_messages (id, user_id, insight_id, role, content)
+     VALUES (gen_random_uuid(), $1, $2, 'assistant', $3)`,
+    [userId, insightId, assistantMessage]
+  )
 }
 
 async function respondWithChatAnswer(req, res, {
@@ -127,6 +137,33 @@ async function respondWithChatAnswer(req, res, {
   errorLabel,
   streamAlreadyStarted = false,
 }) {
+  const reservation = await reserveChatExchange({
+    userId,
+    insightId,
+    userMessage: trimmedMessage,
+  })
+
+  if (!reservation.allowed) {
+    if (streamAlreadyStarted || wantsStream(req)) {
+      if (!streamAlreadyStarted) {
+        beginChatSse(res)
+      }
+      writeSse(res, {
+        type: 'error',
+        error: 'rate_limit_exceeded',
+        message: reservation.status.message,
+        chatLimit: chatLimitPayload(reservation.status),
+      })
+      res.end()
+      return
+    }
+    return res.status(429).json({
+      error: 'rate_limit_exceeded',
+      message: reservation.status.message,
+      ...chatLimitPayload(reservation.status),
+    })
+  }
+
   const beforeYouSpendVerdict = await loadBeforeYouSpendForMessage(
     userId,
     trimmedMessage
@@ -166,10 +203,9 @@ async function respondWithChatAnswer(req, res, {
         }
       )
 
-      await persistChatExchange({
+      await persistAssistantReply({
         userId,
         insightId,
-        userMessage: trimmedMessage,
         assistantMessage: claudeResponseText,
       })
 
@@ -192,10 +228,9 @@ async function respondWithChatAnswer(req, res, {
       askOptions
     )
 
-    await persistChatExchange({
+    await persistAssistantReply({
       userId,
       insightId,
-      userMessage: trimmedMessage,
       assistantMessage: claudeResponseText,
     })
 

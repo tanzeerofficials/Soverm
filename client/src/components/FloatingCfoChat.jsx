@@ -78,13 +78,13 @@ function FloatingCfoChatModal({
    */
   return (
     <div
-      className="fixed inset-0 z-[60] flex h-dvh max-h-dvh w-screen items-center justify-center bg-black/60"
+      className="fixed inset-0 z-[60] flex h-dvh max-h-dvh w-full items-center justify-center bg-black/60"
       onClick={onClose}
       role="presentation"
     >
       <div
         ref={dialogRef}
-        className="flex h-full max-h-full min-h-0 w-full flex-col overflow-hidden bg-app sm:h-[80vh] sm:max-h-[80vh] sm:w-full sm:max-w-3xl sm:rounded-xl sm:border sm:border-border-default sm:shadow-xl"
+        className="flex h-full max-h-full min-h-0 w-full flex-col overflow-hidden bg-app sm:h-[80vh] sm:max-h-[80vh] sm:w-full sm:max-w-3xl sm:rounded-xl sm:border sm:border-border-default sm:card-shadow-md"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -105,7 +105,7 @@ function FloatingCfoChatModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-fg-muted transition hover:bg-surface-elevated hover:text-white"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-fg-muted transition hover:bg-surface-elevated hover:text-fg"
             aria-label="Close chat"
           >
             <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">

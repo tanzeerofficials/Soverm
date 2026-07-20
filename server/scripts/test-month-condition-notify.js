@@ -46,4 +46,13 @@ assert(formatted.subject.includes('accountant letter'), 'subject mentions letter
 assert(formatted.text.includes('month-condition?month=2026-06'), 'deep-link')
 assert(formatted.html.includes('Read your letter'), 'html CTA')
 
+const xss = formatMonthConditionNotifyEmail({
+  ...sample,
+  name: 'Alex',
+  summary: 'Buffer is thin & spending rose <script>x</script>.',
+})
+assert(!xss.html.includes('<script>'), 'html escapes tags in summary')
+assert(xss.html.includes('&lt;script&gt;'), 'script becomes entities')
+assert(xss.html.includes('&amp;'), 'ampersand escaped')
+
 console.log('All monthConditionNotify tests passed.')

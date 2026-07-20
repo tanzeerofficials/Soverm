@@ -7,9 +7,13 @@
 import {
   calendarMonthSqlBounds,
   formatIsoDateInAppTz,
+  getAppDayBounds,
+  getAppTodaySqlParams,
   getCalendarMonthWindow,
   getCurrentProgressMonth,
+  getSecondsUntilAppTomorrow,
   getZonedDateParts,
+  zonedMidnightToUtc,
 } from '../utils/calendarMonth.js'
 
 function assert(condition, message) {
@@ -40,6 +44,25 @@ assert(bounds.startIso === '2026-06-01' && bounds.endExclusiveIso === '2026-07-0
 // Mid-month sanity
 const midJuly = new Date('2026-07-15T16:00:00.000Z')
 assert(getCurrentProgressMonth(midJuly) === '2026-07-01', 'mid-July progress month')
+
+const dayBounds = getAppDayBounds(june30Et)
+assert(dayBounds.todayIso === '2026-06-30', 'app day today is June 30 ET')
+assert(dayBounds.tomorrowIso === '2026-07-01', 'app day tomorrow is July 1')
+
+const sqlParams = getAppTodaySqlParams(june30Et)
+assert(sqlParams.todayIso === '2026-06-30', 'SQL today param')
+assert(sqlParams.tomorrowIso === '2026-07-01', 'SQL tomorrow param')
+assert(sqlParams.timeZone === 'America/New_York', 'SQL timezone param')
+
+const midnightEt = zonedMidnightToUtc('2026-07-01', 'America/New_York')
+assert(formatIsoDateInAppTz(midnightEt, 'America/New_York') === '2026-07-01', 'midnight lands on July 1 ET')
+assert(
+  formatIsoDateInAppTz(new Date(midnightEt.getTime() - 1000), 'America/New_York') === '2026-06-30',
+  'one second before is still June 30 ET'
+)
+
+const seconds = getSecondsUntilAppTomorrow(june30Et)
+assert(seconds > 0 && seconds < 24 * 60 * 60, 'seconds until ET tomorrow is within a day')
 
 if (originalTz === undefined) {
   delete process.env.APP_TIMEZONE

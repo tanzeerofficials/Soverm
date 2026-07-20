@@ -19,6 +19,7 @@ import {
   notificationActionLabel,
   navigateToNotification,
 } from '../lib/notificationNavigation.js'
+import { useFocusTrap } from '../hooks/useFocusTrap.js'
 
 function BellIcon({ className = 'h-5 w-5' }) {
   return (
@@ -34,7 +35,10 @@ function NotificationBell() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const containerRef = useRef(null)
+  const panelRef = useRef(null)
   const [open, setOpen] = useState(false)
+
+  useFocusTrap(open, panelRef)
 
   const { data, isPending } = useQuery({
     queryKey: notificationsAllQueryKey,
@@ -123,8 +127,9 @@ function NotificationBell() {
 
       {open && (
         <div
+          ref={panelRef}
           id={panelId}
-          className="absolute right-0 top-full z-50 mt-2 w-[min(18rem,calc(100vw-2.5rem))] overflow-hidden rounded-xl border border-border-default bg-surface/95 shadow-[0_16px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:w-72"
+          className="absolute right-0 top-full z-50 mt-2 w-[min(18rem,calc(100vw-2.5rem))] overflow-hidden rounded-xl border border-border-default bg-surface/95 overlay-shadow backdrop-blur-xl sm:w-72"
           role="dialog"
           aria-label="Notifications"
         >

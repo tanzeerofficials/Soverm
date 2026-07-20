@@ -75,7 +75,7 @@ function LandingPage() {
                 <SignUpButton mode="modal">
                   <button
                     type="button"
-                    className="rounded-lg bg-brand px-8 py-4 text-base font-semibold text-slate-950 transition hover:bg-brand-soft"
+                    className="rounded-lg bg-brand px-8 py-4 text-base font-semibold text-brand-fg transition hover:bg-brand-soft"
                   >
                     Start free
                   </button>

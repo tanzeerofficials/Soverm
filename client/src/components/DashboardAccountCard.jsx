@@ -2,7 +2,7 @@ import AccountBalanceDisplay from './AccountBalanceDisplay.jsx'
 
 function DashboardAccountCard({ account, onDisconnect }) {
   return (
-    <article className="relative min-w-0 rounded-xl border border-border-default bg-surface p-4 transition hover:border-brand/40 hover:bg-surface-elevated sm:p-5">
+    <article className="relative min-w-0 rounded-xl border border-border-default bg-surface p-4 card-shadow transition hover:border-brand/40 hover:bg-surface-elevated sm:p-5">
       <button
         type="button"
         onClick={() => onDisconnect(account)}

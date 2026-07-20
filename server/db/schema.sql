@@ -15,6 +15,7 @@ CREATE TABLE users (
   next_payday_on DATE,
   payday_source TEXT CHECK (payday_source IS NULL OR payday_source IN ('inferred', 'user')),
   payday_updated_at TIMESTAMP,
+  chat_context_epoch INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -29,6 +30,7 @@ CREATE UNIQUE INDEX users_stripe_subscription_id_uidx
 CREATE TABLE plaid_items (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id TEXT NOT NULL REFERENCES users(id),
+  -- Prefer PLAID_TOKEN_ENCRYPTION_KEY (enc:v1:…); plaintext only if key unset
   plaid_access_token TEXT UNIQUE NOT NULL,
   plaid_external_item_id TEXT,
   plaid_cursor TEXT,
@@ -46,7 +48,6 @@ CREATE TABLE accounts (
   user_id TEXT REFERENCES users(id),
   plaid_item_id UUID REFERENCES plaid_items(id),
   plaid_account_id TEXT UNIQUE,
-  plaid_access_token TEXT,
   bank_name TEXT,
   account_name TEXT,
   account_type TEXT,
@@ -148,6 +149,9 @@ CREATE TABLE notifications (
 CREATE INDEX idx_notifications_user_created ON notifications(user_id, created_at DESC);
 CREATE INDEX idx_notifications_user_unread ON notifications(user_id, read) WHERE read = false;
 CREATE INDEX idx_notifications_dedup ON notifications(user_id, trigger_type, dedup_key, created_at DESC);
+CREATE UNIQUE INDEX notifications_user_trigger_dedup_uidx
+  ON notifications (user_id, trigger_type, dedup_key)
+  WHERE dedup_key IS NOT NULL;
 
 CREATE TABLE expense_analyzer_narratives (
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -232,3 +236,19 @@ CREATE UNIQUE INDEX category_soft_limits_user_category_active_uidx
 CREATE INDEX category_soft_limits_user_active_idx
   ON category_soft_limits (user_id)
   WHERE active = true;
+
+CREATE TABLE plaid_webhook_events (
+  id TEXT PRIMARY KEY,
+  item_id TEXT,
+  webhook_type TEXT,
+  webhook_code TEXT,
+  user_id TEXT,
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'processing', 'done', 'failed')),
+  error_message TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  processed_at TIMESTAMPTZ
+);
+
+CREATE INDEX plaid_webhook_events_status_created_idx
+  ON plaid_webhook_events (status, created_at DESC);

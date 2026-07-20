@@ -50,7 +50,12 @@ export const CSP_CONNECT_SRC = [
 
 export const CSP_SCRIPT_SRC = [
   "'self'",
-  // Clerk injects/bootstrap scripts; style-in-JS companions often need unsafe-inline nearby
+  /*
+   * Clerk injects inline bootstrap/helpers at runtime. Until Clerk supports
+   * nonces on those scripts, 'unsafe-inline' stays required for auth to work.
+   * First-party code (theme-boot.js, Vite bundles) loads from 'self' only —
+   * no inline <script> blocks in index.html.
+   */
   "'unsafe-inline'",
   'https://*.clerk.accounts.dev',
   'https://*.clerk.com',

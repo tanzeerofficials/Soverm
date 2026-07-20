@@ -62,7 +62,7 @@ function ExpenseAnalyzerNarrativeSection({
 
   return (
     <section
-      className="rounded-xl border border-border-default bg-surface"
+      className="rounded-xl border border-border-default bg-surface card-shadow"
       aria-label="Expense analysis and summary"
     >
       <div className="px-5 py-5 sm:px-6">
@@ -130,7 +130,7 @@ function ExpenseAnalyzerNarrativeSection({
                 type="button"
                 onClick={generatePersonalized}
                 disabled={isGenerating || !fingerprint}
-                className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-brand-fg transition hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isGenerating ? 'Preparing your summary…' : 'Get expense summary'}
               </button>

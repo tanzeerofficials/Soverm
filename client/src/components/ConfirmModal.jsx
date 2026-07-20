@@ -5,7 +5,8 @@
  * Optional confirmationPhrase requires typing an exact string before confirming.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useFocusTrap } from '../hooks/useFocusTrap.js'
 
 function ConfirmModal({
   isOpen,
@@ -18,6 +19,9 @@ function ConfirmModal({
   onCancel,
 }) {
   const [typedPhrase, setTypedPhrase] = useState('')
+  const dialogRef = useRef(null)
+
+  useFocusTrap(isOpen, dialogRef)
 
   useEffect(() => {
     if (!isOpen) {
@@ -47,7 +51,8 @@ function ConfirmModal({
       role="presentation"
     >
       <div
-        className="w-full max-w-sm rounded-xl border border-border-default bg-surface p-6"
+        ref={dialogRef}
+        className="w-full max-w-sm rounded-xl border border-border-default bg-surface p-6 card-shadow-md"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -83,7 +88,8 @@ function ConfirmModal({
               value={typedPhrase}
               onChange={(event) => setTypedPhrase(event.target.value)}
               autoComplete="off"
-              className="w-full min-h-11 rounded-lg border border-border-default bg-app px-3 py-2 text-base text-fg focus:border-danger focus:outline-none"
+              data-autofocus
+              className="w-full min-h-11 rounded-lg border border-border-default bg-app px-3 py-2 text-base text-fg focus:border-danger focus:outline-none focus-visible:ring-2 focus-visible:ring-danger/40"
             />
           </div>
         )}
@@ -92,7 +98,7 @@ function ConfirmModal({
           <button
             type="button"
             onClick={onCancel}
-            className="min-h-11 px-4 py-2 text-sm text-fg-muted transition hover:text-fg"
+            className="min-h-11 px-4 py-2 text-sm text-fg-muted transition hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
           >
             Cancel
           </button>
@@ -100,7 +106,8 @@ function ConfirmModal({
             type="button"
             onClick={onConfirm}
             disabled={!phraseMatches || isConfirming}
-            className="min-h-11 rounded-lg bg-danger px-4 py-2 text-sm font-medium text-fg transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            data-autofocus={!phraseRequired ? 'true' : undefined}
+            className="min-h-11 rounded-lg bg-danger px-4 py-2 text-sm font-medium text-fg transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/40 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isConfirming ? 'Deleting…' : confirmLabel}
           </button>

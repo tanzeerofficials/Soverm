@@ -3,9 +3,12 @@
  *
  * Mounted with express.raw so Stripe signature verification works.
  * Updates users.subscription_tier when Checkout completes or a subscription ends.
+ *
+ * Event ids are persisted so Stripe retries / replays do not re-run billing work.
  */
 
 import { Router } from 'express'
+import db from '../db/index.js'
 import {
   getStripeClient,
   isStripeBillingConfigured,
@@ -18,6 +21,67 @@ import {
 import { reportServerError } from '../utils/sentry.js'
 
 const router = Router()
+
+async function claimStripeEvent(event) {
+  try {
+    const result = await db.query(
+      `INSERT INTO stripe_webhook_events (id, event_type, status)
+       VALUES ($1, $2, 'pending')
+       ON CONFLICT (id) DO NOTHING
+       RETURNING id`,
+      [event.id, event.type]
+    )
+    return { claimed: result.rows.length > 0 }
+  } catch (err) {
+    // Migration 029 not applied — process without dedup rather than drop webhooks.
+    if (err.code === '42P01') {
+      console.warn(
+        '[stripe-webhook] stripe_webhook_events missing — run migration 029; processing without dedup'
+      )
+      return { claimed: true, dedupUnavailable: true }
+    }
+    throw err
+  }
+}
+
+async function markStripeEventProcessed(eventId) {
+  try {
+    await db.query(
+      `UPDATE stripe_webhook_events
+       SET status = 'processed',
+           error_message = NULL,
+           processed_at = NOW()
+       WHERE id = $1`,
+      [eventId]
+    )
+  } catch (err) {
+    if (err.code !== '42P01') {
+      console.warn('[stripe-webhook] failed to mark event processed:', err.message)
+    }
+  }
+}
+
+/**
+ * Release the claim on failure so Stripe's retry can re-process.
+ * Leaving a "failed" row would permanently skip the event.
+ */
+async function releaseStripeEventClaim(eventId, message) {
+  try {
+    await db.query(
+      `DELETE FROM stripe_webhook_events WHERE id = $1`,
+      [eventId]
+    )
+    if (message) {
+      console.warn(
+        `[stripe-webhook] released claim for ${eventId} after error: ${message.slice(0, 200)}`
+      )
+    }
+  } catch (err) {
+    if (err.code !== '42P01') {
+      console.warn('[stripe-webhook] failed to release event claim:', err.message)
+    }
+  }
+}
 
 router.post('/', async (req, res) => {
   if (!isStripeBillingConfigured()) {
@@ -44,6 +108,11 @@ router.post('/', async (req, res) => {
   }
 
   try {
+    const claim = await claimStripeEvent(event)
+    if (!claim.claimed) {
+      return res.json({ received: true, deduped: true })
+    }
+
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object
@@ -112,8 +181,10 @@ router.post('/', async (req, res) => {
         break
     }
 
+    await markStripeEventProcessed(event.id)
     res.json({ received: true })
   } catch (err) {
+    await releaseStripeEventClaim(event?.id, err.message)
     reportServerError('to process Stripe webhook', err, { req })
     res.status(500).json({ error: 'Failed to process webhook' })
   }

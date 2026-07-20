@@ -21,6 +21,7 @@ import { loadExpenseAnalyzerChatContext } from './expenseAnalyzerChatContext.js'
 import { loadChatPmfContext } from './chatPmfContext.js'
 import {
   getChatFinancialSnapshot,
+  loadChatContextEpoch,
   setChatFinancialSnapshot,
   withChatFinancialSnapshotInflight,
 } from './chatFinancialSnapshotCache.js'
@@ -306,21 +307,25 @@ async function buildChatFinancialContext(userId, lastSyncedAt) {
  * chat turns reuse the same pack until money data actually changes.
  */
 export async function loadChatFinancialContext(userId) {
-  const lastSyncedAt = await loadLastSyncedAt(userId)
-  const cached = getChatFinancialSnapshot(userId, lastSyncedAt)
+  const [lastSyncedAt, epoch] = await Promise.all([
+    loadLastSyncedAt(userId),
+    loadChatContextEpoch(userId),
+  ])
+  const cached = getChatFinancialSnapshot(userId, lastSyncedAt, epoch)
   if (cached) {
     return cached
   }
 
   return withChatFinancialSnapshotInflight(userId, async () => {
-    // Another request may have finished while we waited for the inflight lock.
-    const again = getChatFinancialSnapshot(userId, lastSyncedAt)
+    // Re-read epoch in case another replica invalidated while we waited.
+    const freshEpoch = await loadChatContextEpoch(userId)
+    const again = getChatFinancialSnapshot(userId, lastSyncedAt, freshEpoch)
     if (again) {
       return again
     }
 
     const snapshot = await buildChatFinancialContext(userId, lastSyncedAt)
-    setChatFinancialSnapshot(userId, lastSyncedAt, snapshot)
+    setChatFinancialSnapshot(userId, lastSyncedAt, snapshot, freshEpoch)
     return snapshot
   })
 }

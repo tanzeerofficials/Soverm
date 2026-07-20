@@ -4,8 +4,6 @@
  * Usage: node scripts/test-badge-tone-logic.js
  */
 
-/* global process */
-
 import { toneForChange } from '../src/lib/insightDisplay.js'
 
 function assertEqual(actual, expected, message) {
@@ -13,8 +11,6 @@ function assertEqual(actual, expected, message) {
     throw new Error(`${message}: expected ${expected}, got ${actual}`)
   }
 }
-
-let passed = 0
 
 try {
   console.log('Badge tone logic tests (insightDisplay.js)\n')
@@ -32,7 +28,7 @@ try {
   assertEqual(toneForChange('spending', 'up', true), 'negative', 'spending new = red')
   console.log('  pass: neutral + new-category tones')
 
-  passed = 3
+  const passed = 3
   console.log(`\n${passed}/${passed} tone groups verified`)
 } catch (err) {
   console.error(`\nFAIL: ${err.message}`)

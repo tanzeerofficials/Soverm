@@ -9,18 +9,15 @@
  *
  * What it does:
  * - Cancels any active Stripe subscription (best-effort) before wiping rows
- * - Collects access tokens from both plaid_items and legacy accounts rows
+ * - Collects access tokens from plaid_items
  * - Deletes the user row (CASCADE clears related tables where configured)
  * - Calls Plaid itemRemove for every unique token after the DB commit
- *
- * Why we need both token sources:
- * - Older links may still store plaid_access_token on accounts without a
- *   plaid_items row. Skipping those would leave a live bank link at Plaid.
  */
 
 import db from '../db/index.js'
 import { plaidClient } from '../services/plaid.js'
 import { cancelStripeSubscriptionsForUser } from '../services/stripeBilling.js'
+import { decryptAccessToken } from './tokenCrypto.js'
 
 export async function deleteAllUserData(userId) {
   /*
@@ -44,20 +41,7 @@ export async function deleteAllUserData(userId) {
     )
     for (const row of itemsResult.rows) {
       if (row.plaid_access_token) {
-        accessTokens.add(row.plaid_access_token)
-      }
-    }
-
-    const legacyAccountsResult = await client.query(
-      `SELECT plaid_access_token
-       FROM accounts
-       WHERE user_id = $1
-         AND plaid_access_token IS NOT NULL`,
-      [userId]
-    )
-    for (const row of legacyAccountsResult.rows) {
-      if (row.plaid_access_token) {
-        accessTokens.add(row.plaid_access_token)
+        accessTokens.add(decryptAccessToken(row.plaid_access_token))
       }
     }
 

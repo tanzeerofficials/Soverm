@@ -102,6 +102,22 @@ export async function createAction(
     throw error
   }
 
+  let resolvedInsightId = insightId ?? null
+  if (resolvedInsightId) {
+    const ownership = await db.query(
+      `SELECT id
+       FROM insights
+       WHERE id = $1 AND user_id = $2
+       LIMIT 1`,
+      [resolvedInsightId, userId]
+    )
+    if (ownership.rows.length === 0) {
+      const error = new Error('Insight not found')
+      error.statusCode = 404
+      throw error
+    }
+  }
+
   const hasLifecycle = await hasActionLifecycleColumns()
   const completed = mapStatusToCompleted(status)
 
@@ -110,7 +126,7 @@ export async function createAction(
       `INSERT INTO actions (user_id, insight_id, description, completed)
        VALUES ($1, $2, $3, $4)
        RETURNING id, description, completed, created_at, insight_id`,
-      [userId, insightId, text, completed]
+      [userId, resolvedInsightId, text, completed]
     )
     invalidateChatFinancialSnapshot(userId)
     return mapActionRow(result.rows[0])
@@ -129,7 +145,7 @@ export async function createAction(
                accepted_at, resolved_at`,
     [
       userId,
-      insightId,
+      resolvedInsightId,
       text,
       completed,
       status,

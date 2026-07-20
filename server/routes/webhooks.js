@@ -9,11 +9,10 @@
  * Instead, we verify a special signature to prove the message
  * really came from Clerk and not a random stranger on the internet.
  *
- * PLAID WEBHOOKS: Not used. There is no POST /webhooks/plaid route and no
- * webhook URL is registered with Plaid — sync is pull-based (/api/plaid/sync-transactions
- * and the cron job). plaid-node v42 has no verifyWebhook helper; if Plaid webhooks are
- * added later, verify the Plaid-Verification JWT per Plaid docs using
- * plaidClient.webhookVerificationKeyGet() (ES256 + request_body_sha256 check).
+ * PLAID WEBHOOKS: Handled at POST /webhooks/plaid (see plaidWebhooks.js).
+ * Signature is verified with Plaid-Verification JWT (ES256 + body hash),
+ * events are deduped in plaid_webhook_events, and sync runs asynchronously
+ * after a fast 200 ACK. Cron remains a fallback sync path.
  *
  * CLERK WEBHOOKS: user.created inserts a Postgres row; user.updated syncs
  * email/name; user.deleted purges app data. Unknown events still return 200

@@ -1,4 +1,4 @@
-import { CHART_BAR_SEQUENCE } from './expenseAnalyzerChartTheme.js'
+import { getChartTheme } from './expenseAnalyzerChartTheme.js'
 import { formatCategoryDisplayName } from './categoryDisplayNames.js'
 
 const MAX_SLICES = 5
@@ -41,6 +41,7 @@ export function prepareDonutSlices(categoryBreakdown) {
   }
 
   const slices = primary.map((entry, index) => toSlice(entry, index, total))
+  const barSequence = getChartTheme().barSequence
 
   if (otherTotal > 0) {
     slices.push({
@@ -48,7 +49,7 @@ export function prepareDonutSlices(categoryBreakdown) {
       label: 'Other',
       amount: otherTotal,
       percent: (otherTotal / total) * 100,
-      color: CHART_BAR_SEQUENCE[slices.length % CHART_BAR_SEQUENCE.length],
+      color: barSequence[slices.length % barSequence.length],
       entry: null,
     })
   }
@@ -57,12 +58,13 @@ export function prepareDonutSlices(categoryBreakdown) {
 }
 
 function toSlice(entry, index, total) {
+  const barSequence = getChartTheme().barSequence
   return {
     key: entry.category,
     label: formatCategoryDisplayName(entry.category),
     amount: entry.currentTotal,
     percent: (entry.currentTotal / total) * 100,
-    color: CHART_BAR_SEQUENCE[index % CHART_BAR_SEQUENCE.length],
+    color: barSequence[index % barSequence.length],
     entry,
   }
 }
@@ -94,12 +96,13 @@ export function prepareRecurringSlices(recurringCharges) {
     0
   )
 
+  const barSequence = getChartTheme().barSequence
   const slices = visible.map((charge, index) => ({
     key: `${charge.merchant}-${charge.lastChargedDate}`,
     label: charge.merchant,
     amount: charge.monthlyEquivalent ?? charge.averageAmount ?? 0,
     percent: ((charge.monthlyEquivalent ?? charge.averageAmount ?? 0) / total) * 100,
-    color: CHART_BAR_SEQUENCE[index % CHART_BAR_SEQUENCE.length],
+    color: barSequence[index % barSequence.length],
   }))
 
   if (otherTotal > 0) {
@@ -108,7 +111,7 @@ export function prepareRecurringSlices(recurringCharges) {
       label: 'Other',
       amount: otherTotal,
       percent: (otherTotal / total) * 100,
-      color: CHART_BAR_SEQUENCE[slices.length % CHART_BAR_SEQUENCE.length],
+      color: barSequence[slices.length % barSequence.length],
     })
   }
 

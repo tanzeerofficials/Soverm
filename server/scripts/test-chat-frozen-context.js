@@ -94,7 +94,7 @@ try {
     'prompt must not reference live transaction data'
   )
   assert(
-    prompt.includes('Overall spending: up 18% vs prior 30 days ($3287 vs $2797)'),
+    prompt.includes('Overall spending: $3,287 this period (was $2,797 before, +$490)'),
     'prompt must include frozen MoM figures'
   )
   assert(

@@ -18,7 +18,7 @@ function formatCurrency(amount) {
 function DashboardSpendingSnapshot({ summary, isLoading }) {
   if (isLoading) {
     return (
-      <section className="rounded-xl border border-border-default bg-surface p-4 sm:p-5">
+      <section className="rounded-xl border border-border-default bg-surface p-4 sm:p-5 card-shadow">
         <Skeleton className="h-4 w-40" />
         <Skeleton className="mt-4 h-16 w-full" />
         <Skeleton className="mt-3 h-10 w-full" />
@@ -32,7 +32,7 @@ function DashboardSpendingSnapshot({ summary, isLoading }) {
 
   if (!hasRecurring) {
     return (
-      <section className="rounded-xl border border-border-default bg-surface p-4 sm:p-5">
+      <section className="rounded-xl border border-border-default bg-surface p-4 sm:p-5 card-shadow">
         <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-ai-soft">
           Spending snapshot
         </p>
@@ -50,7 +50,7 @@ function DashboardSpendingSnapshot({ summary, isLoading }) {
   }
 
   return (
-    <section className="rounded-xl border border-border-default bg-surface p-4 sm:p-5">
+    <section className="rounded-xl border border-border-default bg-surface p-4 sm:p-5 card-shadow">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-ai-soft">

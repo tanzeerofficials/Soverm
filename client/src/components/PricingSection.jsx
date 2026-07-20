@@ -128,7 +128,7 @@ function PricingSection() {
 
       <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2">
         <div className="relative flex flex-col rounded-xl border border-brand/40 bg-brand/5 p-6 shadow-[0_0_32px_rgba(16,185,129,0.08)]">
-          <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-brand px-3 py-1 text-xs font-semibold text-slate-950">
+          <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-brand px-3 py-1 text-xs font-semibold text-brand-fg">
             Start here
           </span>
           <h3 className="text-lg font-semibold text-fg">Free</h3>
@@ -142,7 +142,7 @@ function PricingSection() {
             <SignUpButton mode="modal">
               <button
                 type="button"
-                className="w-full rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-brand-soft"
+                className="w-full rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-brand-fg transition hover:bg-brand-soft"
               >
                 Start free
               </button>

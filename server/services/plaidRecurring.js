@@ -10,6 +10,7 @@ import {
   isCoincidentalMerchantName,
   isExcludedFromRecurringDetection,
 } from '../utils/recurringChargeFilters.js'
+import { decryptAccessToken } from '../utils/tokenCrypto.js'
 
 const PLAID_FREQUENCY_TO_CADENCE = {
   WEEKLY: 'weekly',
@@ -118,11 +119,11 @@ export async function loadAccountLookupByPlaidAccountId(userId) {
 
 export async function fetchPlaidRecurringOutflowsForUser(userId) {
   const tokensResult = await db.query(
-    `SELECT DISTINCT COALESCE(pi.plaid_access_token, a.plaid_access_token) AS access_token
+    `SELECT DISTINCT pi.plaid_access_token AS access_token
      FROM accounts a
-     LEFT JOIN plaid_items pi ON a.plaid_item_id = pi.id
+     INNER JOIN plaid_items pi ON a.plaid_item_id = pi.id
      WHERE a.user_id = $1
-       AND COALESCE(pi.plaid_access_token, a.plaid_access_token) IS NOT NULL`,
+       AND pi.plaid_access_token IS NOT NULL`,
     [userId]
   )
 
@@ -133,7 +134,8 @@ export async function fetchPlaidRecurringOutflowsForUser(userId) {
   const accountLookup = await loadAccountLookupByPlaidAccountId(userId)
   const streams = []
 
-  for (const { access_token: accessToken } of tokensResult.rows) {
+  for (const { access_token: storedToken } of tokensResult.rows) {
+    const accessToken = decryptAccessToken(storedToken)
     try {
       const response = await plaidClient.transactionsRecurringGet({
         access_token: accessToken,

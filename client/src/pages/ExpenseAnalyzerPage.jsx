@@ -34,12 +34,13 @@ import {
   AccountSourceLine,
   CategoryMetaBadges,
   CategoryRecurringLine,
-  formatCategoryDisplayName,
-  getCategoryExamples,
-  formatCategoryAccountSources,
-  formatRecurringAccountSource,
   formatCurrency,
 } from '../components/expenseAnalyzer/ExpenseAnalyzerDisplay.jsx'
+import { formatCategoryDisplayName, getCategoryExamples } from '../lib/categoryDisplayNames.js'
+import {
+  formatCategoryAccountSources,
+  formatRecurringAccountSource,
+} from '../lib/accountAttribution.js'
 import { upsertCategoryLimit, fetchCategoryLimits, deleteCategoryLimit } from '../lib/fetchCategoryLimits.js'
 import CategorySoftLimitControl, {
   CategorySoftLimitsIntro,
@@ -214,11 +215,11 @@ function formatConfidenceLabel(confidence) {
 function confidenceBadgeStyles(confidence) {
   switch (confidence) {
     case 'high':
-      return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+      return 'border-brand/30 bg-brand/10 text-brand'
     case 'medium':
-      return 'border-amber-500/30 bg-amber-500/10 text-amber-200'
+      return 'border-warning/30 bg-warning/10 text-warning'
     default:
-      return 'border-orange-500/30 bg-orange-500/10 text-orange-200'
+      return 'border-warning/40 bg-warning/10 text-fg-muted'
   }
 }
 
@@ -237,25 +238,12 @@ function formatOverallSpendingLine(overallSpending) {
     return `You spent ${formatCurrency(currentTotal)} in the last 30 days.`
   }
 
-  const times =
-    delta.times ??
-    (priorTotal > 0 ? currentTotal / priorTotal : null)
-  const timesLabel =
-    times == null
-      ? null
-      : times >= 10
-        ? `${Math.round(times)}×`
-        : `${(Math.round(times * 10) / 10).toFixed(1).replace(/\.0$/, '')}×`
   const signedChange =
     delta.absoluteChange != null
       ? `${delta.direction === 'down' ? '−' : '+'}${formatCurrency(delta.absoluteChange)}`
       : null
 
-  if (timesLabel) {
-    return `You spent ${formatCurrency(currentTotal)} in the last 30 days — about ${timesLabel} the prior 30 days (${formatCurrency(priorTotal)}${signedChange ? `, ${signedChange}` : ''}).`
-  }
-
-  return `You spent ${formatCurrency(currentTotal)} in the last 30 days vs ${formatCurrency(priorTotal)} in the prior 30 days.`
+  return `You spent ${formatCurrency(currentTotal)} in the last 30 days, compared with ${formatCurrency(priorTotal)} in the prior 30 days${signedChange ? ` (${signedChange})` : ''}.`
 }
 
 function ExpenseAnalyzerPage() {
@@ -438,11 +426,11 @@ function ExpenseAnalyzerPage() {
 
         {isLoading ? (
           <div className="space-y-6 sm:space-y-8" aria-busy="true" aria-label="Loading expense analyzer">
-            <div className="flex gap-1.5 overflow-hidden rounded-2xl border border-border-default bg-surface p-1.5">
-              <Skeleton className="h-14 min-w-[5.75rem] flex-1 rounded-xl" />
-              <Skeleton className="h-14 min-w-[5.75rem] flex-1 rounded-xl" />
-              <Skeleton className="h-14 min-w-[5.75rem] flex-1 rounded-xl" />
-              <Skeleton className="hidden h-14 flex-1 rounded-xl sm:block" />
+            <div className="flex gap-1.5 overflow-hidden rounded-2xl border border-border-default bg-surface p-1.5 card-shadow">
+              <Skeleton className="h-14 min-w-0 flex-1 rounded-xl" />
+              <Skeleton className="h-14 min-w-0 flex-1 rounded-xl" />
+              <Skeleton className="h-14 min-w-0 flex-1 rounded-xl" />
+              <Skeleton className="hidden h-14 min-w-0 flex-1 rounded-xl sm:block" />
             </div>
             <Skeleton className="h-72 w-full rounded-2xl" />
             <div className="space-y-3">
@@ -452,7 +440,7 @@ function ExpenseAnalyzerPage() {
             </div>
           </div>
         ) : isError ? (
-          <div className="rounded-xl border border-border-default bg-surface px-6 py-10 text-center">
+          <div className="rounded-xl border border-border-default bg-surface px-6 py-10 text-center card-shadow">
             <p className="text-sm text-fg-muted">
               Couldn&apos;t load your expense breakdown. Please try again in a moment.
             </p>
@@ -488,7 +476,7 @@ function ExpenseAnalyzerPage() {
 
               {topMoverHeadline && topMoverStyles && (
                 <section
-                  className="rounded-xl border border-border-default bg-surface p-5 sm:p-6"
+                  className="rounded-xl border border-border-default bg-surface p-5 sm:p-6 card-shadow"
                   aria-label="Category worth a look"
                 >
                   <HeadlineTypeBadge variant={topMoverStyles.badgeVariant} className="mb-3" />
@@ -512,14 +500,14 @@ function ExpenseAnalyzerPage() {
                   totalRecurringMonthly={totalRecurringMonthly}
                 />
               ) : (
-                <div className="rounded-xl border border-border-default bg-surface px-6 py-12 text-center">
+                <div className="rounded-xl border border-border-default bg-surface px-6 py-12 text-center card-shadow">
                   <p className="text-sm leading-relaxed text-fg-muted">
                     Connect a bank and sync transactions to unlock your expense summary and Ask
                     Soverm chat.
                   </p>
                   <Link
                     to="/dashboard"
-                    className="mt-4 inline-flex rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-brand-soft"
+                    className="mt-4 inline-flex rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-brand-fg transition hover:bg-brand-soft"
                   >
                     Go to Dashboard
                   </Link>
@@ -533,13 +521,13 @@ function ExpenseAnalyzerPage() {
             >
               <section aria-label="Category breakdown">
                 {categoryBreakdown.length === 0 ? (
-                  <div className="rounded-xl border border-border-default bg-surface px-6 py-10 text-center">
+                  <div className="rounded-xl border border-border-default bg-surface px-6 py-10 text-center card-shadow">
                     <p className="text-sm leading-relaxed text-fg-muted">
                       Connect a bank and sync transactions to see your expense breakdown.
                     </p>
                     <Link
                       to="/dashboard"
-                      className="mt-4 inline-flex rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-brand-soft"
+                      className="mt-4 inline-flex rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-brand-fg transition hover:bg-brand-soft"
                     >
                       Go to Dashboard
                     </Link>
@@ -558,30 +546,11 @@ function ExpenseAnalyzerPage() {
                       const categoryExamples = getCategoryExamples(entry.category)
                       const isExpandable = categoryHasDrillDown(entry)
                       const isExpanded = expandedCategory === entry.category
+                      const categoryDetailsId = `category-details-${encodeURIComponent(entry.category)}`
 
                       return (
                         <li key={entry.category}>
-                          <div
-                            className={`rounded-xl border border-border-default bg-surface px-4 py-4 ${
-                              isExpandable
-                                ? 'cursor-pointer transition hover:border-border-hover hover:bg-surface-elevated'
-                                : ''
-                            }`}
-                            role={isExpandable ? 'button' : undefined}
-                            tabIndex={isExpandable ? 0 : undefined}
-                            aria-expanded={isExpandable ? isExpanded : undefined}
-                            onClick={() => toggleCategoryExpansion(entry.category)}
-                            onKeyDown={(event) => {
-                              if (!isExpandable) {
-                                return
-                              }
-
-                              if (event.key === 'Enter' || event.key === ' ') {
-                                event.preventDefault()
-                                toggleCategoryExpansion(entry.category)
-                              }
-                            }}
-                          >
+                          <div className="rounded-xl border border-border-default bg-surface px-4 py-4 card-shadow">
                             <div className="flex items-start justify-between gap-4">
                               <div className="min-w-0 flex-1 space-y-2">
                                 <div>
@@ -627,27 +596,39 @@ function ExpenseAnalyzerPage() {
                                   />
                                 )}
                                 {isExpandable && (
-                                  <svg
-                                    className={`h-4 w-4 text-fg-muted transition-transform ${
-                                      isExpanded ? 'rotate-180' : ''
-                                    }`}
-                                    viewBox="0 0 20 20"
-                                    fill="currentColor"
-                                    aria-hidden="true"
+                                  <button
+                                    type="button"
+                                    aria-expanded={isExpanded}
+                                    aria-controls={categoryDetailsId}
+                                    aria-label={`${isExpanded ? 'Hide' : 'Show'} details for ${displayCategory}`}
+                                    onClick={() => toggleCategoryExpansion(entry.category)}
+                                    className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-fg-muted transition hover:bg-surface-elevated hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
                                   >
-                                    <path
-                                      fillRule="evenodd"
-                                      d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                                      clipRule="evenodd"
-                                    />
-                                  </svg>
+                                    <svg
+                                      className={`h-4 w-4 transition-transform ${
+                                        isExpanded ? 'rotate-180' : ''
+                                      }`}
+                                      viewBox="0 0 20 20"
+                                      fill="currentColor"
+                                      aria-hidden="true"
+                                    >
+                                      <path
+                                        fillRule="evenodd"
+                                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                                        clipRule="evenodd"
+                                      />
+                                    </svg>
+                                  </button>
                                 )}
                               </div>
                             </div>
                           </div>
 
                           {isExpanded && (
-                            <div className="mt-2 space-y-4 rounded-xl border border-border-default/70 bg-app/40 px-4 py-4">
+                            <div
+                              id={categoryDetailsId}
+                              className="mt-2 space-y-4 rounded-xl border border-border-default/70 bg-app/40 px-4 py-4"
+                            >
                               {recentTransactions.length > 0 && (
                                 <div>
                                   <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-fg-subtle">
@@ -778,7 +759,7 @@ function ExpenseAnalyzerPage() {
                 )}
 
                 {recurringCharges.length === 0 ? (
-                  <div className="rounded-xl border border-border-default bg-surface px-6 py-10 text-center">
+                  <div className="rounded-xl border border-border-default bg-surface px-6 py-10 text-center card-shadow">
                     <p className="text-sm leading-relaxed text-fg-muted">
                       No recurring charges detected yet — check back after a couple months of
                       transaction history.
@@ -801,7 +782,7 @@ function ExpenseAnalyzerPage() {
                 <section aria-label="Review recurring patterns">
                   <div className="flex flex-wrap items-end justify-between gap-2">
                     <div>
-                      <h2 className="text-xs font-semibold uppercase tracking-[0.3em] text-amber-300">
+                      <h2 className="text-xs font-semibold uppercase tracking-[0.3em] text-warning">
                         Review
                       </h2>
                       <p className="mt-2 max-w-xl text-sm leading-relaxed text-fg-muted">
@@ -810,7 +791,7 @@ function ExpenseAnalyzerPage() {
                         there&apos;s stronger evidence.
                       </p>
                     </div>
-                    <p className="font-mono text-sm font-semibold text-amber-200">
+                    <p className="font-mono text-sm font-semibold text-warning">
                       If confirmed: {formatCurrency(totalReviewMonthly)}/mo
                     </p>
                   </div>

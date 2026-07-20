@@ -184,31 +184,18 @@ export function buildMonthOverMonth({
 }
 
 /**
- * M7 — Stable / Tight / At risk.
+ * M7 — On track / Room to improve / Let's plan ahead.
+ * Calm labels: motivate + point to Soverm tools (tracker, category limits).
  */
 export function gradeMonthCondition({
   cashFlow,
   billsLoad,
   buffer,
 } = {}) {
-  const reasons = []
-
-  if (cashFlow?.outcome === 'deficit') {
-    reasons.push('spending exceeded income')
-  }
-  if (buffer?.posture === 'critical' || buffer?.posture === 'fragile') {
-    reasons.push('thin or no cash runway')
-  }
-  if (
-    billsLoad?.fixedShareOfIncome != null &&
-    billsLoad.fixedShareOfIncome >= 60
-  ) {
-    reasons.push('recurring bills take a large share of income')
-  }
-
   let grade = 'stable'
-  let title = 'Stable'
-  let summary = 'You’re covering the month without an obvious cash crunch.'
+  let title = 'On track'
+  let summary =
+    'You’re covering the month with some breathing room. Keep a spending tracker handy so next month stays this smooth.'
 
   if (
     cashFlow?.outcome === 'deficit' ||
@@ -216,8 +203,9 @@ export function gradeMonthCondition({
     (buffer?.posture === 'fragile' && cashFlow?.outcome !== 'surplus')
   ) {
     grade = 'at_risk'
-    title = 'Needs attention'
-    summary = `This month needs a closer look: ${reasons.slice(0, 2).join('; ') || 'cash flow is under pressure'}. One clear next step can help.`
+    title = 'Let’s finish strong'
+    summary =
+      'You can still shape how this month ends. Set up a spending tracker and a category limit on your biggest flexible spend — those two tools make it much easier to finish on your terms.'
   } else if (
     cashFlow?.outcome === 'breakeven' ||
     buffer?.posture === 'thin' ||
@@ -225,16 +213,15 @@ export function gradeMonthCondition({
     (billsLoad?.fixedShareOfIncome != null && billsLoad.fixedShareOfIncome >= 45)
   ) {
     grade = 'tight'
-    title = 'Tight'
+    title = 'Room to improve'
     summary =
-      reasons.length > 0
-        ? `This month is tight: ${reasons.slice(0, 2).join('; ')}.`
-        : 'You’re getting by, but there’s little room for surprises.'
+      'A small setup goes a long way: add a spending tracker and a soft category limit so the rest of the month stays intentional — not guessed.'
   } else if (cashFlow?.outcome === 'surplus') {
-    summary = 'Income covered spending with a little left over — protect that surplus.'
+    summary =
+      'Income covered spending with a little left over — nice work. Lock it in with a tracker so that cushion sticks.'
   }
 
-  return { grade, title, summary, reasons }
+  return { grade, title, summary, reasons: [] }
 }
 
 /**
@@ -251,35 +238,42 @@ export function buildNextMonthPlan({
 
   if (grade === 'at_risk' || cashFlow?.outcome === 'deficit') {
     moves.push({
-      id: 'cut-top-flexible',
-      title: 'Cut the top flexible category first',
+      id: 'set-tracker',
+      title: 'Turn on a spending tracker',
+      detail:
+        'Pick one number to watch (a weekly or monthly cap). Seeing progress in one place makes the month feel doable.',
+      href: '/dashboard?tab=tools',
+    })
+    moves.push({
+      id: 'category-cap',
+      title: 'Set a category spending limit',
       detail:
         topCategories[0]
-          ? `Start with ${topCategories[0].category} (${formatMoney(topCategories[0].amount)}) — set a category cap below this month’s total.`
-          : 'Pick one discretionary category and set a category cap below this month’s spend.',
+          ? `Start with ${topCategories[0].category} (${formatMoney(topCategories[0].amount)} this month) — a soft limit there helps the rest of your budget breathe.`
+          : 'Choose your biggest flexible category and set a soft limit below this month’s spend.',
       href: '/expense-analyzer?tab=categories',
     })
     moves.push({
-      id: 'protect-payday',
-      title: 'Protect the path to next payday',
-      detail: 'Essentials only until the next deposit. Recheck Your week mid-cycle.',
+      id: 'weekly-checkin',
+      title: 'Check Your week once mid-month',
+      detail: 'A quick look at what’s left until payday keeps small leaks from stacking up.',
       href: '/weekly-review',
     })
   } else if (grade === 'tight') {
     moves.push({
-      id: 'hold-discretionary',
-      title: 'Hold one discretionary habit',
-      detail: 'Skip one recurring treat (delivery, shopping) for two weeks and watch what’s left.',
-      href: '/weekly-review',
+      id: 'set-tracker',
+      title: 'Add a spending tracker',
+      detail: 'One clear cap on Home → Quick tools turns “I think I’m fine” into a number you can trust.',
+      href: '/dashboard?tab=tools',
     })
-    if (topCategories[0]) {
-      moves.push({
-        id: 'soft-limit',
-        title: `Cap ${topCategories[0].category}`,
-        detail: `Set a category cap under ${formatMoney(topCategories[0].amount)} so next month can’t quietly overrun.`,
-        href: '/expense-analyzer?tab=categories',
-      })
-    }
+    moves.push({
+      id: 'category-cap',
+      title: topCategories[0] ? `Limit ${topCategories[0].category}` : 'Set a category limit',
+      detail: topCategories[0]
+        ? `A soft cap under ${formatMoney(topCategories[0].amount)} keeps that category from quietly eating the month.`
+        : 'Cap one flexible category so the rest of the month stays intentional.',
+      href: '/expense-analyzer?tab=categories',
+    })
   } else {
     const park =
       whatsLeftAmount != null && whatsLeftAmount > 50
@@ -290,7 +284,7 @@ export function buildNextMonthPlan({
     moves.push({
       id: 'park-buffer',
       title: `Park about ${formatMoney(park)} toward a buffer`,
-      detail: 'Even a small cushion changes the “one surprise away” feeling.',
+      detail: 'Even a small cushion makes next month feel easier — use a savings tracker if you want it automatic.',
       href: '/dashboard?tab=tools',
     })
     if (billsLoad?.recurringMonthly > 0) {

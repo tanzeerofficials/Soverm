@@ -241,6 +241,30 @@ const CHECKS = [
       (await columnExists('users', 'stripe_current_period_end')),
     script: 'scripts/run-025-stripe-cancel-at-period-end-migration.js',
   },
+  {
+    id: '027',
+    label: '027 plaid_webhook_events',
+    check: () => tableExists('plaid_webhook_events'),
+    script: 'scripts/run-027-plaid-webhook-events-migration.js',
+  },
+  {
+    id: '028',
+    label: '028 chat_context_epoch',
+    check: () => columnExists('users', 'chat_context_epoch'),
+    script: 'scripts/run-028-chat-context-epoch-migration.js',
+  },
+  {
+    id: '029',
+    label: '029 stripe_webhook_events',
+    check: () => tableExists('stripe_webhook_events'),
+    script: 'scripts/run-029-stripe-webhook-events-migration.js',
+  },
+  {
+    id: '030',
+    label: '030 drop accounts.plaid_access_token',
+    check: async () => !(await columnExists('accounts', 'plaid_access_token')),
+    script: 'scripts/run-030-drop-accounts-plaid-access-token-migration.js',
+  },
 ]
 
 async function main() {

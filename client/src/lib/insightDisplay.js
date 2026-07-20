@@ -11,41 +11,6 @@ function formatMoneyAmount(amount) {
   })}`
 }
 
-function formatTimesMultiplier(times) {
-  if (times == null || !Number.isFinite(Number(times)) || Number(times) <= 0) {
-    return null
-  }
-
-  const value = Number(times)
-  if (value >= 10) {
-    return `${Math.round(value)}×`
-  }
-
-  const oneDecimal = Math.round(value * 10) / 10
-  return Number.isInteger(oneDecimal) ? `${oneDecimal}×` : `${oneDecimal.toFixed(1)}×`
-}
-
-function resolveTimes(delta) {
-  if (delta?.times != null && Number.isFinite(Number(delta.times))) {
-    return Number(delta.times)
-  }
-
-  if (
-    delta?.currentTotal != null &&
-    delta?.priorTotal > 0 &&
-    Number.isFinite(Number(delta.currentTotal))
-  ) {
-    return Number(delta.currentTotal) / Number(delta.priorTotal)
-  }
-
-  if (delta?.percent != null && Number.isFinite(Number(delta.percent))) {
-    const direction = delta.direction === 'down' ? -1 : 1
-    return 1 + (direction * Number(delta.percent)) / 100
-  }
-
-  return null
-}
-
 export function getDeltaDisplayParts(delta) {
   if (!delta || typeof delta !== 'object' || !delta.direction) {
     return null
@@ -57,7 +22,6 @@ export function getDeltaDisplayParts(delta) {
       delta.direction === 'up' &&
       (delta.percent === null || delta.percent === undefined) &&
       delta.times == null,
-    timesLabel: formatTimesMultiplier(resolveTimes(delta)),
     changeLabel: formatMoneyAmount(delta.absoluteChange),
     currentLabel: formatMoneyAmount(delta.currentTotal),
     priorLabel: formatMoneyAmount(delta.priorTotal),
@@ -131,20 +95,20 @@ export function buildDeltaAriaLabel(delta, statType = 'spending') {
     return `New ${metricLabel.toLowerCase()} category ${DELTA_VS_LABEL}`
   }
 
-  const timesLabel = formatTimesMultiplier(resolveTimes(delta))
   const currentLabel = formatMoneyAmount(delta.currentTotal)
   const priorLabel = formatMoneyAmount(delta.priorTotal)
+  const changeLabel = formatMoneyAmount(delta.absoluteChange)
+  const directionWord = delta.direction === 'up' ? 'up' : 'down'
 
-  if (timesLabel && currentLabel && priorLabel) {
-    return `${metricLabel} about ${timesLabel} ${DELTA_VS_LABEL} — ${currentLabel} vs ${priorLabel}`
+  if (currentLabel && priorLabel) {
+    return `${metricLabel} ${currentLabel} this period, ${directionWord} from ${priorLabel} in the prior 30 days`
   }
 
-  if (timesLabel) {
-    return `${metricLabel} about ${timesLabel} ${DELTA_VS_LABEL}`
+  if (changeLabel) {
+    return `${metricLabel} ${directionWord} by ${changeLabel} ${DELTA_VS_LABEL}`
   }
 
   // Legacy insights that only stored percent.
-  const directionWord = delta.direction === 'up' ? 'up' : 'down'
   return `${metricLabel} ${directionWord} ${delta.percent}% ${DELTA_VS_LABEL}`
 }
 
@@ -208,24 +172,25 @@ export function buildQuickQuestions(insight) {
     }
 
     const label = String(stat.label ?? 'this category').toLowerCase()
-    const timesLabel = formatTimesMultiplier(resolveTimes(delta))
     const changeLabel = formatMoneyAmount(delta.absoluteChange)
+    const currentLabel = formatMoneyAmount(delta.currentTotal)
+    const priorLabel = formatMoneyAmount(delta.priorTotal)
 
     if (delta.direction === 'up') {
       if (delta.percent == null && delta.times == null) {
         add(`Why is ${label} new this period?`)
-      } else if (changeLabel && timesLabel) {
-        add(`Why did ${label} jump by about ${changeLabel} (${timesLabel})?`)
-      } else if (timesLabel) {
-        add(`Why is ${label} about ${timesLabel} the prior period?`)
+      } else if (currentLabel && priorLabel) {
+        add(`What changed in ${label} from ${priorLabel} before to ${currentLabel} this period?`)
+      } else if (changeLabel) {
+        add(`What contributed to the ${changeLabel} increase in ${label}?`)
       } else {
         add(`Why did ${label} go up ${delta.percent}%?`)
       }
     } else if (delta.direction === 'down') {
-      if (changeLabel && timesLabel) {
-        add(`Why did ${label} drop by about ${changeLabel} (now ${timesLabel})?`)
-      } else if (timesLabel) {
-        add(`Why is ${label} only about ${timesLabel} the prior period?`)
+      if (currentLabel && priorLabel) {
+        add(`What changed in ${label} from ${priorLabel} before to ${currentLabel} this period?`)
+      } else if (changeLabel) {
+        add(`What contributed to the ${changeLabel} decrease in ${label}?`)
       } else if (delta.percent != null) {
         add(`Why did ${label} go down ${delta.percent}%?`)
       }
@@ -282,36 +247,20 @@ export function formatCompactDelta(delta) {
     return 'new'
   }
 
-  const timesLabel = formatTimesMultiplier(resolveTimes(delta))
   const changeLabel = formatMoneyAmount(delta.absoluteChange)
+  const currentLabel = formatMoneyAmount(delta.currentTotal)
+  const priorLabel = formatMoneyAmount(delta.priorTotal)
+  const arrow = delta.direction === 'down' ? '↓' : '↑'
 
-  if (delta.direction === 'up') {
-    if (timesLabel && changeLabel) {
-      return `↑ ${timesLabel} · +${changeLabel}`
-    }
-    if (timesLabel) {
-      return `↑ ${timesLabel}`
-    }
-    if (changeLabel) {
-      return `↑ +${changeLabel}`
-    }
-    return `↑ ${delta.percent}%`
+  if (currentLabel && priorLabel) {
+    return `${arrow} ${currentLabel} · was ${priorLabel}`
   }
 
-  if (delta.direction === 'down') {
-    if (timesLabel && changeLabel) {
-      return `↓ ${timesLabel} · −${changeLabel}`
-    }
-    if (timesLabel) {
-      return `↓ ${timesLabel}`
-    }
-    if (changeLabel) {
-      return `↓ −${changeLabel}`
-    }
-    return `↓ ${delta.percent}%`
+  if (changeLabel) {
+    return `${arrow} ${delta.direction === 'down' ? '−' : '+'}${changeLabel}`
   }
 
-  return null
+  return delta.percent != null ? `${arrow} ${delta.percent}%` : null
 }
 
 export function compactDeltaToneClass(statType, delta) {
@@ -326,11 +275,11 @@ export function compactDeltaToneClass(statType, delta) {
   const tone = toneForChange(statType, delta.direction, isNew)
 
   if (tone === 'positive') {
-    return 'text-emerald-400'
+    return 'text-brand-soft'
   }
 
   if (tone === 'negative') {
-    return 'text-red-400'
+    return 'text-danger'
   }
 
   return 'text-fg-muted'

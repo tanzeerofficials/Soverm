@@ -50,7 +50,7 @@ function progressBarClassName(limit) {
 
 export function CategorySoftLimitsIntro({ activeCount = 0 }) {
   return (
-    <div className="mb-4 rounded-xl border border-border-default bg-surface px-4 py-4 sm:px-5">
+    <div className="mb-4 rounded-xl border border-border-default bg-surface px-4 py-4 sm:px-5 card-shadow">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-fg">Category caps</p>
@@ -198,7 +198,7 @@ export default function CategorySoftLimitControl({
               type="button"
               disabled={isSaving}
               onClick={handleSave}
-              className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-600 disabled:opacity-60"
+              className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-brand-fg transition hover:bg-brand-soft disabled:opacity-60"
             >
               {isSaving ? 'Saving…' : 'Save limit'}
             </button>

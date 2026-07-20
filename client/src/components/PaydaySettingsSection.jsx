@@ -129,7 +129,7 @@ function PaydaySettingsSection() {
             type="button"
             disabled={saveMutation.isPending || !nextPaydayOn || !payCadence}
             onClick={() => saveMutation.mutate()}
-            className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-brand-soft disabled:opacity-60"
+            className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-brand-fg transition hover:bg-brand-soft disabled:opacity-60"
           >
             {saveMutation.isPending ? 'Saving…' : payday?.configured ? 'Update payday' : 'Save payday'}
           </button>

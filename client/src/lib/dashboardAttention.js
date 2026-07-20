@@ -191,7 +191,7 @@ export function getInsightFreshnessNudge(insightCreatedAt, { hasInsight = true }
  */
 export function buildAttentionItems({
   hasAccounts,
-  hasInsight,
+  hasInsight: _hasInsight,
   highlightGenerate,
   lastSyncedAt,
   incompleteActionCount,

@@ -25,7 +25,7 @@ function FreeVsProPlanCallout({ onUpgrade }) {
   return (
     <section
       aria-labelledby="free-vs-pro-heading"
-      className="rounded-xl border border-border-default bg-surface p-4 sm:p-5"
+      className="rounded-xl border border-border-default bg-surface p-4 sm:p-5 card-shadow"
     >
       <p className="text-xs font-semibold uppercase tracking-[0.22em] text-fg-subtle">Your plan</p>
       <h2 id="free-vs-pro-heading" className="mt-1 text-base font-semibold text-fg">

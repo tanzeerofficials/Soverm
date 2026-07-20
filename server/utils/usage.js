@@ -11,6 +11,7 @@ import {
   FREE_DAILY_INSIGHT_LIMIT,
   FREE_HISTORY_DAYS,
 } from '../shared/usageLimits.js'
+import { getAppTodaySqlParams } from './calendarMonth.js'
 
 export { FREE_DAILY_INSIGHT_LIMIT, FREE_HISTORY_DAYS } from '../shared/usageLimits.js'
 
@@ -20,12 +21,14 @@ export async function getUserTier(userId) {
 }
 
 export async function getInsightsGeneratedToday(userId) {
+  const { todayIso, tomorrowIso, timeZone } = getAppTodaySqlParams()
   const result = await db.query(
     `SELECT COUNT(*) AS count
      FROM insights
      WHERE user_id = $1
-       AND created_at::date = NOW()::date`,
-    [userId]
+       AND created_at >= ($2::timestamp AT TIME ZONE $3)
+       AND created_at < ($4::timestamp AT TIME ZONE $3)`,
+    [userId, todayIso, timeZone, tomorrowIso]
   )
   return Number(result.rows[0].count)
 }
@@ -84,12 +87,14 @@ export async function reserveFreeInsightSlot(client, userId) {
   const tier = tierResult.rows[0]?.subscription_tier ?? 'free'
   const isPro = tier === 'pro'
 
+  const { todayIso, tomorrowIso, timeZone } = getAppTodaySqlParams()
   const countResult = await client.query(
     `SELECT COUNT(*) AS count
      FROM insights
      WHERE user_id = $1
-       AND created_at::date = NOW()::date`,
-    [userId]
+       AND created_at >= ($2::timestamp AT TIME ZONE $3)
+       AND created_at < ($4::timestamp AT TIME ZONE $3)`,
+    [userId, todayIso, timeZone, tomorrowIso]
   )
   const generatedToday = Number(countResult.rows[0].count)
 

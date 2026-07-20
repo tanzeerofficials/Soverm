@@ -150,7 +150,7 @@ function ExpenseAnalyzerVisuals({
   return (
     <section
       aria-label="Spending visuals"
-      className="relative overflow-hidden rounded-2xl border border-border-default bg-surface"
+      className="relative overflow-hidden rounded-2xl border border-border-default bg-surface card-shadow"
     >
       <div
         className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-ai/10 blur-3xl"

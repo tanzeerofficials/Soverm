@@ -94,15 +94,40 @@ function DashboardTabBar({
     },
   ]
 
+  function handleTabKeyDown(event, currentIndex) {
+    let nextIndex = null
+
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      nextIndex = (currentIndex + 1) % tabs.length
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      nextIndex = (currentIndex - 1 + tabs.length) % tabs.length
+    } else if (event.key === 'Home') {
+      nextIndex = 0
+    } else if (event.key === 'End') {
+      nextIndex = tabs.length - 1
+    }
+
+    if (nextIndex == null) {
+      return
+    }
+
+    event.preventDefault()
+    const nextTab = tabs[nextIndex]
+    onChange(nextTab.id)
+    requestAnimationFrame(() => {
+      document.getElementById(`dashboard-tab-${nextTab.id}`)?.focus()
+    })
+  }
+
   return (
     <div className="relative mt-6">
       <div
-        className="overflow-hidden rounded-2xl border border-border-default bg-gradient-to-b from-surface-deep to-app shadow-[0_8px_32px_rgba(0,0,0,0.35)]"
+        className="overflow-hidden rounded-2xl border border-border-default bg-gradient-to-b from-surface-deep to-app card-shadow-md"
         role="tablist"
         aria-label="Dashboard sections"
       >
         <div className="grid grid-cols-3 gap-1 p-1.5">
-          {tabs.map((tab) => {
+          {tabs.map((tab, index) => {
             const isActive = activeTab === tab.id
 
             return (
@@ -113,10 +138,12 @@ function DashboardTabBar({
                 id={`dashboard-tab-${tab.id}`}
                 aria-selected={isActive}
                 aria-controls={`dashboard-panel-${tab.id}`}
+                tabIndex={isActive ? 0 : -1}
                 onClick={() => onChange(tab.id)}
-                className={`group relative flex min-h-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-3 py-2.5 transition-all duration-200 sm:flex-row sm:gap-2 sm:py-3 ${
+                onKeyDown={(event) => handleTabKeyDown(event, index)}
+                className={`group relative flex min-h-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-3 py-2.5 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 sm:flex-row sm:gap-2 sm:py-3 ${
                   isActive
-                    ? 'bg-surface-elevated text-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-brand/35'
+                    ? 'bg-surface-elevated text-fg shadow-sm ring-1 ring-brand/35'
                     : 'text-fg-muted hover:bg-surface-elevated/50 hover:text-fg active:scale-[0.98]'
                 }`}
               >

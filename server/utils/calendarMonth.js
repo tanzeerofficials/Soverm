@@ -159,6 +159,64 @@ export function calendarMonthSqlBounds(referenceDate = new Date(), timeZone = ge
   }
 }
 
+/**
+ * Inclusive start + exclusive end civil dates for "today" in the app timezone.
+ * Pass todayIso / tomorrowIso into SQL with AT TIME ZONE (see getAppTodaySqlParams).
+ */
+export function getAppDayBounds(referenceDate = new Date(), timeZone = getAppTimezone()) {
+  const { year, month, day } = getZonedDateParts(referenceDate, timeZone)
+  const todayIso = formatIsoDateParts({ year, month, day })
+  const nextUtc = new Date(Date.UTC(year, month - 1, day + 1))
+  const tomorrowIso = formatIsoDateParts({
+    year: nextUtc.getUTCFullYear(),
+    month: nextUtc.getUTCMonth() + 1,
+    day: nextUtc.getUTCDate(),
+  })
+  return { todayIso, tomorrowIso, timeZone }
+}
+
+/**
+ * UTC Date for midnight (00:00:00) of a YYYY-MM-DD civil date in timeZone.
+ * Binary-searches the UTC timeline so DST transitions stay correct.
+ */
+export function zonedMidnightToUtc(isoDate, timeZone = getAppTimezone()) {
+  const [year, month, day] = String(isoDate).slice(0, 10).split('-').map(Number)
+  let lo = Date.UTC(year, month - 1, day - 1, 0, 0, 0)
+  let hi = Date.UTC(year, month - 1, day + 2, 0, 0, 0)
+
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2)
+    const asIso = formatIsoDateInAppTz(new Date(mid), timeZone)
+    if (asIso < isoDate) {
+      lo = mid + 1
+    } else {
+      hi = mid
+    }
+  }
+
+  return new Date(lo)
+}
+
+/**
+ * Seconds until the next app-timezone midnight (for daily-limit retry hints).
+ */
+export function getSecondsUntilAppTomorrow(referenceDate = new Date(), timeZone = getAppTimezone()) {
+  const { tomorrowIso } = getAppDayBounds(referenceDate, timeZone)
+  const nextMidnight = zonedMidnightToUtc(tomorrowIso, timeZone)
+  return Math.max(1, Math.ceil((nextMidnight.getTime() - referenceDate.getTime()) / 1000))
+}
+
+/**
+ * Params for “created_at falls on app-today” SQL filters.
+ *
+ *   created_at >= ($todayIso::timestamp AT TIME ZONE $timeZone)
+ *   AND created_at < ($tomorrowIso::timestamp AT TIME ZONE $timeZone)
+ */
+export function getAppTodaySqlParams(referenceDate = new Date(), timeZone = getAppTimezone()) {
+  const { todayIso, tomorrowIso } = getAppDayBounds(referenceDate, timeZone)
+  return { todayIso, tomorrowIso, timeZone }
+}
+
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 
 /**

@@ -133,17 +133,42 @@ function ExpenseAnalyzerTabBar({
     },
   ]
 
+  function handleTabKeyDown(event, currentIndex) {
+    let nextIndex = null
+
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      nextIndex = (currentIndex + 1) % tabs.length
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      nextIndex = (currentIndex - 1 + tabs.length) % tabs.length
+    } else if (event.key === 'Home') {
+      nextIndex = 0
+    } else if (event.key === 'End') {
+      nextIndex = tabs.length - 1
+    }
+
+    if (nextIndex == null) {
+      return
+    }
+
+    event.preventDefault()
+    const nextTab = tabs[nextIndex]
+    onChange(nextTab.id)
+    requestAnimationFrame(() => {
+      document.getElementById(`expense-tab-${nextTab.id}`)?.focus()
+    })
+  }
+
   return (
     <div className="relative">
       <div
-        className="overflow-hidden rounded-2xl border border-border-default bg-gradient-to-b from-surface-deep to-app shadow-[0_8px_32px_rgba(0,0,0,0.35)]"
+        className="overflow-hidden rounded-2xl border border-border-default bg-gradient-to-b from-surface-deep to-app card-shadow-md"
         role="tablist"
         aria-label="Expense analyzer sections"
       >
         <div
           className="flex gap-1 overflow-x-auto p-1.5 [-ms-overflow-style:none] [scrollbar-width:none] sm:grid sm:grid-cols-4 sm:overflow-visible [&::-webkit-scrollbar]:hidden"
         >
-          {tabs.map((tab) => {
+          {tabs.map((tab, index) => {
             const isActive = activeTab === tab.id
             const countLabel = tabCountLabel(tab.count)
             const showSummaryDot =
@@ -157,10 +182,12 @@ function ExpenseAnalyzerTabBar({
                 id={`expense-tab-${tab.id}`}
                 aria-selected={isActive}
                 aria-controls={`expense-panel-${tab.id}`}
+                tabIndex={isActive ? 0 : -1}
                 onClick={() => onChange(tab.id)}
-                className={`group relative flex min-h-11 min-w-[5.75rem] flex-1 snap-center flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-2.5 transition-all duration-200 sm:min-w-0 sm:flex-row sm:gap-2 sm:px-3 sm:py-3 ${
+                onKeyDown={(event) => handleTabKeyDown(event, index)}
+                className={`group relative flex min-h-11 min-w-0 flex-1 snap-center flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-2.5 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 sm:flex-row sm:gap-2 sm:px-3 sm:py-3 ${
                   isActive
-                    ? 'bg-surface-elevated text-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-brand/35'
+                    ? 'bg-surface-elevated text-fg shadow-sm ring-1 ring-brand/35'
                     : 'text-fg-muted hover:bg-surface-elevated/50 hover:text-fg active:scale-[0.98]'
                 }`}
               >

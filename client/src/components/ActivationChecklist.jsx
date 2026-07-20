@@ -25,7 +25,7 @@ function ActivationChecklist({ hasAccounts = false, paydayConfigured = false }) 
 
   if (collapsed) {
     return (
-      <section className="rounded-xl border border-border-default bg-surface px-4 py-3">
+      <section className="rounded-xl border border-border-default bg-surface px-4 py-3 card-shadow">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 text-left">
             <p className="text-sm font-semibold text-fg">Get set up</p>
@@ -48,7 +48,7 @@ function ActivationChecklist({ hasAccounts = false, paydayConfigured = false }) 
 
   return (
     <section
-      className="rounded-xl border border-border-default border-l-4 border-l-brand bg-surface p-5 text-left"
+      className="rounded-xl border border-border-default border-l-4 border-l-brand bg-surface p-5 text-left card-shadow"
       aria-labelledby="activation-checklist-heading"
     >
       <div className="flex items-start justify-between gap-3">
@@ -86,7 +86,7 @@ function ActivationChecklist({ hasAccounts = false, paydayConfigured = false }) 
                 className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
                   step.done
                     ? 'bg-brand/20 text-brand-soft'
-                    : 'bg-brand text-slate-950'
+                    : 'bg-brand text-brand-fg'
                 }`}
               >
                 {step.done ? '✓' : checklist.steps.indexOf(step) + 1}

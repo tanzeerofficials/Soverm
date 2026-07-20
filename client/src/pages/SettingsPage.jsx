@@ -32,6 +32,7 @@ import {
 } from '../lib/queryKeys.js'
 import AccountBalanceDisplay from '../components/AccountBalanceDisplay.jsx'
 import { trackUpgradeProClick } from '../lib/analytics.js'
+import { useTheme, THEME_DARK, THEME_LIGHT } from '../context/ThemeContext.jsx'
 import {
   checkoutErrorToastMessage,
   openBillingPortal,
@@ -47,7 +48,7 @@ function SettingsAccountSkeleton() {
       {[0, 1].map((index) => (
         <div
           key={index}
-          className="flex items-start justify-between gap-3 rounded-xl border border-border-default bg-surface-elevated p-4"
+          className="flex items-start justify-between gap-3 rounded-xl border border-border-default bg-surface-elevated p-4 card-shadow"
         >
           <div className="min-w-0 flex-1 space-y-2">
             <Skeleton className="h-3 w-24" />
@@ -68,6 +69,7 @@ function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
   const { showToast } = useToastContext()
+  const { theme, setTheme } = useTheme()
 
   const [accountToDelete, setAccountToDelete] = useState(null)
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false)
@@ -312,10 +314,48 @@ function SettingsPage() {
       <main className="mx-auto max-w-2xl px-4 pb-16 pt-24 sm:px-6 sm:pt-28">
         <PageHeader
           title="Profile"
-          description="Manage your plan, payday, connected banks, notifications, and account data."
+          description="Manage your plan, appearance, payday, connected banks, notifications, and account data."
         />
 
         <div className="space-y-8">
+          <SettingsSection title="Appearance">
+            <p className="text-sm text-fg-muted">
+              Choose a light or dark look. Your choice is saved on this device.
+            </p>
+            <div
+              className="mt-4 grid grid-cols-2 gap-2"
+              role="radiogroup"
+              aria-label="Color theme"
+            >
+              <button
+                type="button"
+                role="radio"
+                aria-checked={theme === THEME_LIGHT}
+                onClick={() => setTheme(THEME_LIGHT)}
+                className={`rounded-lg border px-4 py-3 text-sm font-semibold transition ${
+                  theme === THEME_LIGHT
+                    ? 'border-brand bg-brand/10 text-brand'
+                    : 'border-border-default bg-surface-elevated text-fg-muted hover:border-border-hover hover:text-fg'
+                }`}
+              >
+                Light
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={theme === THEME_DARK}
+                onClick={() => setTheme(THEME_DARK)}
+                className={`rounded-lg border px-4 py-3 text-sm font-semibold transition ${
+                  theme === THEME_DARK
+                    ? 'border-brand bg-brand/10 text-brand'
+                    : 'border-border-default bg-surface-elevated text-fg-muted hover:border-border-hover hover:text-fg'
+                }`}
+              >
+                Dark
+              </button>
+            </div>
+          </SettingsSection>
+
           <SettingsSection title="Your plan">
             <div className="flex flex-col gap-3">
               <p className="text-lg font-semibold text-fg">
@@ -345,7 +385,7 @@ function SettingsPage() {
                           type="button"
                           onClick={handleKeepPro}
                           disabled={reactivateLoading || !billingConfigured}
-                          className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-brand-soft disabled:opacity-60 sm:w-auto"
+                          className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-brand-fg transition hover:bg-brand-soft disabled:opacity-60 sm:w-auto"
                         >
                           {reactivateLoading ? 'Renewing…' : 'Keep Pro / Resubscribe'}
                         </button>
@@ -408,7 +448,7 @@ function SettingsPage() {
                     type="button"
                     onClick={handleUpgrade}
                     disabled={checkoutLoading || !billingConfigured}
-                    className="mt-1 w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-brand-soft disabled:opacity-60 sm:w-auto"
+                    className="mt-1 w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-brand-fg transition hover:bg-brand-soft disabled:opacity-60 sm:w-auto"
                   >
                     {checkoutLoading
                       ? 'Redirecting…'
@@ -479,7 +519,7 @@ function SettingsPage() {
                   {accounts.map((account) => (
                     <li
                       key={account.id}
-                      className="flex items-start justify-between gap-3 rounded-xl border border-border-default bg-surface-elevated p-4"
+                      className="flex items-start justify-between gap-3 rounded-xl border border-border-default bg-surface-elevated p-4 card-shadow"
                     >
                       <div className="min-w-0">
                         <p className="truncate text-xs font-medium uppercase tracking-wide text-fg-muted">

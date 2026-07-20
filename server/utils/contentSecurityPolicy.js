@@ -29,6 +29,12 @@ export function createSecurityHeaders({
 } = {}) {
   return helmet({
     contentSecurityPolicy: buildApiContentSecurityPolicy({ reportOnly }),
+    // One-year HSTS for the API origin (Railway). SPA edge HSTS is set on Vercel.
+    hsts: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true,
+    },
     // COEP can break third-party embeds if this API ever served HTML UI.
     crossOriginEmbedderPolicy: false,
   })

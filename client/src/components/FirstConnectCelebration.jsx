@@ -5,12 +5,13 @@
  * celebrate → confirm payday → optional buffer goal → first what's left.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { createTracker, fetchTrackers } from '../lib/fetchTrackers.js'
 import { fetchPayday, savePayday } from '../lib/fetchPayday.js'
 import { formatPayCadence } from '../lib/payCadenceLabels.js'
 import { PAY_CADENCE_OPTIONS } from '../lib/payCadenceLabels.js'
+import { useFocusTrap } from '../hooks/useFocusTrap.js'
 
 const CADENCE_OPTIONS = PAY_CADENCE_OPTIONS
 
@@ -43,6 +44,9 @@ function FirstConnectCelebration({
   const [whatsLeft, setWhatsLeft] = useState(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const dialogRef = useRef(null)
+
+  useFocusTrap(isOpen, dialogRef)
 
   useEffect(() => {
     if (!isOpen) {
@@ -200,7 +204,10 @@ function FirstConnectCelebration({
         onClick={onClose}
       />
 
-      <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-border-default bg-surface shadow-2xl">
+      <div
+        ref={dialogRef}
+        className="relative w-full max-w-md overflow-hidden rounded-2xl border border-border-default bg-surface card-shadow-md"
+      >
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.18),transparent_55%)]" />
         <div className="relative p-6 sm:p-8">
           {step === 'celebrate' && (
@@ -235,7 +242,7 @@ function FirstConnectCelebration({
                 <button
                   type="button"
                   onClick={() => setStep('payday')}
-                  className="min-h-11 w-full rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-brand-soft"
+                  className="min-h-11 w-full rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-brand-fg transition hover:bg-brand-soft"
                 >
                   Confirm payday
                 </button>
@@ -311,7 +318,7 @@ function FirstConnectCelebration({
                 <button
                   type="submit"
                   disabled={saving || !nextPaydayOn}
-                  className="min-h-11 w-full rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-brand-soft disabled:opacity-60"
+                  className="min-h-11 w-full rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-brand-fg transition hover:bg-brand-soft disabled:opacity-60"
                 >
                   {saving ? 'Saving…' : 'Save payday'}
                 </button>
@@ -354,7 +361,7 @@ function FirstConnectCelebration({
                 <button
                   type="submit"
                   disabled={saving}
-                  className="min-h-11 w-full rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-brand-soft disabled:opacity-60"
+                  className="min-h-11 w-full rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-brand-fg transition hover:bg-brand-soft disabled:opacity-60"
                 >
                   {saving ? 'Saving…' : 'Save buffer & continue'}
                 </button>
@@ -407,7 +414,7 @@ function FirstConnectCelebration({
                 <Link
                   to="/weekly-review"
                   onClick={onClose}
-                  className="flex min-h-11 w-full items-center justify-center rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-brand-soft"
+                  className="flex min-h-11 w-full items-center justify-center rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-brand-fg transition hover:bg-brand-soft"
                 >
                   Check your week
                 </Link>

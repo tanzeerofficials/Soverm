@@ -26,7 +26,7 @@ function SecurityNote() {
   }
 
   return (
-    <div className="relative rounded-xl border border-border-default border-l-4 border-l-brand bg-surface p-4 text-sm">
+    <div className="relative rounded-xl border border-border-default border-l-4 border-l-brand bg-surface p-4 text-sm card-shadow">
       <button
         type="button"
         onClick={handleDismiss}

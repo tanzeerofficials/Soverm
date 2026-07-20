@@ -59,7 +59,8 @@ export function createUserRateLimiter({ windowMs, max }) {
 
 export const plaidRateLimiter = createUserRateLimiter({
   windowMs: 60 * 60 * 1000,
-  max: 30,
+  // Dev: Strict Mode + HMR + Clerk getToken churn burns a tight 30/hr quickly.
+  max: process.env.NODE_ENV === 'production' ? 30 : 200,
 })
 
 export const syncRateLimiter = createUserRateLimiter({

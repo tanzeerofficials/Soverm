@@ -74,27 +74,28 @@ function StatDeltaBadge({ delta, statType = 'spending', inline = false }) {
   }
 
   const arrow = parts.direction === 'down' ? '↓' : '↑'
-  const magnitude = parts.timesLabel
-    ? parts.timesLabel
-    : parts.legacyPercent != null
-      ? `${parts.legacyPercent}%`
-      : null
+  const magnitude =
+    parts.currentLabel ??
+    (parts.changeLabel
+      ? `${parts.direction === 'down' ? '−' : '+'}${parts.changeLabel}`
+      : parts.legacyPercent != null
+        ? `${parts.legacyPercent}%`
+        : null)
 
   if (!magnitude) {
     return null
   }
 
-  const moneyHint =
-    parts.changeLabel != null
-      ? `${parts.direction === 'down' ? '−' : '+'}${parts.changeLabel}`
-      : null
+  const comparisonHint = parts.priorLabel ? `was ${parts.priorLabel}` : null
 
   return renderPill(
     <>
       <span aria-hidden="true">{arrow}</span>
       <span className="text-sm font-bold leading-none">{magnitude}</span>
-      {moneyHint ? (
-        <span className="text-[11px] font-semibold leading-none opacity-90">{moneyHint}</span>
+      {comparisonHint ? (
+        <span className="text-[11px] font-semibold leading-none opacity-90">
+          {comparisonHint}
+        </span>
       ) : (
         <span className="text-[11px] font-semibold leading-none opacity-90">
           {DELTA_VS_LABEL}

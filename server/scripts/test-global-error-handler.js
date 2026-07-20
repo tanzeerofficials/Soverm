@@ -1,21 +1,20 @@
 /*
  * Verifies global error middleware catches Clerk getAuth() throws
- * (real @clerk/express middleware in the pipeline — not mocked).
+ * when a route runs without clerkMiddleware having authenticated the request.
  *
  * Usage:
  *   node scripts/test-global-error-handler.js before
  *   node scripts/test-global-error-handler.js after
+ *
+ * Why a minimal route (not insightsRouter): insights now uses requireAuth(),
+ * which redirects unauthenticated requests instead of throwing — that would
+ * never reach the error handler. getAuth() still throws without middleware.
  */
 
 import 'dotenv/config'
-import path from 'path'
-import { fileURLToPath } from 'url'
 import express from 'express'
 import { clerkMiddleware, getAuth } from '@clerk/express'
-import insightsRouter from '../routes/insights.js'
 import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const mode = process.argv[2] || 'before'
 const withErrorHandler = mode === 'after'
@@ -24,9 +23,11 @@ function buildApp() {
   const app = express()
   app.use(express.json())
 
-  // Same failure mode as test #3: insights router calls getAuth() but this
-  // mount point never ran clerkMiddleware for the request.
-  app.use('/api/insights', insightsRouter)
+  // Intentionally mounted before clerkMiddleware so getAuth() throws.
+  app.get('/api/insights/usage', (req, res) => {
+    const { userId } = getAuth(req)
+    res.json({ userId })
+  })
 
   app.use(
     clerkMiddleware({
@@ -61,7 +62,7 @@ const server = app.listen(0, async () => {
     !raw.includes('getAuth')
 
   console.log(`Mode: ${mode} (error handler ${withErrorHandler ? 'ON' : 'OFF'})`)
-  console.log('GET /api/insights/usage (insights mounted before clerkMiddleware)')
+  console.log('GET /api/insights/usage (route mounted before clerkMiddleware)')
   console.log('HTTP status:', res.status)
   console.log('Content-Type:', res.headers.get('content-type'))
   console.log('Body preview:', raw.slice(0, 200).replace(/\n/g, ' '))

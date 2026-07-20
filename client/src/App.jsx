@@ -53,7 +53,7 @@ function PrivateRoutes() {
  */
 function App() {
   return (
-    <div className="flex min-h-screen flex-col bg-app">
+    <div className="flex min-h-screen flex-col overflow-x-hidden bg-app">
       <div className="flex-1">
         <AnalyticsPageView />
         <Routes>

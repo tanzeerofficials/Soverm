@@ -131,7 +131,7 @@ function BeforeYouSpendPanel({ getToken, softLimits = [], paydayConfigured = fal
         <button
           type="submit"
           disabled={loading}
-          className="min-h-11 w-full rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-brand-soft disabled:opacity-60"
+          className="min-h-11 w-full rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-brand-fg transition hover:bg-brand-soft disabled:opacity-60"
         >
           {loading ? 'Checking…' : 'Check this purchase'}
         </button>

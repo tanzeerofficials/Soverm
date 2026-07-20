@@ -125,7 +125,7 @@ function BillDefenseSection({
       return null
     }
     return (
-      <section className="rounded-xl border border-border-default bg-surface px-5 py-5 text-left">
+      <section className="rounded-xl border border-border-default bg-surface px-5 py-5 text-left card-shadow">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-fg-subtle">
           {title}
         </p>
@@ -136,7 +136,7 @@ function BillDefenseSection({
 
   return (
     <section
-      className="rounded-xl border border-border-default bg-surface px-5 py-5 text-left"
+      className="rounded-xl border border-border-default bg-surface px-5 py-5 text-left card-shadow"
       aria-label={title}
     >
       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-fg-subtle">

@@ -416,8 +416,35 @@ export async function setUserProFromStripe({
   cancelAtPeriodEnd = false,
   currentPeriodEnd = null,
 }) {
-  if (!userId) {
-    return { updated: false }
+  let resolvedUserId = userId
+
+  /*
+   * Upgrade webhooks must never ACK success without applying Pro. If Clerk
+   * metadata was missing, fall back to Stripe customer / subscription ids
+   * already stored on users (same as the free-path helper).
+   */
+  if (!resolvedUserId && subscriptionId) {
+    const bySub = await db.query(
+      `SELECT id FROM users WHERE stripe_subscription_id = $1 LIMIT 1`,
+      [subscriptionId]
+    )
+    resolvedUserId = bySub.rows[0]?.id ?? null
+  }
+
+  if (!resolvedUserId && customerId) {
+    const byCustomer = await db.query(
+      `SELECT id FROM users WHERE stripe_customer_id = $1 LIMIT 1`,
+      [customerId]
+    )
+    resolvedUserId = byCustomer.rows[0]?.id ?? null
+  }
+
+  if (!resolvedUserId) {
+    const err = new Error(
+      'Stripe Pro upgrade could not resolve a Clerk user id from session metadata, subscription, or customer'
+    )
+    err.code = 'STRIPE_USER_UNRESOLVED'
+    throw err
   }
 
   await db.query(
@@ -429,7 +456,7 @@ export async function setUserProFromStripe({
          stripe_current_period_end = $5::timestamptz
      WHERE id = $1`,
     [
-      userId,
+      resolvedUserId,
       customerId ?? null,
       subscriptionId ?? null,
       Boolean(cancelAtPeriodEnd),
@@ -437,7 +464,7 @@ export async function setUserProFromStripe({
     ]
   )
 
-  return { updated: true }
+  return { updated: true, userId: resolvedUserId }
 }
 
 export async function setUserFreeFromStripe({ userId, customerId, subscriptionId }) {

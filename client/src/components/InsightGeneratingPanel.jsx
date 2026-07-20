@@ -22,7 +22,7 @@ function InsightGeneratingPanel() {
 
   return (
     <article
-      className="overflow-hidden rounded-xl border border-border-default border-l-4 border-l-ai bg-surface p-5 sm:p-6"
+      className="overflow-hidden rounded-xl border border-border-default border-l-4 border-l-ai bg-surface p-5 sm:p-6 card-shadow"
       aria-busy="true"
       aria-live="polite"
       aria-label="Generating your financial insight"

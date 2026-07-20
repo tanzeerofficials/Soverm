@@ -81,7 +81,7 @@ function DashboardHero({
       >
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(16,185,129,0.1),transparent_65%)]" />
         <div className="relative">
-          <p className="text-xs font-medium uppercase tracking-[0.28em] text-emerald-400">Step 1</p>
+          <p className="text-xs font-medium uppercase tracking-[0.28em] text-brand">Step 1</p>
           <h2 className="mt-3 text-2xl font-bold text-fg sm:text-3xl">
             Connect your bank to get started
           </h2>
@@ -115,7 +115,7 @@ function DashboardHero({
   return (
     <section
       id="dashboard-hero"
-      className="relative overflow-hidden rounded-2xl border border-border-default bg-gradient-to-b from-surface-deep/90 via-surface to-app px-6 py-10 text-center shadow-[0_12px_40px_rgba(0,0,0,0.25)] sm:px-10 sm:py-12"
+      className="relative overflow-hidden rounded-2xl border border-border-default bg-gradient-to-b from-surface-deep/90 via-surface to-app px-6 py-10 text-center card-shadow-md sm:px-10 sm:py-12"
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(16,185,129,0.14),transparent_60%)]" />
       <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-ai/10 blur-3xl" />
@@ -216,7 +216,7 @@ function DashboardHero({
               </p>
               <Link
                 to="/settings"
-                className="mt-3 inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-brand-fg transition hover:bg-brand-hover"
+                className="mt-3 inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-brand-fg transition hover:bg-brand-soft"
               >
                 Set payday in Profile
               </Link>
@@ -264,7 +264,7 @@ function DashboardHero({
               <p className="text-sm font-medium text-fg">Confirm payday to see what’s left</p>
               <Link
                 to="/settings"
-                className="mt-3 inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-brand-fg transition hover:bg-brand-hover"
+                className="mt-3 inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-brand-fg transition hover:bg-brand-soft"
               >
                 Set payday in Profile
               </Link>
@@ -286,7 +286,7 @@ function DashboardHero({
               </p>
               <Link
                 to="/settings"
-                className="mt-3 inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-brand-fg transition hover:bg-brand-hover"
+                className="mt-3 inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-brand-fg transition hover:bg-brand-soft"
               >
                 Set payday in Profile
               </Link>
@@ -298,8 +298,8 @@ function DashboardHero({
           <>
             <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-fg-muted">
               <span className="relative flex h-2 w-2" aria-hidden="true">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-40" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand opacity-40" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-brand" />
               </span>
               Last synced {formatDistanceToNow(new Date(lastSyncedAt))} ago
             </p>
@@ -329,7 +329,7 @@ function DashboardHero({
                     onClick={() => onRangeChange(value)}
                     className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
                       selectedRange === value
-                        ? 'bg-brand text-slate-950 shadow-sm'
+                        ? 'bg-brand text-brand-fg shadow-sm'
                         : 'text-fg-muted hover:text-fg'
                     }`}
                   >

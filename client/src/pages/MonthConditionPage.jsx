@@ -32,13 +32,14 @@ function formatCurrency(amount) {
 }
 
 function gradeTone(grade) {
+  // Calm surfaces — inform without a red “alarm” card.
   if (grade === 'at_risk') {
-    return 'border-danger/30 bg-danger/10'
+    return 'border-brand/30 bg-surface card-shadow'
   }
   if (grade === 'tight') {
-    return 'border-warning/30 bg-warning/10'
+    return 'border-brand/25 bg-surface card-shadow'
   }
-  return 'border-brand/30 bg-brand/10'
+  return 'border-brand/30 bg-brand/10 card-shadow'
 }
 
 function MonthConditionPage() {
@@ -116,7 +117,7 @@ function MonthConditionPage() {
             )}
 
             {data.accountCount === 0 && (
-              <div className="rounded-xl border border-border-default bg-surface px-4 py-3 text-sm text-fg-muted">
+              <div className="rounded-xl border border-border-default bg-surface px-4 py-3 text-sm text-fg-muted card-shadow">
                 Connect a bank to unlock a full month letter.
                 <Link
                   to="/dashboard"
@@ -137,13 +138,14 @@ function MonthConditionPage() {
                 {data.condition?.summary}
               </p>
               <p className="mt-2 text-xs text-fg-subtle">
-                Stable = cushion · Tight = little room · Needs attention = plan ahead for bills
+                Use a spending tracker and category limits to stay on course — small setups, clearer
+                finish.
               </p>
               <p className="mt-1 text-xs text-fg-subtle">{data.periodLabel}</p>
             </section>
 
             {/* M2 cash flow */}
-            <section className="rounded-xl border border-border-default bg-surface px-5 py-5 text-left">
+            <section className="rounded-xl border border-border-default bg-surface px-5 py-5 text-left card-shadow">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-fg-subtle">
                 Money in vs money out
               </p>
@@ -157,7 +159,7 @@ function MonthConditionPage() {
               <p className="mt-3 text-sm leading-relaxed text-fg-muted">
                 {data.cashFlow?.summary}
               </p>
-              <div className="mt-4 grid grid-cols-3 gap-3 text-center">
+              <div className="mt-4 grid grid-cols-3 gap-2 text-center sm:gap-3">
                 <div>
                   <p className="text-[11px] text-fg-subtle">Money in</p>
                   <p className="mt-1 font-mono text-sm font-semibold tabular-nums text-fg">
@@ -263,7 +265,7 @@ function MonthConditionPage() {
             </section>
 
             {/* M3 drivers */}
-            <section className="rounded-xl border border-border-default bg-surface px-5 py-5 text-left">
+            <section className="rounded-xl border border-border-default bg-surface px-5 py-5 text-left card-shadow">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-fg-subtle">
                 Where money went
               </p>
@@ -294,7 +296,7 @@ function MonthConditionPage() {
             </section>
 
             {/* M4 bills */}
-            <section className="rounded-xl border border-border-default bg-surface px-5 py-5 text-left">
+            <section className="rounded-xl border border-border-default bg-surface px-5 py-5 text-left card-shadow">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-fg-subtle">
                 Bills & subscriptions
               </p>
@@ -321,7 +323,7 @@ function MonthConditionPage() {
             />
 
             {/* M5 buffer */}
-            <section className="rounded-xl border border-border-default bg-surface px-5 py-5 text-left">
+            <section className="rounded-xl border border-border-default bg-surface px-5 py-5 text-left card-shadow">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-fg-subtle">
                 Cash cushion
               </p>
@@ -337,7 +339,7 @@ function MonthConditionPage() {
             </section>
 
             {/* M6 MoM */}
-            <section className="rounded-xl border border-border-default bg-surface px-5 py-5 text-left">
+            <section className="rounded-xl border border-border-default bg-surface px-5 py-5 text-left card-shadow">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-fg-subtle">
                 Vs last month
               </p>
@@ -346,23 +348,30 @@ function MonthConditionPage() {
               </p>
             </section>
 
-            {/* M8 plan */}
-            <section className="rounded-xl border border-ai/30 bg-ai/10 px-5 py-5 text-left">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-ai-soft">
+            {/* M8 plan — calm surface + brand accents (actionable, not alarm/AI purple) */}
+            <section className="rounded-xl border border-border-default bg-surface px-5 py-5 text-left card-shadow">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand">
                 Plan for next month
               </p>
+              <p className="mt-1.5 text-xs leading-relaxed text-fg-muted">
+                Small setups that help you finish the month on your terms.
+              </p>
               {(data.nextMonthPlan ?? []).length > 0 ? (
-                <ul className="mt-3 space-y-3">
+                <ul className="mt-4 space-y-3">
                   {(data.nextMonthPlan ?? []).map((move, index) => (
-                    <li key={move.id} className="rounded-lg border border-border-default/60 bg-app/40 px-3 py-3">
+                    <li
+                      key={move.id}
+                      className="rounded-lg border border-border-default bg-app px-3.5 py-3.5"
+                    >
                       <p className="text-sm font-semibold text-fg">
-                        {index + 1}. {move.title}
+                        <span className="mr-1.5 text-brand tabular-nums">{index + 1}.</span>
+                        {move.title}
                       </p>
-                      <p className="mt-1 text-xs leading-relaxed text-fg-muted">{move.detail}</p>
+                      <p className="mt-1.5 text-xs leading-relaxed text-fg-muted">{move.detail}</p>
                       {move.href && (
                         <Link
                           to={move.href}
-                          className="mt-2 inline-block text-xs font-semibold text-ai-soft hover:underline"
+                          className="mt-2.5 inline-flex items-center text-xs font-semibold text-brand hover:text-brand-soft hover:underline"
                         >
                           {move.actionLabel || 'Open →'}
                         </Link>
@@ -382,7 +391,7 @@ function MonthConditionPage() {
               items={[
                 'Income and spending use posted transactions on connected accounts for the selected calendar month (app timezone).',
                 'Recurring load comes from detected / verified recurring charges.',
-                'Condition grade weighs surplus/deficit, cash runway, and how heavy bills are vs income.',
+                'Condition grade looks at surplus/deficit, cash on hand until payday, and how large known bills are vs income — then points to a useful next step.',
                 'This is a read-only accountant letter — not tax or investment advice.',
               ]}
             />

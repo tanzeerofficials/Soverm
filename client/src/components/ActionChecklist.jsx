@@ -120,7 +120,7 @@ function ActionChecklist({ actions, onUpdate, id = 'dashboard-insight-actions', 
       await updateActionLifecycle(getToken, actionId, { status: 'skipped' })
       showToast?.('Action skipped', 'success')
       await queryClient.invalidateQueries({ queryKey: dashboardQueryKey })
-    } catch (err) {
+    } catch (_err) {
       showToast?.('Couldn’t skip that action', 'error')
     }
   }
@@ -132,7 +132,7 @@ function ActionChecklist({ actions, onUpdate, id = 'dashboard-insight-actions', 
   return (
     <section
       id={id}
-      className={`rounded-xl border border-border-default border-l-4 border-l-brand bg-surface p-4 sm:p-5 ${className}`}
+      className={`rounded-xl border border-border-default border-l-4 border-l-brand bg-surface p-4 sm:p-5 card-shadow ${className}`}
       aria-label="Insight action checklist"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">

@@ -147,7 +147,7 @@ try {
     'System prompt must expose SparkFun annual recurring data'
   )
   assert(
-    prompt.includes('Overall spending: up 7% vs prior 30 days ($800 vs $750)'),
+    prompt.includes('Overall spending: $800 this period (was $750 before, +$50)'),
     'Frozen MoM figures must still come from insight snapshot'
   )
   assert(

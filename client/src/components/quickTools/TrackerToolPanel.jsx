@@ -295,7 +295,7 @@ function TrackerCreateForm({
       <button
         type="submit"
         disabled={isSaving || !monthlyAmount}
-        className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-brand-soft disabled:opacity-60"
+        className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-brand-fg transition hover:bg-brand-soft disabled:opacity-60"
       >
         {isSaving ? 'Saving…' : 'Start tracking'}
       </button>
@@ -794,7 +794,7 @@ function SavingsDetectionsPanel({ detections, savingTrackers, getToken }) {
                   force: true,
                 })
               }
-              className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:bg-brand-soft disabled:opacity-60"
+              className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-brand-fg transition hover:bg-brand-soft disabled:opacity-60"
             >
               Add it anyway
             </button>
@@ -849,7 +849,7 @@ function SavingsDetectionsPanel({ detections, savingTrackers, getToken }) {
                     setPendingForce(null)
                     applyMutation.mutate({ detectionId: detection.id, trackerId })
                   }}
-                  className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:bg-brand-soft disabled:opacity-60"
+                  className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-brand-fg transition hover:bg-brand-soft disabled:opacity-60"
                 >
                   Add to goal
                 </button>

@@ -132,11 +132,11 @@ function GenerateInsightButton({
       )}
 
       {insight && (
-        <div className="rounded-lg border-l-4 border-emerald-500 bg-slate-800 p-6 text-white">
-          <p className="text-sm font-semibold uppercase tracking-wide text-emerald-400">
+        <div className="rounded-lg border-l-4 border-brand bg-surface-deep p-6 text-fg">
+          <p className="text-sm font-semibold uppercase tracking-wide text-brand-soft">
             Your Financial Summary
           </p>
-          <p className="mt-3 leading-relaxed text-slate-100">{insight}</p>
+          <p className="mt-3 leading-relaxed text-fg-muted">{insight}</p>
         </div>
       )}
     </div>

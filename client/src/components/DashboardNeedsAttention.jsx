@@ -8,10 +8,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import {
-  notificationActionLabel,
-  resolveNotificationTarget,
-} from '../lib/notificationNavigation.js'
+import { resolveNotificationTarget } from '../lib/notificationNavigation.js'
 import { markNotificationRead } from '../lib/fetchNotifications.js'
 import { notificationsQueryKey } from '../lib/queryKeys.js'
 import { DASHBOARD_TABS } from './DashboardTabs.jsx'
@@ -103,7 +100,7 @@ function DashboardNeedsAttention({
 
   return (
     <section
-      className="rounded-xl border border-border-default bg-surface p-4 sm:p-5"
+      className="rounded-xl border border-border-default bg-surface p-4 sm:p-5 card-shadow"
       aria-label="Needs your attention"
     >
       <div className="mb-4">

@@ -8,7 +8,7 @@
 import { useMemo, useState } from 'react'
 import { useAuth } from '@clerk/clerk-react'
 import { useQuery } from '@tanstack/react-query'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import AppNavbar from '../components/AppNavbar.jsx'
 import PageHeader from '../components/PageHeader.jsx'
 import HistoryInsightEntry from '../components/HistoryInsightEntry.jsx'
@@ -103,7 +103,6 @@ function HistoryErrorState({ message, onRetry }) {
 
 function HistoryPage() {
   const { getToken } = useAuth()
-  const navigate = useNavigate()
   const { showToast } = useToastContext()
   const [selectedInsight, setSelectedInsight] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')

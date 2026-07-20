@@ -8,6 +8,7 @@
 import db from '../db/index.js'
 import { buildWeeklyReviewForUser } from './weeklyReview.js'
 import { sendTransactionalEmail } from '../utils/transactionalEmail.js'
+import { escapeHtml } from '../utils/escapeHtml.js'
 import {
   insertRitualNotification,
   RITUAL_TRIGGER_TYPES,
@@ -123,23 +124,32 @@ export function formatWeeklyDigestEmail(digest) {
 
   const text = lines.join('\n')
 
+  const safeName = escapeHtml(firstName)
+  const safeWeek = escapeHtml(digest.weekLabel || 'this week')
+  const safeWhatChanged = escapeHtml(b.whatChanged)
+  const safeAtRisk = escapeHtml(b.whatsAtRisk)
+  const safeAction = escapeHtml(b.oneAction)
+  const safeWeeklyReview = escapeHtml(digest.links.weeklyReview)
+  const safeDashboard = escapeHtml(digest.links.dashboard)
+  const safeSettings = escapeHtml(digest.links.settings)
+
   const html = `<!DOCTYPE html>
 <html><body style="font-family:system-ui,sans-serif;line-height:1.5;color:#0f172a">
-  <p>Hi ${firstName},</p>
-  <p>Here’s your Soverm truth letter for <strong>${digest.weekLabel || 'this week'}</strong>:</p>
+  <p>Hi ${safeName},</p>
+  <p>Here’s your Soverm truth letter for <strong>${safeWeek}</strong>:</p>
   <ol>
-    <li><strong>What changed</strong> — ${b.whatChanged}</li>
-    <li><strong>What’s at risk</strong> — ${b.whatsAtRisk}</li>
-    <li><strong>One action</strong> — ${b.oneAction}</li>
+    <li><strong>What changed</strong> — ${safeWhatChanged}</li>
+    <li><strong>What’s at risk</strong> — ${safeAtRisk}</li>
+    <li><strong>One action</strong> — ${safeAction}</li>
   </ol>
   <p>
-    <a href="${digest.links.weeklyReview}" style="display:inline-block;padding:10px 16px;background:#0f172a;color:#fff;text-decoration:none;border-radius:8px;font-weight:600">
+    <a href="${safeWeeklyReview}" style="display:inline-block;padding:10px 16px;background:#0f172a;color:#fff;text-decoration:none;border-radius:8px;font-weight:600">
       Open Your week
     </a>
   </p>
   <p style="color:#64748b;font-size:12px">
-    <a href="${digest.links.dashboard}">Dashboard</a> ·
-    <a href="${digest.links.settings}">Notification settings</a>
+    <a href="${safeDashboard}">Dashboard</a> ·
+    <a href="${safeSettings}">Notification settings</a>
   </p>
   <p style="color:#64748b;font-size:12px">— Soverm</p>
 </body></html>`
@@ -192,11 +202,24 @@ export async function deliverWeeklyDigestForUser(userId) {
     return { created: false, reason: 'notify_error' }
   })
 
+  /*
+   * Gate email on a freshly created notification so cron re-runs / multi-
+   * instance workers do not send the same weekly letter twice.
+   */
+  if (!notification?.created) {
+    return {
+      delivered: false,
+      reason: notification?.reason ?? 'already_delivered',
+      notificationCreated: false,
+      digest,
+    }
+  }
+
   const formatted = formatWeeklyDigestEmail(digest)
   const result = await sendWeeklyDigestEmail(formatted)
   return {
     delivered: Boolean(result.sent),
-    notificationCreated: Boolean(notification?.created),
+    notificationCreated: true,
     digest,
     ...result,
   }

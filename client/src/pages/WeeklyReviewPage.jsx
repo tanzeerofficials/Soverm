@@ -196,7 +196,7 @@ function WeeklyReviewPage() {
         ) : (
           <div className="space-y-4">
             {data.sparse && (
-              <div className="rounded-xl border border-border-default bg-surface px-4 py-3 text-sm text-fg-muted">
+              <div className="rounded-xl border border-border-default bg-surface px-4 py-3 text-sm text-fg-muted card-shadow">
                 {data.accountCount === 0
                   ? 'Connect a bank to unlock a full weekly review.'
                   : `Early days (${data.historyDays} day${data.historyDays === 1 ? '' : 's'} of history). We’ll get sharper after a full week of transactions.`}
@@ -288,7 +288,7 @@ function WeeklyReviewPage() {
             </section>
 
             {/* R4 Payday edit */}
-            <section className="rounded-xl border border-border-default bg-surface px-5 py-5 text-left">
+            <section className="rounded-xl border border-border-default bg-surface px-5 py-5 text-left card-shadow">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-fg-subtle">
@@ -343,7 +343,7 @@ function WeeklyReviewPage() {
                       type="button"
                       disabled={saveMutation.isPending || !nextPaydayOn}
                       onClick={() => saveMutation.mutate()}
-                      className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-slate-950 hover:bg-brand-soft disabled:opacity-60"
+                      className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-brand-fg hover:bg-brand-soft disabled:opacity-60"
                     >
                       {saveMutation.isPending ? 'Saving…' : 'Save payday'}
                     </button>
@@ -362,7 +362,7 @@ function WeeklyReviewPage() {
             </section>
 
             <section
-              className="rounded-xl border border-border-default bg-surface px-5 py-5 text-left"
+              className="rounded-xl border border-border-default bg-surface px-5 py-5 text-left card-shadow"
               aria-labelledby="how-you-did-heading"
             >
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-fg-subtle">
@@ -380,7 +380,7 @@ function WeeklyReviewPage() {
             </section>
 
             <section
-              className="rounded-xl border border-border-default bg-surface px-5 py-5 text-left"
+              className="rounded-xl border border-border-default bg-surface px-5 py-5 text-left card-shadow"
               aria-labelledby="whats-left-heading"
             >
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-fg-subtle">
@@ -441,7 +441,7 @@ function WeeklyReviewPage() {
             />
 
             {data.followUps?.length > 0 && (
-              <section className="rounded-xl border border-border-default bg-surface px-5 py-5 text-left">
+              <section className="rounded-xl border border-border-default bg-surface px-5 py-5 text-left card-shadow">
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-fg-subtle">
                   Last week’s follow-up
                 </p>
@@ -507,7 +507,7 @@ function WeeklyReviewPage() {
                   type="button"
                   disabled={actionMutation.isPending || !data.move?.title}
                   onClick={() => actionMutation.mutate({ mode: 'accept' })}
-                  className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-slate-950 hover:bg-brand-soft disabled:opacity-60"
+                  className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-brand-fg hover:bg-brand-soft disabled:opacity-60"
                 >
                   Accept this move
                 </button>

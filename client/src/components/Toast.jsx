@@ -8,14 +8,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 const TYPE_STYLES = {
   success: {
-    container: 'border-emerald-500/30 bg-surface/95 text-fg',
-    icon: 'text-emerald-400',
-    bar: 'bg-emerald-500',
+    container: 'border-brand/30 bg-surface/95 text-fg',
+    icon: 'text-brand-soft',
+    bar: 'bg-brand',
   },
   error: {
-    container: 'border-red-500/30 bg-surface/95 text-fg',
-    icon: 'text-red-400',
-    bar: 'bg-red-500',
+    container: 'border-danger/30 bg-surface/95 text-fg',
+    icon: 'text-danger',
+    bar: 'bg-danger',
   },
   info: {
     container: 'border-border-default bg-surface/95 text-fg',

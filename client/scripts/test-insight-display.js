@@ -4,8 +4,6 @@
  * Usage: node scripts/test-insight-display.js
  */
 
-/* global process */
-
 import {
   buildDeltaAriaLabel,
   buildQuickQuestions,
@@ -21,8 +19,6 @@ function assert(condition, message) {
     throw new Error(message)
   }
 }
-
-let passed = 0
 
 try {
   console.log('Insight display helper tests\n')
@@ -58,7 +54,7 @@ try {
         priorTotal: 700,
       },
       'income'
-    ) === 'Income about 1.2× vs prior 30 days — $842 vs $700',
+    ) === 'Income $842 this period, up from $700 in the prior 30 days',
     'income aria-label incorrect'
   )
   assert(
@@ -98,9 +94,10 @@ try {
   })
 
   assert(
-    momQuestions[0] === 'Why did dining jump by about $142 (1.2×)?',
+    momQuestions[0] === 'What changed in dining from $700 before to $842 this period?',
     `expected MoM question first, got: ${momQuestions[0]}`
   )
+  assert(!momQuestions.some((question) => question.includes('×')), 'quick questions should avoid multipliers')
   assert(momQuestions.length === 3, 'quick questions should cap at 3')
   console.log('  pass: MoM-aware quick questions')
 
@@ -130,18 +127,18 @@ try {
       percent: 18,
       times: 1.18,
       absoluteChange: 142,
-    }) === '↑ 1.2× · +$142',
+    }) === '↑ +$142',
     'compact delta format'
   )
   assert(
-    formatCompactDelta({ direction: 'up', percent: 18 }) === '↑ 1.2×',
-    'legacy percent-only delta should convert to times'
+    formatCompactDelta({ direction: 'up', percent: 18 }) === '↑ 18%',
+    'legacy percent-only delta should retain percent context'
   )
-  assert(compactDeltaToneClass('income', { direction: 'down', percent: 8 }) === 'text-red-400', 'income down tone')
+  assert(compactDeltaToneClass('income', { direction: 'down', percent: 8 }) === 'text-danger', 'income down tone')
   console.log('  pass: history timeline stat preview helpers')
 
-  passed = 6
-  console.log(`\n${passed}/${passed} tests passed`)
+  const totalPassed = 6
+  console.log(`\n${totalPassed}/${totalPassed} tests passed`)
 } catch (err) {
   console.error(`\nFAIL: ${err.message}`)
   process.exit(1)

@@ -241,7 +241,7 @@ function DashboardQuickTools({
   )
 
   return (
-    <section id="dashboard-quick-tools" className="rounded-xl border border-border-default bg-surface p-4 sm:p-5">
+    <section id="dashboard-quick-tools" className="rounded-xl border border-border-default bg-surface p-4 sm:p-5 card-shadow">
       <div>
         <h2 className="text-sm font-semibold text-fg">Quick tools</h2>
         <p className="mt-1 text-sm text-fg-muted">

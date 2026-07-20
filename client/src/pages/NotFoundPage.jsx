@@ -22,7 +22,7 @@ function NotFoundPage() {
         </p>
         <Link
           to="/"
-          className="mt-8 inline-block rounded-lg bg-brand px-6 py-3 text-sm font-medium text-slate-950 transition hover:bg-brand-soft"
+          className="mt-8 inline-block rounded-lg bg-brand px-6 py-3 text-sm font-medium text-brand-fg transition hover:bg-brand-soft"
         >
           Back to home
         </Link>

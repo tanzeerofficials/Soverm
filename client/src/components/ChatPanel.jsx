@@ -37,9 +37,9 @@ const assistantMarkdownComponents = {
   ul: ({ children }) => <ul className="mb-2 ml-4 list-disc space-y-1">{children}</ul>,
   ol: ({ children }) => <ol className="mb-2 ml-4 list-decimal space-y-1">{children}</ol>,
   li: ({ children }) => <li className="text-sm leading-relaxed">{children}</li>,
-  strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
+  strong: ({ children }) => <strong className="font-semibold text-fg">{children}</strong>,
   h3: ({ children }) => (
-    <h3 className="mb-1.5 mt-3 text-sm font-semibold text-white first:mt-0">{children}</h3>
+    <h3 className="mb-1.5 mt-3 text-sm font-semibold text-fg first:mt-0">{children}</h3>
   ),
   h4: ({ children }) => (
     <h4 className="mb-1 mt-2 text-sm font-semibold text-fg">{children}</h4>
@@ -49,7 +49,7 @@ const assistantMarkdownComponents = {
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="font-medium text-ai-soft underline underline-offset-2 hover:text-white"
+      className="font-medium text-ai-soft underline underline-offset-2 hover:text-fg"
     >
       {children}
     </a>
@@ -94,7 +94,7 @@ function ChatSuggestedPrompts({ prompts, disabled, onSelect }) {
             type="button"
             disabled={disabled}
             onClick={() => onSelect(prompt)}
-            className="max-w-full rounded-full border border-border-default bg-app px-3 py-2 text-left text-xs leading-snug text-fg-muted transition hover:border-ai/40 hover:bg-surface-elevated hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+            className="max-w-full rounded-full border border-border-default bg-app px-3 py-2 text-left text-xs leading-snug text-fg-muted transition hover:border-ai/40 hover:bg-surface-elevated hover:text-fg disabled:cursor-not-allowed disabled:opacity-60"
           >
             {prompt}
           </button>
@@ -155,7 +155,7 @@ function AssistantMessageBody({
 
   return (
     <div>
-      <div className="prose prose-invert prose-sm max-w-none">
+      <div className="prose prose-sm max-w-none text-fg">
         {markdown ? (
           <ReactMarkdown remarkPlugins={[remarkGfm]} components={assistantMarkdownComponents}>
             {markdown}
@@ -192,7 +192,7 @@ function ChatSendingStatus({ phase, serverStatus = null, onRetry, onCancel }) {
 
   return (
     <div className="flex justify-start" aria-live="polite">
-      <div className="max-w-[92%] rounded-xl bg-surface-elevated px-3.5 py-2.5 sm:max-w-[85%]">
+      <div className="max-w-[92%] rounded-xl bg-surface-elevated px-3.5 py-2.5 shadow-sm sm:max-w-[85%]">
         <p className="text-xs text-fg-muted">{copy.title}</p>
         {copy.detail ? (
           <p className="mt-1 text-[11px] leading-relaxed text-fg-subtle">{copy.detail}</p>
@@ -632,7 +632,7 @@ function ChatPanel({
       className={
         isModalLayout
           ? 'flex min-h-0 flex-1 flex-col'
-          : 'mt-4 scroll-mt-28 rounded-xl border border-border-default border-l-4 border-l-ai bg-surface p-4 sm:p-6'
+          : 'mt-4 scroll-mt-28 rounded-xl border border-border-default border-l-4 border-l-ai bg-surface p-4 sm:p-6 card-shadow'
       }
     >
       {!isModalLayout && (
@@ -726,8 +726,8 @@ function ChatPanel({
             <div
               className={`max-w-[92%] break-words rounded-xl px-3.5 py-2.5 text-sm sm:max-w-[85%] ${
                 message.role === 'user'
-                  ? 'bg-emerald-500 text-slate-950'
-                  : 'bg-surface-elevated text-fg'
+                  ? 'bg-brand text-brand-fg'
+                  : 'bg-surface-elevated text-fg shadow-sm'
               }`}
             >
               {message.role === 'user' ? (

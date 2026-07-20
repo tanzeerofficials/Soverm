@@ -14,6 +14,7 @@ import {
 } from '../utils/calendarMonth.js'
 import { buildMonthConditionLetterForUser } from './monthConditionLetter.js'
 import { sendTransactionalEmail } from '../utils/transactionalEmail.js'
+import { escapeHtml } from '../utils/escapeHtml.js'
 import {
   insertRitualNotification,
   RITUAL_TRIGGER_TYPES,
@@ -68,11 +69,11 @@ export async function buildMonthConditionNotifyForUser(
   const gradeLabel =
     letter?.condition?.title ||
     (gradeId === 'at_risk'
-      ? 'Needs attention'
+      ? 'Let’s finish strong'
       : gradeId === 'tight'
-        ? 'Tight'
+        ? 'Room to improve'
         : gradeId === 'stable'
-          ? 'Stable'
+          ? 'On track'
           : null)
 
   const summary =
@@ -117,19 +118,27 @@ export function formatMonthConditionNotifyEmail(payload) {
     '— Soverm',
   ].join('\n')
 
+  const safeName = escapeHtml(firstName)
+  const safeMonth = escapeHtml(payload.monthLabel)
+  const safeGrade = escapeHtml(gradeBit)
+  const safeSummary = escapeHtml(payload.summary)
+  const safeLetter = escapeHtml(payload.links.monthCondition)
+  const safeDashboard = escapeHtml(payload.links.dashboard)
+  const safeSettings = escapeHtml(payload.links.settings)
+
   const html = `<!DOCTYPE html>
 <html><body style="font-family:system-ui,sans-serif;line-height:1.5;color:#0f172a">
-  <p>Hi ${firstName},</p>
-  <p>Your monthly accountant letter for <strong>${payload.monthLabel}</strong> is ready${gradeBit}.</p>
-  <p>${payload.summary}</p>
+  <p>Hi ${safeName},</p>
+  <p>Your monthly accountant letter for <strong>${safeMonth}</strong> is ready${safeGrade}.</p>
+  <p>${safeSummary}</p>
   <p>
-    <a href="${payload.links.monthCondition}" style="display:inline-block;padding:10px 16px;background:#0f172a;color:#fff;text-decoration:none;border-radius:8px;font-weight:600">
+    <a href="${safeLetter}" style="display:inline-block;padding:10px 16px;background:#0f172a;color:#fff;text-decoration:none;border-radius:8px;font-weight:600">
       Read your letter
     </a>
   </p>
   <p style="color:#64748b;font-size:12px">
-    <a href="${payload.links.dashboard}">Dashboard</a> ·
-    <a href="${payload.links.settings}">Notification settings</a>
+    <a href="${safeDashboard}">Dashboard</a> ·
+    <a href="${safeSettings}">Notification settings</a>
   </p>
   <p style="color:#64748b;font-size:12px">— Soverm</p>
 </body></html>`
@@ -166,6 +175,19 @@ export async function deliverMonthConditionNotifyForUser(userId, options = {}) {
     return { created: false, reason: 'notify_error' }
   })
 
+  /*
+   * Only email when this run created the in-app notification. Re-runs that
+   * hit the dedup key must stay quiet so cron retries do not spam inboxes.
+   */
+  if (!notification?.created) {
+    return {
+      delivered: false,
+      reason: notification?.reason ?? 'already_delivered',
+      notificationCreated: false,
+      payload,
+    }
+  }
+
   const formatted = formatMonthConditionNotifyEmail(payload)
   const result = await sendTransactionalEmail({
     ...formatted,
@@ -174,7 +196,7 @@ export async function deliverMonthConditionNotifyForUser(userId, options = {}) {
 
   return {
     delivered: Boolean(result.sent),
-    notificationCreated: Boolean(notification?.created),
+    notificationCreated: true,
     payload,
     ...result,
   }

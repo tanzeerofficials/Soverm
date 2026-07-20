@@ -16,6 +16,10 @@ import {
 } from '../shared/usageLimits.js'
 import { getUserTier } from './usage.js'
 import { reportServerError } from './sentry.js'
+import {
+  getAppTodaySqlParams,
+  getSecondsUntilAppTomorrow,
+} from './calendarMonth.js'
 
 export {
   CHAT_HOURLY_LIMIT,
@@ -52,22 +56,21 @@ export async function getChatMessagesInLastHour(userId) {
 }
 
 export async function getChatMessagesToday(userId) {
+  const { todayIso, tomorrowIso, timeZone } = getAppTodaySqlParams()
   const result = await db.query(
     `SELECT COUNT(*)::int AS count
      FROM chat_messages
      WHERE user_id = $1
        AND role = 'user'
-       AND created_at::date = NOW()::date`,
-    [userId]
+       AND created_at >= ($2::timestamp AT TIME ZONE $3)
+       AND created_at < ($4::timestamp AT TIME ZONE $3)`,
+    [userId, todayIso, timeZone, tomorrowIso]
   )
   return result.rows[0].count
 }
 
-async function getSecondsUntilTomorrow() {
-  const result = await db.query(
-    `SELECT EXTRACT(EPOCH FROM (DATE_TRUNC('day', NOW()) + INTERVAL '1 day' - NOW()))::int AS seconds`
-  )
-  return Math.max(result.rows[0]?.seconds ?? 3600, 1)
+function getSecondsUntilTomorrow() {
+  return getSecondsUntilAppTomorrow()
 }
 
 async function buildHourlyChatLimitStatus(userId) {
@@ -116,7 +119,7 @@ async function buildDailyChatLimitStatus(userId) {
     limit,
     remaining,
     period: 'day',
-    retryAfterSeconds: allowed ? null : await getSecondsUntilTomorrow(),
+    retryAfterSeconds: allowed ? null : getSecondsUntilTomorrow(),
     message: allowed
       ? null
       : 'Daily message limit reached. Try again tomorrow.',
@@ -129,6 +132,108 @@ export async function getChatRateLimitStatus(userId) {
     return buildHourlyChatLimitStatus(userId)
   }
   return buildDailyChatLimitStatus(userId)
+}
+
+/*
+ * What this does: under a user-row lock, checks whether another chat message
+ * is allowed right now (free daily / Pro hourly).
+ *
+ * Why: the Express middleware check alone is not atomic — two parallel
+ * requests can both pass COUNT and both call Claude. Callers reserve before
+ * the model call and re-check before persist (same pattern as insights).
+ *
+ * @param {import('pg').PoolClient} client - open transaction client
+ * @param {string} userId
+ */
+export async function reserveChatSlot(client, userId) {
+  const tierResult = await client.query(
+    `SELECT subscription_tier
+     FROM users
+     WHERE id = $1
+     FOR UPDATE`,
+    [userId]
+  )
+
+  const tier = tierResult.rows[0]?.subscription_tier ?? 'free'
+  const isPro = tier === 'pro'
+
+  if (isPro) {
+    const countResult = await client.query(
+      `SELECT COUNT(*)::int AS count
+       FROM chat_messages
+       WHERE user_id = $1
+         AND role = 'user'
+         AND created_at > NOW() - INTERVAL '1 hour'`,
+      [userId]
+    )
+    const count = Number(countResult.rows[0].count)
+    const limit = CHAT_HOURLY_LIMIT
+    const remaining = Math.max(limit - count, 0)
+    const allowed = count < limit
+
+    let retryAfterSeconds = null
+    if (!allowed) {
+      const oldest = await client.query(
+        `SELECT EXTRACT(EPOCH FROM (created_at + INTERVAL '1 hour' - NOW()))::int AS seconds
+         FROM chat_messages
+         WHERE user_id = $1
+           AND role = 'user'
+           AND created_at > NOW() - INTERVAL '1 hour'
+         ORDER BY created_at ASC
+         LIMIT 1`,
+        [userId]
+      )
+      retryAfterSeconds = Math.max(oldest.rows[0]?.seconds ?? 60, 1)
+    }
+
+    return {
+      allowed,
+      status: {
+        allowed,
+        count,
+        limit,
+        remaining,
+        period: 'hour',
+        retryAfterSeconds,
+        message: allowed
+          ? null
+          : 'Message limit reached for this hour. Try again in a few minutes.',
+      },
+    }
+  }
+
+  const { todayIso, tomorrowIso, timeZone } = getAppTodaySqlParams()
+  const countResult = await client.query(
+    `SELECT COUNT(*)::int AS count
+     FROM chat_messages
+     WHERE user_id = $1
+       AND role = 'user'
+       AND created_at >= ($2::timestamp AT TIME ZONE $3)
+       AND created_at < ($4::timestamp AT TIME ZONE $3)`,
+    [userId, todayIso, timeZone, tomorrowIso]
+  )
+  const count = Number(countResult.rows[0].count)
+  const limit = FREE_DAILY_CHAT_LIMIT
+  const remaining = Math.max(limit - count, 0)
+  const allowed = count < limit
+
+  let retryAfterSeconds = null
+  if (!allowed) {
+    retryAfterSeconds = getSecondsUntilAppTomorrow()
+  }
+
+  return {
+    allowed,
+    status: {
+      allowed,
+      count,
+      limit,
+      remaining,
+      period: 'day',
+      retryAfterSeconds,
+      message: allowed ? null : 'Daily message limit reached. Try again tomorrow.',
+    },
+  }
 }
 
 export function isGenerateRateLimited(usage) {

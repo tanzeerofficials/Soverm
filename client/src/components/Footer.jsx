@@ -66,9 +66,9 @@ function PlaidBadge() {
   return (
     <div className="rounded-xl border border-border-default bg-surface p-4">
       <div className="flex items-start gap-3">
-        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-emerald-500/30 bg-emerald-500/10">
+        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-brand/30 bg-brand/10">
           <svg
-            className="h-4 w-4 text-emerald-400"
+            className="h-4 w-4 text-brand-soft"
             viewBox="0 0 20 20"
             fill="currentColor"
             aria-hidden="true"
@@ -125,7 +125,7 @@ function Footer() {
                 <SignUpButton mode="modal">
                   <button
                     type="button"
-                    className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400"
+                    className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-brand-fg transition hover:bg-brand-soft"
                   >
                     Get started free
                   </button>

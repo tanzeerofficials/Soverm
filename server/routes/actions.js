@@ -39,12 +39,28 @@ router.get('/', async (req, res) => {
 /*
  * POST /api/actions
  * Accept a weekly (or other) action into the closed-loop.
+ *
+ * If insightId is sent, it must be a UUID that belongs to this user
+ * (ownership is enforced in createAction — otherwise anyone could attach
+ * another user's insight id to their action row).
  */
 router.post('/', async (req, res) => {
   const { userId } = getAuth(req)
 
   try {
     await ensureUserExists(userId)
+
+    let insightId = req.body?.insightId ?? null
+    if (insightId != null && insightId !== '') {
+      const idCheck = validateUuidParam(insightId, 'insightId')
+      if (idCheck.error) {
+        return res.status(400).json({ error: idCheck.error })
+      }
+      insightId = idCheck.value
+    } else {
+      insightId = null
+    }
+
     const week = getCalendarWeekWindow()
     const action = await createAction(userId, {
       description: req.body?.description,
@@ -52,12 +68,15 @@ router.post('/', async (req, res) => {
       status: req.body?.status ?? 'accepted',
       weekStartOn: req.body?.weekStartOn ?? week.weekStartIso,
       metadata: req.body?.metadata ?? {},
-      insightId: req.body?.insightId ?? null,
+      insightId,
     })
     res.status(201).json({ action })
   } catch (err) {
     if (err.statusCode === 400) {
       return res.status(400).json({ error: err.message })
+    }
+    if (err.statusCode === 404) {
+      return res.status(404).json({ error: err.message })
     }
     reportServerError('to create action', err, { userId, req })
     res.status(500).json({ error: GENERIC_ERROR_MESSAGE })

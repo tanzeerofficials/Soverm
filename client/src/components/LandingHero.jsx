@@ -32,7 +32,7 @@ function LandingHero() {
 
       <div className="relative mx-auto max-w-4xl px-6 pt-16 text-center sm:pt-24">
         <div className="landing-hero-stagger">
-          <p className="text-4xl font-bold tracking-[0.18em] text-fg sm:text-5xl lg:text-6xl">
+          <p className="text-4xl font-bold tracking-[0.12em] text-fg sm:text-5xl sm:tracking-[0.18em] lg:text-6xl">
             SOVERM
           </p>
 
@@ -49,7 +49,7 @@ function LandingHero() {
             <SignUpButton mode="modal">
               <button
                 type="button"
-                className="w-full rounded-lg bg-brand px-8 py-3.5 text-sm font-semibold text-slate-950 transition hover:bg-brand-soft sm:w-auto"
+                className="w-full rounded-lg bg-brand px-8 py-3.5 text-sm font-semibold text-brand-fg transition hover:bg-brand-soft sm:w-auto"
               >
                 Start free
               </button>

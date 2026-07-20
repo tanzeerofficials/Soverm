@@ -57,7 +57,7 @@ function ConnectBankButton({
   const isSecondary = variant === 'secondary'
   const buttonClass = isSecondary
     ? `min-h-11 w-full rounded-lg border border-brand/40 bg-brand/10 px-4 py-2.5 text-sm font-semibold text-brand-soft transition hover:bg-brand/15 disabled:cursor-not-allowed disabled:opacity-60 ${className}`
-    : `min-h-11 w-full rounded-lg bg-brand px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-60 ${
+    : `min-h-11 w-full rounded-lg bg-brand px-4 py-3 text-sm font-semibold text-brand-fg transition hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-60 ${
         highlighted && !isExchanging ? 'animate-pulse' : ''
       } ${className}`
 

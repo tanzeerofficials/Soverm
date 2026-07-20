@@ -1,21 +1,81 @@
 @import "tailwindcss";
 
-@theme {
-  --color-app: #0a0f1c;
-  --color-surface: #111827;
-  --color-surface-elevated: #1a2236;
-  --color-border-default: #1e2d45;
-  --color-border-hover: #2d3a52;
-  --color-surface-deep: #131b2e;
-  --color-fg: #f9fafb;
-  --color-fg-muted: #9ca3af;
-  --color-fg-subtle: #6b7280;
-  --color-brand: #10b981;
-  --color-brand-soft: #34d399;
-  --color-ai: #8b5cf6;
-  --color-ai-soft: #c4b5fd;
-  --color-danger: #ef4444;
-  --color-warning: #f59e0b;
+/*
+ * THEME TOKENS
+ *
+ * Runtime CSS variables flip with data-theme on <html>.
+ * @theme inline maps Tailwind utilities (bg-app, text-fg, …) to those vars.
+ * Landing hero stays hardcoded dark regardless of app theme.
+ */
+
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+  --soverm-app: #0a0f1c;
+  --soverm-surface: #111827;
+  --soverm-surface-elevated: #1a2236;
+  --soverm-surface-deep: #131b2e;
+  --soverm-border: #1e2d45;
+  --soverm-border-hover: #2d3a52;
+  --soverm-fg: #f9fafb;
+  --soverm-fg-muted: #9ca3af;
+  --soverm-fg-subtle: #6b7280;
+  --soverm-brand: #10b981;
+  --soverm-brand-soft: #34d399;
+  --soverm-brand-fg: #0f172a;
+  --soverm-ai: #8b5cf6;
+  --soverm-ai-soft: #c4b5fd;
+  --soverm-danger: #ef4444;
+  --soverm-warning: #f59e0b;
+  --soverm-scroll-thumb: #374151;
+  --soverm-scroll-thumb-hover: #4b5563;
+  --soverm-overlay-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  --soverm-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --soverm-card-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.28);
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --soverm-app: #eef0f4;
+  --soverm-surface: #ffffff;
+  --soverm-surface-elevated: #ffffff;
+  --soverm-surface-deep: #e4e7ed;
+  --soverm-border: #d8dce3;
+  --soverm-border-hover: #c2c8d2;
+  --soverm-fg: #0f172a;
+  --soverm-fg-muted: #475467;
+  --soverm-fg-subtle: #6b7688;
+  --soverm-brand: #059669;
+  --soverm-brand-soft: #10b981;
+  --soverm-brand-fg: #ffffff;
+  --soverm-ai: #7c3aed;
+  --soverm-ai-soft: #8b5cf6;
+  --soverm-danger: #dc2626;
+  --soverm-warning: #d97706;
+  --soverm-scroll-thumb: #94a3b8;
+  --soverm-scroll-thumb-hover: #64748b;
+  --soverm-overlay-shadow: 0 16px 40px rgba(15, 23, 42, 0.14);
+  --soverm-card-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.1);
+  --soverm-card-shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.08);
+}
+
+@theme inline {
+  --color-app: var(--soverm-app);
+  --color-surface: var(--soverm-surface);
+  --color-surface-elevated: var(--soverm-surface-elevated);
+  --color-surface-deep: var(--soverm-surface-deep);
+  --color-border-default: var(--soverm-border);
+  --color-border-hover: var(--soverm-border-hover);
+  --color-fg: var(--soverm-fg);
+  --color-fg-muted: var(--soverm-fg-muted);
+  --color-fg-subtle: var(--soverm-fg-subtle);
+  --color-brand: var(--soverm-brand);
+  --color-brand-soft: var(--soverm-brand-soft);
+  --color-brand-fg: var(--soverm-brand-fg);
+  --color-ai: var(--soverm-ai);
+  --color-ai-soft: var(--soverm-ai-soft);
+  --color-danger: var(--soverm-danger);
+  --color-warning: var(--soverm-warning);
 }
 
 html,
@@ -23,8 +83,9 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100%;
-  background-color: var(--color-app);
-  color: var(--color-fg);
+  overflow-x: hidden;
+  background-color: var(--soverm-app);
+  color: var(--soverm-fg);
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
@@ -32,15 +93,56 @@ body {
 
 #root {
   min-height: 100vh;
+  overflow-x: hidden;
+}
+
+:where(a[href], button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--soverm-brand-soft);
+  outline-offset: 2px;
 }
 
 .pb-safe {
   padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.25rem);
 }
 
+.overlay-shadow {
+  box-shadow: var(--soverm-overlay-shadow);
+}
+
+/*
+ * Card / panel elevation — light needs a real drop shadow because
+ * surface and elevated are both white; dark keeps a subtler lift.
+ */
+.card-shadow {
+  box-shadow: var(--soverm-card-shadow);
+}
+
+.card-shadow-md {
+  box-shadow: var(--soverm-card-shadow-md);
+}
+
+/* Brand mark chip — theme-aware gradient / letter / glow */
+.logo-chip {
+  background: linear-gradient(to bottom right, #34d399, #10b981, #0d9488);
+  box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.25);
+}
+
+.logo-chip-letter {
+  color: #022c22;
+}
+
+[data-theme="light"] .logo-chip {
+  background: linear-gradient(to bottom right, #10b981, #059669, #0f766e);
+  box-shadow: 0 10px 15px -3px rgba(5, 150, 105, 0.2);
+}
+
+[data-theme="light"] .logo-chip-letter {
+  color: #ffffff;
+}
+
 .chat-scroll {
   scrollbar-width: thin;
-  scrollbar-color: #374151 transparent;
+  scrollbar-color: var(--soverm-scroll-thumb) transparent;
 }
 
 .chat-scroll::-webkit-scrollbar {
@@ -52,12 +154,12 @@ body {
 }
 
 .chat-scroll::-webkit-scrollbar-thumb {
-  background-color: #374151;
+  background-color: var(--soverm-scroll-thumb);
   border-radius: 9999px;
 }
 
 .chat-scroll::-webkit-scrollbar-thumb:hover {
-  background-color: #4b5563;
+  background-color: var(--soverm-scroll-thumb-hover);
 }
 
 /* Notification dropdown — thinner gutter, thumb only on hover */
@@ -67,7 +169,7 @@ body {
 }
 
 .notification-scroll:hover {
-  scrollbar-color: rgb(55 65 81 / 0.7) transparent;
+  scrollbar-color: color-mix(in srgb, var(--soverm-scroll-thumb) 70%, transparent) transparent;
 }
 
 .notification-scroll::-webkit-scrollbar {
@@ -84,9 +186,10 @@ body {
 }
 
 .notification-scroll:hover::-webkit-scrollbar-thumb {
-  background-color: rgb(55 65 81 / 0.7);
+  background-color: color-mix(in srgb, var(--soverm-scroll-thumb) 70%, transparent);
 }
 
+/* Landing hero — always dark marketing wash (hardcoded, not theme tokens) */
 @media (prefers-reduced-motion: no-preference) {
   @keyframes landing-hero-in {
     from {
@@ -256,6 +359,41 @@ body {
   .first-insight-banner {
     animation: first-insight-in 0.45s ease-out;
   }
+}
+
+/* Hero shell/mesh also needed when reduced motion is on */
+.landing-hero-mesh {
+  background:
+    radial-gradient(ellipse 90% 70% at 50% -15%, rgba(16, 185, 129, 0.28), transparent 68%),
+    radial-gradient(circle at 12% 45%, rgba(139, 92, 246, 0.16), transparent 42%),
+    radial-gradient(circle at 88% 38%, rgba(16, 185, 129, 0.14), transparent 38%),
+    linear-gradient(180deg, rgba(26, 34, 54, 0.35) 0%, transparent 55%);
+}
+
+.landing-hero-shell {
+  background:
+    radial-gradient(ellipse 120% 80% at 50% -20%, rgba(16, 185, 129, 0.08), transparent 50%),
+    linear-gradient(180deg, #0d1528 0%, #0a0f1c 72%);
+}
+
+.landing-hero-grid {
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.045) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 85% 75% at 50% 20%, black 15%, transparent 72%);
+}
+
+.landing-hero-orb--brand {
+  background: rgba(16, 185, 129, 0.18);
+}
+
+.landing-hero-orb--ai {
+  background: rgba(139, 92, 246, 0.16);
+}
+
+.landing-hero-orb--center {
+  background: rgba(139, 92, 246, 0.1);
 }
 
 @media (prefers-reduced-motion: reduce) {

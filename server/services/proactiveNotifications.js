@@ -18,6 +18,7 @@ import { enrichTracker } from '../utils/monthlyTrackers.js'
 import { getCalendarMonthWindow } from '../utils/safeToSpend.js'
 import { hasMonthlyTrackersTable } from '../utils/monthlyTrackersSchema.js'
 import { loadSpentThisCalendarMonth } from './trackerSnapshot.js'
+import { getAppTodaySqlParams } from '../utils/calendarMonth.js'
 
 async function loadRecentTransactionsForTriggers(userId) {
   const result = await db.query(
@@ -73,14 +74,16 @@ async function loadPreviouslyNotifiedRecurringMerchants(userId) {
 }
 
 async function loadNotificationLimits(userId) {
+  const { todayIso, tomorrowIso, timeZone } = getAppTodaySqlParams()
   const [todayResult, dedupResult] = await Promise.all([
     db.query(
       `SELECT trigger_type, COUNT(*)::int AS count
        FROM notifications
        WHERE user_id = $1
-         AND created_at >= date_trunc('day', NOW())
+         AND created_at >= ($2::timestamp AT TIME ZONE $3)
+         AND created_at < ($4::timestamp AT TIME ZONE $3)
        GROUP BY trigger_type`,
-      [userId]
+      [userId, todayIso, timeZone, tomorrowIso]
     ),
     db.query(
       `SELECT trigger_type, dedup_key
@@ -173,20 +176,52 @@ function shouldSkipTrigger(trigger, limits) {
 }
 
 async function insertNotification(userId, trigger, copy) {
-  await db.query(
-    `INSERT INTO notifications (
-       id, user_id, trigger_type, title, body, related_data, dedup_key
-     )
-     VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6)`,
-    [
-      userId,
-      trigger.triggerType,
-      copy.title,
-      copy.body,
-      JSON.stringify(trigger.relatedData),
-      trigger.dedupKey,
-    ]
-  )
+  try {
+    const result = await db.query(
+      `INSERT INTO notifications (
+         id, user_id, trigger_type, title, body, related_data, dedup_key
+       )
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6)
+       ON CONFLICT (user_id, trigger_type, dedup_key)
+         WHERE dedup_key IS NOT NULL
+       DO NOTHING
+       RETURNING id`,
+      [
+        userId,
+        trigger.triggerType,
+        copy.title,
+        copy.body,
+        JSON.stringify(trigger.relatedData),
+        trigger.dedupKey,
+      ]
+    )
+    return { created: result.rows.length > 0 }
+  } catch (err) {
+    // Unique violation if migration 026 index exists but ON CONFLICT target
+    // could not be inferred — treat as already delivered.
+    if (err.code === '23505') {
+      return { created: false, reason: 'already_exists' }
+    }
+    // Index missing — fall back to plain insert (pre-026 environments).
+    if (err.code === '42P10' || /no unique|ON CONFLICT/i.test(err.message)) {
+      await db.query(
+        `INSERT INTO notifications (
+           id, user_id, trigger_type, title, body, related_data, dedup_key
+         )
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6)`,
+        [
+          userId,
+          trigger.triggerType,
+          copy.title,
+          copy.body,
+          JSON.stringify(trigger.relatedData),
+          trigger.dedupKey,
+        ]
+      )
+      return { created: true }
+    }
+    throw err
+  }
 }
 
 /*
@@ -228,7 +263,11 @@ export async function evaluateAndCreateProactiveNotifications(userId) {
       }
 
       const copy = await generateProactiveNotificationCopy(trigger)
-      await insertNotification(userId, trigger, copy)
+      const inserted = await insertNotification(userId, trigger, copy)
+      if (!inserted.created) {
+        limits.recentDedupKeys.add(`${trigger.triggerType}:${trigger.dedupKey}`)
+        continue
+      }
 
       limits.createdToday += 1
       limits.triggerTypeCountsToday[trigger.triggerType] =

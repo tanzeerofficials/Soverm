@@ -49,6 +49,24 @@ const ACCOUNT_NAV = [
 
 const SETTINGS_NAV = ACCOUNT_NAV.find((item) => item.to === '/settings')
 
+function PersonIcon({ className = 'h-4 w-4' }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="8" r="3.5" />
+      <path d="M5.5 19.5a6.5 6.5 0 0 1 13 0" />
+    </svg>
+  )
+}
+
 function NavIcon({ name, className = 'h-4 w-4' }) {
   const props = {
     className,
@@ -108,12 +126,7 @@ function NavIcon({ name, className = 'h-4 w-4' }) {
   }
 
   if (name === 'settings') {
-    return (
-      <svg {...props}>
-        <circle cx="12" cy="12" r="3" />
-        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-      </svg>
-    )
+    return <PersonIcon className={className} />
   }
 
   return null
@@ -168,7 +181,7 @@ function NavPill({ to, label, shortLabel, icon, active, onNavigate }) {
       aria-current={active ? 'page' : undefined}
       className={`flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-medium transition-all duration-200 xl:px-4 ${
         active
-          ? 'bg-surface-elevated text-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-brand/35'
+          ? 'bg-surface-elevated text-fg shadow-sm ring-1 ring-brand/35'
           : 'text-fg-muted hover:bg-surface-elevated/55 hover:text-fg'
       }`}
     >
@@ -186,7 +199,6 @@ function AppNavbar({ leftContent, backTo, backLabel, children }) {
   const [menuOpen, setMenuOpen] = useState(false)
 
   const firstName = user?.firstName ?? 'there'
-  const initials = firstName.charAt(0).toUpperCase()
   const mobileBackNav = Boolean(backTo && backLabel)
 
   useEffect(() => {
@@ -219,7 +231,7 @@ function AppNavbar({ leftContent, backTo, backLabel, children }) {
   }
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 border-b border-border-default/70 bg-app/88 shadow-[0_8px_32px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+    <header className="fixed inset-x-0 top-0 z-50 border-b border-border-default/70 bg-app/88 shadow-lg backdrop-blur-xl">
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-brand/35 to-transparent" />
 
       <div className="relative mx-auto flex h-16 max-w-6xl items-center gap-3 px-3 sm:px-6 lg:gap-6">
@@ -297,10 +309,10 @@ function AppNavbar({ leftContent, backTo, backLabel, children }) {
             title="Profile"
           >
             <div
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-surface-elevated to-surface text-sm font-semibold text-brand-soft ring-1 ring-border-default"
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-surface-elevated to-surface text-brand-soft ring-1 ring-border-default"
               aria-hidden="true"
             >
-              {initials}
+              <PersonIcon className="h-4 w-4" />
             </div>
             <span className="hidden max-w-[7rem] truncate text-sm xl:inline">
               {firstName}
@@ -350,10 +362,10 @@ function AppNavbar({ leftContent, backTo, backLabel, children }) {
             <div className="border-b border-border-default bg-gradient-to-r from-surface-elevated to-surface px-4 py-4">
               <div className="flex items-center gap-3">
                 <div
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-surface-elevated to-app text-sm font-semibold text-brand-soft ring-1 ring-border-default"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-surface-elevated to-app text-brand-soft ring-1 ring-border-default"
                   aria-hidden="true"
                 >
-                  {initials}
+                  <PersonIcon className="h-5 w-5" />
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-fg">{firstName}</p>

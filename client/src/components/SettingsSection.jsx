@@ -3,7 +3,7 @@ function SettingsSection({ title, children, variant = 'default', className = '' 
 
   return (
     <section
-      className={`rounded-xl border bg-surface p-5 sm:p-6 ${
+      className={`rounded-xl border bg-surface p-5 sm:p-6 card-shadow ${
         isDanger ? 'border-danger/30' : 'border-border-default'
       } ${className}`}
     >

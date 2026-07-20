@@ -87,3 +87,16 @@ export function trackWeeklyReviewView() {
 export function trackMonthLetterView() {
   track('month_letter_view')
 }
+
+export function trackWelcomeIntroView() {
+  track('intro_modal_view')
+}
+
+/** @param {'skip' | 'close' | 'connect'} reason */
+export function trackWelcomeIntroDismiss(reason) {
+  track('intro_modal_dismiss', { reason })
+}
+
+export function trackWelcomeIntroConnect() {
+  track('intro_modal_connect')
+}

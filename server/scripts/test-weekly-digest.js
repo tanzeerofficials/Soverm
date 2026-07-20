@@ -65,4 +65,20 @@ assert(formatted.text.includes('/weekly-review'), 'deep-links weekly review')
 assert(formatted.html.includes('Open Your week'), 'html CTA')
 assert(formatted.html.includes('/weekly-review'), 'html deep-link')
 
+const xssSample = {
+  ...sample,
+  name: 'Alex',
+  weekLabel: 'Jul 6–12 & friends',
+  bullets: {
+    whatChanged: 'Spent <script>alert(1)</script> more',
+    whatsAtRisk: 'Risk & reward',
+    oneAction: "Don't skip rent",
+  },
+}
+const xssHtml = formatWeeklyDigestEmail(xssSample).html
+assert(!xssHtml.includes('<script>'), 'html escapes script tags')
+assert(xssHtml.includes('&lt;script&gt;'), 'script becomes entities')
+assert(xssHtml.includes('&amp;'), 'ampersands escaped in html')
+assert(xssHtml.includes('Don&#39;t'), 'apostrophe escaped')
+
 console.log('test-weekly-digest: ok')

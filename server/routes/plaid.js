@@ -18,6 +18,7 @@ import { reportServerError } from '../utils/sentry.js'
 import { plaidRateLimiter, syncRateLimiter } from '../middleware/security.js'
 import { validatePublicToken, validateUuidParam } from '../utils/validation.js'
 import { invalidateChatFinancialSnapshot } from '../utils/chatFinancialSnapshotCache.js'
+import { decryptAccessToken, encryptAccessToken } from '../utils/tokenCrypto.js'
 
 const router = Router()
 
@@ -57,22 +58,43 @@ router.post('/exchange-public-token', plaidRateLimiter, async (req, res) => {
       public_token: tokenCheck.value,
     })
     const { access_token } = exchangeResponse.data
+    const encryptedAccessToken = encryptAccessToken(access_token)
 
     const accountsResponse = await plaidClient.accountsBalanceGet({ access_token })
     const { accounts, item } = accountsResponse.data
     const bankName = item.institution_name ?? item.institution_id ?? null
+    const externalItemId = item.item_id ?? null
 
-    const itemResult = await db.query(
-      `INSERT INTO plaid_items (user_id, plaid_access_token, institution_name, last_synced_at, plaid_external_item_id)
-       VALUES ($1, $2, $3, NOW(), $4)
-       ON CONFLICT (plaid_access_token) DO UPDATE
-         SET institution_name = EXCLUDED.institution_name,
-             last_synced_at = NOW(),
-             plaid_external_item_id = COALESCE(EXCLUDED.plaid_external_item_id, plaid_items.plaid_external_item_id)
-         WHERE plaid_items.user_id = EXCLUDED.user_id
-       RETURNING id`,
-      [userId, access_token, bankName, item.item_id ?? null]
-    )
+    /*
+     * Prefer conflict on Plaid's stable item id — encrypted tokens use a random
+     * IV so ON CONFLICT (plaid_access_token) would never match a re-link.
+     * Fall back to the encrypted token unique key when item_id is missing.
+     */
+    let itemResult
+    if (externalItemId) {
+      itemResult = await db.query(
+        `INSERT INTO plaid_items (user_id, plaid_access_token, institution_name, last_synced_at, plaid_external_item_id)
+         VALUES ($1, $2, $3, NOW(), $4)
+         ON CONFLICT (plaid_external_item_id) WHERE plaid_external_item_id IS NOT NULL DO UPDATE
+           SET plaid_access_token = EXCLUDED.plaid_access_token,
+               institution_name = EXCLUDED.institution_name,
+               last_synced_at = NOW()
+           WHERE plaid_items.user_id = EXCLUDED.user_id
+         RETURNING id`,
+        [userId, encryptedAccessToken, bankName, externalItemId]
+      )
+    } else {
+      itemResult = await db.query(
+        `INSERT INTO plaid_items (user_id, plaid_access_token, institution_name, last_synced_at, plaid_external_item_id)
+         VALUES ($1, $2, $3, NOW(), $4)
+         ON CONFLICT (plaid_access_token) DO UPDATE
+           SET institution_name = EXCLUDED.institution_name,
+               last_synced_at = NOW()
+           WHERE plaid_items.user_id = EXCLUDED.user_id
+         RETURNING id`,
+        [userId, encryptedAccessToken, bankName, null]
+      )
+    }
 
     if (itemResult.rows.length === 0) {
       return res.status(403).json({
@@ -83,17 +105,19 @@ router.post('/exchange-public-token', plaidRateLimiter, async (req, res) => {
     const plaidItemId = itemResult.rows[0].id
 
     for (const account of accounts) {
+      /*
+       * Token lives only on plaid_items (encrypted). accounts never stores it.
+       */
       const accountResult = await db.query(
         `INSERT INTO accounts (
-          id, user_id, plaid_item_id, plaid_account_id, plaid_access_token,
+          id, user_id, plaid_item_id, plaid_account_id,
           bank_name, account_name, account_type,
           balance_current, balance_available, currency
         ) VALUES (
-          gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+          gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9
         )
         ON CONFLICT (plaid_account_id) DO UPDATE SET
           plaid_item_id = EXCLUDED.plaid_item_id,
-          plaid_access_token = EXCLUDED.plaid_access_token,
           bank_name = EXCLUDED.bank_name,
           account_name = EXCLUDED.account_name,
           account_type = EXCLUDED.account_type,
@@ -101,7 +125,7 @@ router.post('/exchange-public-token', plaidRateLimiter, async (req, res) => {
           balance_available = EXCLUDED.balance_available,
           currency = EXCLUDED.currency,
           plaid_cursor = CASE
-            WHEN accounts.plaid_access_token IS DISTINCT FROM EXCLUDED.plaid_access_token
+            WHEN accounts.plaid_item_id IS DISTINCT FROM EXCLUDED.plaid_item_id
               THEN NULL
             ELSE accounts.plaid_cursor
           END
@@ -111,7 +135,6 @@ router.post('/exchange-public-token', plaidRateLimiter, async (req, res) => {
           userId,
           plaidItemId,
           account.account_id,
-          access_token,
           bankName,
           account.name,
           account.subtype,
@@ -188,7 +211,7 @@ router.delete('/accounts/:accountId', async (req, res) => {
 
     const accountResult = await client.query(
       `SELECT a.id, a.plaid_item_id,
-              COALESCE(pi.plaid_access_token, a.plaid_access_token) AS plaid_access_token
+              pi.plaid_access_token AS plaid_access_token
        FROM accounts a
        LEFT JOIN plaid_items pi ON a.plaid_item_id = pi.id
        WHERE a.id = $1 AND a.user_id = $2`,
@@ -199,8 +222,11 @@ router.delete('/accounts/:accountId', async (req, res) => {
       return res.status(404).json({ error: 'Account not found' })
     }
 
-    const { plaid_item_id: plaidItemId, plaid_access_token: accessToken } =
+    const { plaid_item_id: plaidItemId, plaid_access_token: storedAccessToken } =
       accountResult.rows[0]
+    const accessToken = storedAccessToken
+      ? decryptAccessToken(storedAccessToken)
+      : null
 
     let isLastAccountOnItem = false
 
@@ -210,14 +236,6 @@ router.delete('/accounts/:accountId', async (req, res) => {
          FROM accounts
          WHERE plaid_item_id = $1 AND id != $2`,
         [plaidItemId, accountId]
-      )
-      isLastAccountOnItem = remainingResult.rows[0].count === 0
-    } else if (accessToken) {
-      const remainingResult = await client.query(
-        `SELECT COUNT(*)::int AS count
-         FROM accounts
-         WHERE user_id = $1 AND plaid_access_token = $2 AND id != $3`,
-        [userId, accessToken, accountId]
       )
       isLastAccountOnItem = remainingResult.rows[0].count === 0
     }

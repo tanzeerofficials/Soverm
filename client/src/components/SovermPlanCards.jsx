@@ -52,7 +52,7 @@ function SovermPlanCards({ plan }) {
         <button
           type="button"
           onClick={handleCopyPlan}
-          className="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium text-ai-soft transition hover:bg-ai/10 hover:text-white"
+          className="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium text-ai-soft transition hover:bg-ai/10 hover:text-fg"
           aria-label="Copy plan"
         >
           {copyState === 'copied' ? 'Copied' : copyState === 'error' ? 'Failed' : 'Copy plan'}

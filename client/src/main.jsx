@@ -19,9 +19,13 @@ import './index.css'
 import App from './App.jsx'
 import AppLoadingScreen from './components/AppLoadingScreen.jsx'
 import { PlaidLinkProvider } from './context/PlaidLinkContext.jsx'
+import { ThemeProvider } from './context/ThemeContext.jsx'
 import { ToastProvider } from './context/ToastContext.jsx'
 import { initAnalytics } from './lib/analytics.js'
 import { initSentry, Sentry, captureClientError } from './lib/sentry.js'
+import { applyTheme, resolveInitialTheme } from './lib/themePrefs.js'
+
+applyTheme(resolveInitialTheme(), { persist: false })
 
 const queryClient = new QueryClient({
   queryCache: new QueryCache({
@@ -73,9 +77,11 @@ createRoot(document.getElementById('root')).render(
         <QueryClientProvider client={queryClient}>
           <ToastProvider>
             <BrowserRouter>
-              <PlaidLinkProvider>
-                <App />
-              </PlaidLinkProvider>
+              <ThemeProvider>
+                <PlaidLinkProvider>
+                  <App />
+                </PlaidLinkProvider>
+              </ThemeProvider>
             </BrowserRouter>
           </ToastProvider>
         </QueryClientProvider>

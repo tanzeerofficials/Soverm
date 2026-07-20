@@ -28,7 +28,7 @@ function DashboardUpcomingBills({
 }) {
   if (isLoading) {
     return (
-      <section className="rounded-xl border border-border-default bg-surface p-4 sm:p-5">
+      <section className="rounded-xl border border-border-default bg-surface p-4 sm:p-5 card-shadow">
         <Skeleton className="h-4 w-36" />
         <Skeleton className="mt-4 h-16 w-full" />
       </section>
@@ -42,7 +42,7 @@ function DashboardUpcomingBills({
 
   if (summary.billCount === 0) {
     return (
-      <section className="rounded-xl border border-border-default bg-surface p-4 sm:p-5">
+      <section className="rounded-xl border border-border-default bg-surface p-4 sm:p-5 card-shadow">
         <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-fg-subtle">
           Upcoming bills
         </p>
@@ -62,7 +62,7 @@ function DashboardUpcomingBills({
   const previewDays = days.slice(0, 3)
 
   return (
-    <section className="rounded-xl border border-border-default bg-surface p-4 sm:p-5">
+    <section className="rounded-xl border border-border-default bg-surface p-4 sm:p-5 card-shadow">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-fg-subtle">

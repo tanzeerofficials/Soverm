@@ -14,6 +14,8 @@ import {
 export const DASHBOARD_VISITED_KEY = 'soverm:dashboard-visited'
 export const ONBOARDING_COLLAPSED_KEY = 'soverm:dashboard-onboarding-collapsed'
 export const SECURITY_NOTE_DISMISSED_KEY = 'soverm:security-note-dismissed'
+/** One-time welcome intro after first sign-in (no bank connected yet). */
+export const WELCOME_INTRO_DISMISSED_KEY = 'soverm:welcome-intro-dismissed'
 
 export function getInitialOnboardingCollapsed(userId) {
   const stored = readUserScopedFlag(ONBOARDING_COLLAPSED_KEY, userId)
@@ -60,4 +62,16 @@ export function isSecurityNoteDismissed(userId) {
 
 export function dismissSecurityNote(userId) {
   writeUserScopedFlag(SECURITY_NOTE_DISMISSED_KEY, userId, '1')
+}
+
+/*
+ * What this does: remembers that the new-user welcome intro was dismissed.
+ * Why: show the feature intro once on first Home visit with no banks linked.
+ */
+export function isWelcomeIntroDismissed(userId) {
+  return readUserScopedFlag(WELCOME_INTRO_DISMISSED_KEY, userId) === '1'
+}
+
+export function dismissWelcomeIntro(userId) {
+  writeUserScopedFlag(WELCOME_INTRO_DISMISSED_KEY, userId, '1')
 }

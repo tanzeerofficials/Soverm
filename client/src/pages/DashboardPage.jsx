@@ -28,10 +28,12 @@ import PaywallCard from '../components/PaywallCard.jsx'
 import FreeVsProPlanCallout from '../components/FreeVsProPlanCallout.jsx'
 import { useToastContext } from '../context/ToastContext.jsx'
 import FirstConnectCelebration from '../components/FirstConnectCelebration.jsx'
+import WelcomeIntroModal from '../components/WelcomeIntroModal.jsx'
 import ActivationChecklist from '../components/ActivationChecklist.jsx'
 import TrackerDiscoveryHint from '../components/TrackerDiscoveryHint.jsx'
 import DashboardActionsSection from '../components/DashboardActionsSection.jsx'
 import ConnectBankButton from '../components/ConnectBankButton.jsx'
+import { usePlaidLinkContext } from '../context/PlaidLinkContext.jsx'
 import {
   DASHBOARD_TABS,
   DashboardTabBar,
@@ -71,14 +73,22 @@ import { markNotificationRead } from '../lib/fetchNotifications.js'
 import { syncTransactions } from '../lib/syncTransactions.js'
 import { consumeFirstConnectCelebration } from '../lib/firstConnectCelebration.js'
 import { fetchUsage } from '../lib/fetchUsage.js'
-import { trackUpgradeProClick } from '../lib/analytics.js'
+import {
+  trackConnectBankClick,
+  trackUpgradeProClick,
+  trackWelcomeIntroConnect,
+  trackWelcomeIntroDismiss,
+  trackWelcomeIntroView,
+} from '../lib/analytics.js'
 import {
   checkoutErrorToastMessage,
   startProCheckout,
 } from '../lib/startProCheckout.js'
 import {
   buildHomeGreeting,
+  dismissWelcomeIntro,
   hasVisitedDashboard,
+  isWelcomeIntroDismissed,
   markDashboardVisited,
 } from '../lib/dashboardUiPrefs.js'
 import { useAskSoverm } from '../context/AskSovermContext.jsx'
@@ -106,7 +116,11 @@ function DashboardPage() {
   const [limitReached, setLimitReached] = useState(false)
   const [selectedRange, setSelectedRange] = useState('30d')
   const { showToast } = useToastContext()
+  const { open: openPlaidLink, ready: plaidReady, linkTokenError, retryLinkToken, isFetchingLinkToken } =
+    usePlaidLinkContext()
   const [firstConnectCelebration, setFirstConnectCelebration] = useState(null)
+  const [showWelcomeIntro, setShowWelcomeIntro] = useState(false)
+  const welcomeIntroViewedRef = useRef(false)
   const [firstInsightCelebration, setFirstInsightCelebration] = useState(false)
   const [activeTab, setActiveTab] = useState(DASHBOARD_TABS.OVERVIEW)
   const [quickToolsTab, setQuickToolsTab] = useState(QUICK_TOOL_TABS.TRACKER)
@@ -118,14 +132,15 @@ function DashboardPage() {
   /*
    * Snapshot “have they opened Home before?” once — markDashboardVisited runs
    * later, so this stays accurate for Hi vs Welcome back in this session.
+   * useState (not useRef) so the value is safe to read during render.
    */
-  const hasVisitedHomeBefore = useRef(hasVisitedDashboard(userId))
+  const [hasVisitedHomeBefore] = useState(() => hasVisitedDashboard(userId))
   const homeGreeting = useMemo(
     () =>
       buildHomeGreeting(user?.firstName, {
-        hasVisitedBefore: hasVisitedHomeBefore.current,
+        hasVisitedBefore: hasVisitedHomeBefore,
       }),
-    [user?.firstName]
+    [user?.firstName, hasVisitedHomeBefore]
   )
 
   const { data: usage } = useQuery({
@@ -213,6 +228,68 @@ function DashboardPage() {
     }
     markDashboardVisited(userId)
   }, [userId])
+
+  /*
+   * What this does: opens the one-time welcome intro for new users with no banks.
+   * Why: introduce What’s left / week / Ask Soverm before the empty Home feels blank.
+   * Skips when First Connect is open or they’ve already dismissed the intro.
+   */
+  useEffect(() => {
+    if (!userId || isPending || !dashboardData) {
+      return
+    }
+    if (firstConnectCelebration) {
+      setShowWelcomeIntro(false)
+      return
+    }
+    if ((dashboardData.accounts?.length ?? 0) > 0) {
+      setShowWelcomeIntro(false)
+      return
+    }
+    if (isWelcomeIntroDismissed(userId)) {
+      setShowWelcomeIntro(false)
+      return
+    }
+
+    setShowWelcomeIntro(true)
+    if (!welcomeIntroViewedRef.current) {
+      welcomeIntroViewedRef.current = true
+      trackWelcomeIntroView()
+    }
+  }, [userId, isPending, dashboardData, firstConnectCelebration])
+
+  function handleWelcomeIntroDismiss(reason = 'skip') {
+    if (userId) {
+      dismissWelcomeIntro(userId)
+    }
+    trackWelcomeIntroDismiss(reason)
+    setShowWelcomeIntro(false)
+  }
+
+  function handleWelcomeIntroConnect() {
+    /*
+     * Keep the intro open until Link is ready (or failed). Dismissing first
+     * left first-run users with a closed modal and no Plaid open when the
+     * link token was still fetching.
+     */
+    if (linkTokenError) {
+      retryLinkToken()
+      return
+    }
+
+    if (!plaidReady) {
+      return
+    }
+
+    if (userId) {
+      dismissWelcomeIntro(userId)
+    }
+    trackWelcomeIntroConnect()
+    trackWelcomeIntroDismiss('connect')
+    setShowWelcomeIntro(false)
+    trackConnectBankClick()
+    openPlaidLink()
+  }
 
   useEffect(() => {
     if (searchParams.get('focus') !== 'balance') {
@@ -591,13 +668,14 @@ function DashboardPage() {
             <button
               type="button"
               onClick={() => refetch()}
-              className="rounded-lg bg-brand px-5 py-2.5 text-sm font-medium text-slate-950 transition hover:bg-brand-soft"
+              className="rounded-lg bg-brand px-5 py-2.5 text-sm font-medium text-brand-fg transition hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
             >
               Try again
             </button>
           </div>
         ) : dashboardData ? (
           <>
+            <h1 className="sr-only">Home</h1>
             <DashboardTabBar
               activeTab={activeTab}
               onChange={setActiveTab}
@@ -762,7 +840,7 @@ function DashboardPage() {
               />
 
               {!hasInsight && !insightLoading && (
-                <div className="rounded-xl border border-border-default bg-surface px-6 py-8 text-center">
+                <div className="rounded-xl border border-border-default bg-surface px-6 py-8 text-center card-shadow">
                   <p className="text-sm font-medium text-fg">No insight yet</p>
                   <p className="mt-2 text-sm text-fg-muted">
                     Sync your accounts, then tap{' '}
@@ -795,7 +873,7 @@ function DashboardPage() {
               className="mt-8 space-y-6 outline-none"
             >
               {!hasAccounts && (
-                <div className="rounded-xl border border-border-default bg-surface px-6 py-8 text-center">
+                <div className="rounded-xl border border-border-default bg-surface px-6 py-8 text-center card-shadow">
                   <p className="text-sm font-medium text-fg">Connect a bank to use tools</p>
                   <p className="mt-2 text-sm text-fg-muted">
                     Recent transactions, period comparisons, and account health appear here once
@@ -833,6 +911,14 @@ function DashboardPage() {
           </>
         ) : null}
       </main>
+      <WelcomeIntroModal
+        isOpen={showWelcomeIntro && !firstConnectCelebration}
+        onDismiss={handleWelcomeIntroDismiss}
+        onConnectBank={handleWelcomeIntroConnect}
+        connectPending={!plaidReady && !linkTokenError}
+        connectError={Boolean(linkTokenError)}
+        isPreparingLink={Boolean(isFetchingLinkToken)}
+      />
       <FirstConnectCelebration
         isOpen={Boolean(firstConnectCelebration)}
         accountsConnected={firstConnectCelebration?.accountsConnected ?? 1}
