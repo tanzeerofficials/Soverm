@@ -1,9 +1,4 @@
-function formatCurrency(amount) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount)
-}
+import { formatCurrency } from '../../lib/formatCurrency.js'
 
 export function AccountSourceLine({ sources }) {
   if (!sources) {
@@ -63,5 +58,3 @@ export function CategoryRecurringLine({ recurringMonthly }) {
     </p>
   )
 }
-
-export { formatCurrency }

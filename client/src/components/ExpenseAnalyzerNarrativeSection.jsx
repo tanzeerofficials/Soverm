@@ -4,10 +4,10 @@ import ChatWithCfoButton from './ChatWithCfoButton.jsx'
 import { useAskSoverm } from '../context/AskSovermContext.jsx'
 import { buildExpenseAnalyzerSuggestedPrompts } from '../lib/chatSuggestedPrompts.js'
 import {
-  formatCurrency,
   formatGeneratedAt,
   useExpenseAnalyzerNarrative,
 } from '../lib/useExpenseAnalyzerNarrative.js'
+import { formatCurrency } from '../lib/formatCurrency.js'
 
 const EA_CHAT_CONTEXT_LABEL =
   'Your ongoing Ask Soverm chat — using Expense Analyzer categories, recurring charges, and your connected accounts.'

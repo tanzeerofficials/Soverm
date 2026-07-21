@@ -12,6 +12,7 @@ import { useToastContext } from '../context/ToastContext.jsx'
 import { fetchPayday, savePayday } from '../lib/fetchPayday.js'
 import { paydayQueryKey, trackerQueryKey } from '../lib/queryKeys.js'
 import { formatPayCadence, PAY_CADENCE_OPTIONS } from '../lib/payCadenceLabels.js'
+import { toUserFacingErrorMessage } from '../lib/userFacingError.js'
 
 const CADENCE_OPTIONS = PAY_CADENCE_OPTIONS
 
@@ -57,7 +58,7 @@ function PaydaySettingsSection() {
       ])
     },
     onError: (err) => {
-      showToast(err.message || 'Couldn’t save payday', 'error')
+      showToast(toUserFacingErrorMessage(err, 'Couldn’t save payday'), 'error')
     },
   })
 

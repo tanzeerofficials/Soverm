@@ -7,29 +7,27 @@ import {
 } from './balanceHelpers.js'
 import { CONNECTED_ACCOUNT_TRANSACTION_JOINS } from './connectedAccountTransactions.js'
 import {
+  getRollingComparisonSqlParams,
+  ROLLING_COMPARISON_DAYS,
+} from './calendarMonth.js'
+import { buildComparisonFromTransactions } from './rollingComparison.js'
+import {
   EXCLUDE_INTERNAL_MOVES_FILTER,
   NON_PENDING_FILTER,
 } from './transactionFilters.js'
 
 export { normalizeMerchantName } from './merchantNormalize.js'
 
-// Shared rolling window for insight transaction context and month-over-month comparison.
+// Shared rolling window length (app-TZ civil days). Prefer getRollingComparisonSqlParams().
+export const COMPARISON_PERIOD_DAYS = ROLLING_COMPARISON_DAYS
+/** @deprecated Prefer COMPARISON_PERIOD_DAYS + getRollingComparisonSqlParams() */
 export const COMPARISON_PERIOD_INTERVAL = '30 days'
 export const RECURRING_CHARGE_LOOKBACK_INTERVAL = '3 months'
 
-function buildCategoryTotals(rows) {
-  const byCategory = {}
-
-  for (const row of rows) {
-    const category = row.category || 'Uncategorized'
-    byCategory[category] = Number(row.total)
-  }
-
-  return byCategory
-}
-
 // Minimum absolute MoM percent change before a category counts as a "top mover" in UI copy.
 export const SIGNIFICANT_CATEGORY_CHANGE_PERCENT = 5
+// New categories have no percent — require a material dollar floor so noise stays out of headlines.
+export const SIGNIFICANT_NEW_CATEGORY_ABSOLUTE = 50
 
 function roundMoney(amount) {
   return Math.round((Number(amount) || 0) * 100) / 100
@@ -62,10 +60,17 @@ export function formatTimesMultiplier(times) {
 }
 
 export function formatMoneyAmount(amount) {
-  return `$${roundMoney(amount).toLocaleString('en-US', {
+  const value = Number(amount)
+  if (!Number.isFinite(value)) {
+    return '$0'
+  }
+
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
-  })}`
+  }).format(value)
 }
 
 /**
@@ -104,7 +109,8 @@ export function computeSpendingDelta(current, prior) {
       direction: 'flat',
       percent: 0,
       times: 1,
-      absoluteChange: 0,
+      // Keep the real dollar gap even when percent rounds to 0 (e.g. $1000 → $1004).
+      absoluteChange,
       isNewCategory: false,
     }
   }
@@ -143,8 +149,12 @@ export function formatComparisonPhrase(current, prior, delta, { vsLabel = 'vs pr
 }
 
 export function isSignificantCategoryDelta(delta) {
-  if (!delta || delta.isNewCategory) {
+  if (!delta) {
     return false
+  }
+
+  if (delta.isNewCategory) {
+    return (delta.absoluteChange ?? 0) >= SIGNIFICANT_NEW_CATEGORY_ABSOLUTE
   }
 
   if (delta.direction === 'flat') {
@@ -159,7 +169,16 @@ export function isSignificantCategoryDelta(delta) {
 }
 
 function categoryChangeMagnitude({ spendingDelta }) {
-  if (!spendingDelta || spendingDelta.isNewCategory) {
+  if (!spendingDelta) {
+    return null
+  }
+
+  // Material new categories sort by dollars so a new $800 category can headline.
+  // Sub-threshold new spend sorts last (null) so it doesn't outrank real % movers.
+  if (spendingDelta.isNewCategory) {
+    if ((spendingDelta.absoluteChange ?? 0) >= SIGNIFICANT_NEW_CATEGORY_ABSOLUTE) {
+      return spendingDelta.absoluteChange
+    }
     return null
   }
 
@@ -167,7 +186,7 @@ function categoryChangeMagnitude({ spendingDelta }) {
 }
 
 function toPublicCategoryDelta(spendingDelta) {
-  if (!spendingDelta || spendingDelta.isNewCategory) {
+  if (!spendingDelta) {
     return null
   }
 
@@ -176,6 +195,7 @@ function toPublicCategoryDelta(spendingDelta) {
     percent: spendingDelta.percent,
     times: spendingDelta.times ?? null,
     absoluteChange: spendingDelta.absoluteChange ?? null,
+    isNewCategory: spendingDelta.isNewCategory === true,
   }
 }
 
@@ -253,124 +273,27 @@ export async function detectRecurringCharges(userId) {
 export { loadExpenseAnalyzerChatContext } from './expenseAnalyzerChatContext.js'
 
 export async function loadMonthOverMonthComparison(userId) {
-  const [
-    currentSpendingTotalResult,
-    currentSpendingByCategoryResult,
-    priorSpendingTotalResult,
-    priorSpendingByCategoryResult,
-    currentIncomeTotalResult,
-    priorIncomeTotalResult,
-    priorTransactionCountResult,
-  ] = await Promise.all([
-    db.query(
-      `SELECT COALESCE(SUM(t.amount), 0) AS total
-       FROM transactions t
-       ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
-       WHERE t.user_id = $1
-         AND t.amount > 0
-         ${NON_PENDING_FILTER}
-         ${EXCLUDE_INTERNAL_MOVES_FILTER}
-         AND t.date >= NOW() - $2::interval`,
-      [userId, COMPARISON_PERIOD_INTERVAL]
-    ),
-    db.query(
-      `SELECT COALESCE(t.category, 'Uncategorized') AS category,
-              COALESCE(SUM(t.amount), 0) AS total
-       FROM transactions t
-       ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
-       WHERE t.user_id = $1
-         AND t.amount > 0
-         ${NON_PENDING_FILTER}
-         ${EXCLUDE_INTERNAL_MOVES_FILTER}
-         AND t.date >= NOW() - $2::interval
-       GROUP BY t.category`,
-      [userId, COMPARISON_PERIOD_INTERVAL]
-    ),
-    db.query(
-      `SELECT COALESCE(SUM(t.amount), 0) AS total
-       FROM transactions t
-       ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
-       WHERE t.user_id = $1
-         AND t.amount > 0
-         ${NON_PENDING_FILTER}
-         ${EXCLUDE_INTERNAL_MOVES_FILTER}
-         AND t.date >= NOW() - $3::interval
-         AND t.date < NOW() - $2::interval`,
-      [userId, COMPARISON_PERIOD_INTERVAL, '60 days']
-    ),
-    db.query(
-      `SELECT COALESCE(t.category, 'Uncategorized') AS category,
-              COALESCE(SUM(t.amount), 0) AS total
-       FROM transactions t
-       ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
-       WHERE t.user_id = $1
-         AND t.amount > 0
-         ${NON_PENDING_FILTER}
-         ${EXCLUDE_INTERNAL_MOVES_FILTER}
-         AND t.date >= NOW() - $3::interval
-         AND t.date < NOW() - $2::interval
-       GROUP BY t.category`,
-      [userId, COMPARISON_PERIOD_INTERVAL, '60 days']
-    ),
-    db.query(
-      `SELECT COALESCE(SUM(ABS(t.amount)), 0) AS total
-       FROM transactions t
-       ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
-       WHERE t.user_id = $1
-         AND t.amount < 0
-         ${NON_PENDING_FILTER}
-         ${EXCLUDE_INTERNAL_MOVES_FILTER}
-         AND t.date >= NOW() - $2::interval`,
-      [userId, COMPARISON_PERIOD_INTERVAL]
-    ),
-    db.query(
-      `SELECT COALESCE(SUM(ABS(t.amount)), 0) AS total
-       FROM transactions t
-       ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
-       WHERE t.user_id = $1
-         AND t.amount < 0
-         ${NON_PENDING_FILTER}
-         ${EXCLUDE_INTERNAL_MOVES_FILTER}
-         AND t.date >= NOW() - $3::interval
-         AND t.date < NOW() - $2::interval`,
-      [userId, COMPARISON_PERIOD_INTERVAL, '60 days']
-    ),
-    db.query(
-      `SELECT COUNT(*)::int AS count
-       FROM transactions t
-       ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
-       WHERE t.user_id = $1
-         ${NON_PENDING_FILTER}
-         ${EXCLUDE_INTERNAL_MOVES_FILTER}
-         AND t.date >= NOW() - $3::interval
-         AND t.date < NOW() - $2::interval`,
-      [userId, COMPARISON_PERIOD_INTERVAL, '60 days']
-    ),
-  ])
+  /*
+   * Same builder as Expense Analyzer: app-TZ civil windows, refund netting,
+   * and a coverage gate for hasComparisonData.
+   */
+  const window = getRollingComparisonSqlParams()
+  const result = await db.query(
+    `SELECT t.*,
+            a.bank_name,
+            a.account_name
+     FROM transactions t
+     ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
+     WHERE t.user_id = $1
+       ${NON_PENDING_FILTER}
+       ${EXCLUDE_INTERNAL_MOVES_FILTER}
+       AND t.date >= $2::date
+       AND t.date < $3::date
+     ORDER BY t.date ASC`,
+    [userId, window.priorStartIso, window.tomorrowIso]
+  )
 
-  const hasComparisonData = priorTransactionCountResult.rows[0].count > 0
-
-  return {
-    currentPeriod: {
-      spending: {
-        total: Number(currentSpendingTotalResult.rows[0].total),
-        byCategory: buildCategoryTotals(currentSpendingByCategoryResult.rows),
-      },
-      income: {
-        total: Number(currentIncomeTotalResult.rows[0].total),
-      },
-    },
-    priorPeriod: {
-      spending: {
-        total: Number(priorSpendingTotalResult.rows[0].total),
-        byCategory: buildCategoryTotals(priorSpendingByCategoryResult.rows),
-      },
-      income: {
-        total: Number(priorIncomeTotalResult.rows[0].total),
-      },
-    },
-    hasComparisonData,
-  }
+  return buildComparisonFromTransactions(result.rows)
 }
 
 export async function loadFinancialContextForUser(userId) {
@@ -379,7 +302,10 @@ export async function loadFinancialContextForUser(userId) {
    * only transactions still linked to a connected Plaid Item.
    * After disconnect, account_id is nulled — those rows stay in Postgres
    * but must not feed AI advice the rest of the app no longer shows.
+   *
+   * Window matches MoM current period (app-TZ civil days, no futures).
    */
+  const window = getRollingComparisonSqlParams()
   const [transactionsResult, accountsResult] = await Promise.all([
     db.query(
       `SELECT t.*,
@@ -389,9 +315,10 @@ export async function loadFinancialContextForUser(userId) {
        ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
        WHERE t.user_id = $1
          AND (t.pending IS NOT TRUE)
-         AND t.date >= NOW() - $2::interval
+         AND t.date >= $2::date
+         AND t.date < $3::date
        ORDER BY t.date DESC`,
-      [userId, COMPARISON_PERIOD_INTERVAL]
+      [userId, window.currentStartIso, window.tomorrowIso]
     ),
     db.query(
       `SELECT account_name, account_type, balance_current, balance_available

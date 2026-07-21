@@ -6,6 +6,7 @@
  */
 
 export const SIGNIFICANT_CATEGORY_CHANGE_PERCENT = 5
+export const SIGNIFICANT_NEW_CATEGORY_ABSOLUTE = 50
 
 function formatMoneyAmount(amount) {
   if (amount == null || !Number.isFinite(Number(amount))) {
@@ -21,6 +22,10 @@ function formatMoneyAmount(amount) {
 export function isNotableTopMover(topMover) {
   if (!topMover) {
     return false
+  }
+
+  if (topMover.isNewCategory) {
+    return (topMover.absoluteChange ?? topMover.currentTotal ?? 0) >= SIGNIFICANT_NEW_CATEGORY_ABSOLUTE
   }
 
   if (topMover.direction === 'flat') {
@@ -45,6 +50,13 @@ export function buildTopMoverHeadline(topMover) {
 
   const currentLabel = formatMoneyAmount(currentTotal)
   const priorLabel = formatMoneyAmount(priorTotal)
+
+  if (topMover.isNewCategory) {
+    if (currentLabel) {
+      return `Worth a quick look: ${displayCategory} is new this period at ${currentLabel} (nothing in the prior period). Open that category when you can — just a heads-up.`
+    }
+    return `Worth a quick look: ${displayCategory} showed up this period with no spend in the prior 30 days. Open the category when you can.`
+  }
 
   if (direction === 'down') {
     if (currentLabel && priorLabel) {

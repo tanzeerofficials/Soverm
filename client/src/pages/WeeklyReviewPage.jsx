@@ -5,6 +5,7 @@
  * one risk, one move — plus inline payday confirm/edit (R4).
  */
 
+import { formatCurrency } from '../lib/formatCurrency.js'
 import { useEffect, useState } from 'react'
 import { useAuth } from '@clerk/clerk-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -28,18 +29,9 @@ import {
   trackerQueryKey,
   weeklyReviewQueryKey,
 } from '../lib/queryKeys.js'
+import { toUserFacingErrorMessage } from '../lib/userFacingError.js'
 
 const CADENCE_OPTIONS = PAY_CADENCE_OPTIONS
-
-function formatCurrency(amount) {
-  if (amount == null) {
-    return '—'
-  }
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount)
-}
 
 function toneClasses(tone) {
   if (tone === 'danger' || tone === 'at_risk') {
@@ -115,7 +107,7 @@ function WeeklyReviewPage() {
       ])
     },
     onError: (err) => {
-      showToast(err.message || 'Couldn’t save payday', 'error')
+      showToast(toUserFacingErrorMessage(err, 'Couldn’t save payday'), 'error')
     },
   })
 
@@ -155,7 +147,7 @@ function WeeklyReviewPage() {
       await queryClient.invalidateQueries({ queryKey: weeklyReviewQueryKey })
     },
     onError: (err) => {
-      showToast(err.message || 'Couldn’t update that action', 'error')
+      showToast(toUserFacingErrorMessage(err, 'Couldn’t update that action'), 'error')
     },
   })
 

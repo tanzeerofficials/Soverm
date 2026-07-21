@@ -12,19 +12,13 @@ import {
   isSpendingCapWarningActive,
   resolveSpendingAlertThresholds,
 } from './spendingAlertThresholds.js'
+import { formatCurrency as formatAttentionCurrency } from './formatCurrency.js'
 
 export const INSIGHT_STALE_DAYS = 5
 export const SYNC_STALE_HOURS = 24
 export const MAX_NOTIFICATION_ITEMS = 2
 /** @deprecated Prefer resolveSpendingAlertThresholds / isSpendingCapWarningActive */
 export const SPENDING_CAP_WARNING_PERCENT = DEFAULT_SPENDING_CAP_WARNING_PERCENT
-
-function formatAttentionCurrency(amount) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount ?? 0)
-}
 
 /**
  * Surfaces spending-cap warnings for the Overview "Needs attention" card.

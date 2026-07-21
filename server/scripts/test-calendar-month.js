@@ -5,14 +5,18 @@
  */
 
 import {
+  addCalendarDaysToIso,
   calendarMonthSqlBounds,
   formatIsoDateInAppTz,
   getAppDayBounds,
   getAppTodaySqlParams,
   getCalendarMonthWindow,
   getCurrentProgressMonth,
+  getRollingComparisonWindow,
   getSecondsUntilAppTomorrow,
   getZonedDateParts,
+  isWithinAppDaysAgo,
+  isWithinAppPriorPeriod,
   zonedMidnightToUtc,
 } from '../utils/calendarMonth.js'
 
@@ -63,6 +67,15 @@ assert(
 
 const seconds = getSecondsUntilAppTomorrow(june30Et)
 assert(seconds > 0 && seconds < 24 * 60 * 60, 'seconds until ET tomorrow is within a day')
+
+const mid = new Date('2026-07-15T16:00:00.000Z')
+const today = formatIsoDateInAppTz(mid)
+assert(isWithinAppDaysAgo(addCalendarDaysToIso(today, -29), 30, mid), 'current includes day 29')
+assert(!isWithinAppDaysAgo(addCalendarDaysToIso(today, -30), 30, mid), 'current excludes day 30')
+assert(isWithinAppPriorPeriod(addCalendarDaysToIso(today, -30), 30, 60, mid), 'prior starts day 30')
+const roll = getRollingComparisonWindow(mid)
+assert(roll.currentStartIso === addCalendarDaysToIso(today, -29), 'rolling current start')
+assert(roll.priorStartIso === addCalendarDaysToIso(today, -59), 'rolling prior start')
 
 if (originalTz === undefined) {
   delete process.env.APP_TIMEZONE

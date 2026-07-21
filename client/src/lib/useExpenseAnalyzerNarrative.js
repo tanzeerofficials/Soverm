@@ -2,13 +2,6 @@ import { useAuth } from '@clerk/clerk-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { expenseAnalyzerNarrativeQueryKey } from '../lib/queryKeys.js'
 
-function formatCurrency(amount) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount)
-}
-
 function formatGeneratedAt(value) {
   if (!value) {
     return null
@@ -109,4 +102,4 @@ export function useExpenseAnalyzerNarrative({ fingerprint, templateSummary, enab
   }
 }
 
-export { formatCurrency, formatGeneratedAt }
+export { formatGeneratedAt }

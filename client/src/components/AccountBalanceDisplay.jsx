@@ -6,6 +6,7 @@
  * Other liabilities (loans/mortgages): amount owed only.
  */
 
+import { formatCurrency } from '../lib/formatCurrency.js'
 import {
   getCreditAvailable,
   getCreditSpent,
@@ -13,13 +14,6 @@ import {
   isCreditAccount,
   isLiabilityAccount,
 } from '../lib/balanceHelpers.js'
-
-function formatCurrency(amount) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount)
-}
 
 function AccountBalanceDisplay({ account, align = 'right', size = 'sm' }) {
   const alignClass = align === 'left' ? 'text-left' : 'text-right'

@@ -6,14 +6,8 @@
  * Self transfer, peer rails, etc.) so nothing hides under a vague label.
  */
 
+import { formatCurrency } from '../lib/formatCurrency.js'
 import { computeCashFlowMetrics } from '../lib/cashFlowSummary.js'
-
-function formatCurrency(amount) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount)
-}
 
 /** Ordered breakdown rows — only shown when the amount is > 0. */
 const BREAKDOWN_ROWS = [

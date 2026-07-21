@@ -22,6 +22,7 @@ import { PlaidLinkProvider } from './context/PlaidLinkContext.jsx'
 import { ThemeProvider } from './context/ThemeContext.jsx'
 import { ToastProvider } from './context/ToastContext.jsx'
 import { initAnalytics } from './lib/analytics.js'
+import { clerkAppearance } from './lib/clerkAppearance.js'
 import { initSentry, Sentry, captureClientError } from './lib/sentry.js'
 import { applyTheme, resolveInitialTheme } from './lib/themePrefs.js'
 
@@ -69,7 +70,7 @@ createRoot(document.getElementById('root')).render(
         </div>
       }
     >
-      <ClerkProvider publishableKey={clerkPublishableKey}>
+      <ClerkProvider publishableKey={clerkPublishableKey} appearance={clerkAppearance}>
       <ClerkLoading>
         <AppLoadingScreen />
       </ClerkLoading>

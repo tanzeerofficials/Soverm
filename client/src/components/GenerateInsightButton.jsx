@@ -14,6 +14,7 @@ import {
   trackGenerateInsightResult,
 } from '../lib/analytics.js'
 import { captureClientError } from '../lib/sentry.js'
+import { toUserFacingErrorMessage } from '../lib/userFacingError.js'
 
 function GenerateInsightButton({
   className = '',
@@ -94,10 +95,14 @@ function GenerateInsightButton({
       captureClientError(err, { label: 'generate_insight' })
       console.error('Insight generation failed:', err.message)
       trackGenerateInsightResult('error')
-      setError(err.message)
-      onError?.(err.message)
+      const message = toUserFacingErrorMessage(
+        err,
+        'Couldn’t generate that insight — please try again'
+      )
+      setError(message)
+      onError?.(message)
       setInsight(null)
-      showToast?.('Insight generation failed — please try again', 'error')
+      showToast?.(message, 'error')
     } finally {
       setInternalLoading(false)
       onLoadingChange?.(false)

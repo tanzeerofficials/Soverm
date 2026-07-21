@@ -2,7 +2,7 @@
 
 React + Vite frontend for **Soverm** ([soverm.vercel.app](https://soverm.vercel.app)). Talks to the Express API on Railway; auth via Clerk; bank linking via Plaid Link (tokens from the API).
 
-The product name is **Soverm** (`client/index.html` title: “Soverm — Your AI CFO”; landing page hero uses “SOVERM”).
+The product name is **Soverm** (`client/index.html` title: “Soverm — Your Personal Accountant”; landing wordmark: “SOVERM”). Spell it **Soverm** everywhere user-facing — not Sovrm or Sovrn. Clerk’s modal title (“Sign in to …”) comes from the Clerk Dashboard application name; set that to **Soverm** as well.
 
 ## Scripts
 
@@ -26,7 +26,7 @@ Copy `.env.example` to `.env`. Only variables prefixed with `VITE_` are exposed 
 | `VITE_POSTHOG_SESSION_RECORDING` | No | `true` to enable session replay |
 | `VITE_SENTRY_DSN` | No | Sentry browser DSN; leave blank to disable |
 
-**No Plaid env vars on the client.** `PLAID_CLIENT_ID`, `PLAID_SECRET`, and `PLAID_ENV` are server-only. Plaid Link is loaded from the CDN in `index.html`; the app fetches link tokens from `/api/plaid/create-link-token`.
+**No Plaid env vars on the client.** `PLAID_CLIENT_ID`, `PLAID_SECRET`, and `PLAID_ENV` are server-only. Plaid Link’s CDN script is loaded lazily after sign-in (`ensurePlaidLinkScript` / `PlaidLinkProvider`); the app fetches link tokens from `/api/plaid/create-link-token`.
 
 This project uses `VITE_POSTHOG_KEY` / `VITE_POSTHOG_HOST` (not `VITE_PUBLIC_POSTHOG_*`).
 

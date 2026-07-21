@@ -4,6 +4,7 @@
  * Compact Home reminder so free users see what Free includes vs what Pro unlocks.
  */
 
+import { formatCurrency } from '../lib/formatCurrency.js'
 import {
   CHAT_HOURLY_LIMIT,
   FREE_DAILY_CHAT_LIMIT,
@@ -11,15 +12,6 @@ import {
   FREE_HISTORY_DAYS,
   PRO_MONTHLY_PRICE,
 } from '@shared/usageLimits.js'
-
-function formatCurrency(amount) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount)
-}
 
 function FreeVsProPlanCallout({ onUpgrade }) {
   return (

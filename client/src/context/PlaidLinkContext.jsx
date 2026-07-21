@@ -2,7 +2,8 @@
  * PLAID LINK CONTEXT
  *
  * Keeps a single usePlaidLink instance for the whole app.
- * Plaid's script must only be embedded once per page.
+ * Plaid's script must only be embedded once per page — and only after sign-in,
+ * so anonymous marketing visitors never download link-initialize.js.
  *
  * What this file does:
  * - Fetches a Plaid link_token when the user is signed in
@@ -19,15 +20,30 @@ import { useAuth } from '@clerk/clerk-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { invalidateAfterAccountChange } from '../lib/queryKeys.js'
 import { getCachedAccountCount, markFirstConnectCelebration } from '../lib/firstConnectCelebration.js'
+import { ensurePlaidLinkScript } from '../lib/ensurePlaidLinkScript.js'
 import { useToastContext } from './ToastContext.jsx'
 import { captureClientError } from '../lib/sentry.js'
 
 const PlaidLinkContext = createContext(null)
 
-export function PlaidLinkProvider({ children }) {
-  const { getToken, isSignedIn } = useAuth()
+const SIGNED_OUT_VALUE = {
+  open: () => {},
+  ready: false,
+  isExchanging: false,
+  isFetchingLinkToken: false,
+  linkTokenError: null,
+  retryLinkToken: () => {},
+}
+
+/**
+ * Signed-in half of the provider — mounts usePlaidLink only when needed,
+ * which also keeps react-plaid-link from injecting the CDN script on `/`.
+ */
+function PlaidLinkSignedInProvider({ children }) {
+  const { getToken } = useAuth()
   const queryClient = useQueryClient()
   const { showToast } = useToastContext()
+  const [scriptReady, setScriptReady] = useState(() => typeof window !== 'undefined' && !!window.Plaid)
   const [linkToken, setLinkToken] = useState(null)
   const [linkTokenError, setLinkTokenError] = useState(null)
   const [isFetchingLinkToken, setIsFetchingLinkToken] = useState(false)
@@ -47,6 +63,29 @@ export function PlaidLinkProvider({ children }) {
   useEffect(() => {
     showToastRef.current = showToast
   }, [showToast])
+
+  useEffect(() => {
+    let cancelled = false
+
+    ensurePlaidLinkScript()
+      .then(() => {
+        if (!cancelled) {
+          setScriptReady(true)
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load Plaid Link script:', err.message)
+        captureClientError(err, { label: 'plaid_script' })
+        if (!cancelled) {
+          setLinkTokenError('Couldn’t load bank connection — please refresh and try again')
+          showToastRef.current('Couldn’t load bank connection — please refresh and try again', 'error')
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const retryLinkToken = useCallback(() => {
     setLinkToken(null)
@@ -107,17 +146,11 @@ export function PlaidLinkProvider({ children }) {
   }, [queryClient])
 
   useEffect(() => {
-    if (!isSignedIn) {
-      setLinkToken(null)
-      setLinkTokenError(null)
-      setIsFetchingLinkToken(false)
-      inFlightRef.current = false
+    if (!scriptReady) {
       return
     }
 
     let cancelled = false
-    // Generation id so a Strict Mode remount can start a new fetch even while
-    // the cancelled first effect's request is still in flight.
     const requestId = ++fetchGenerationRef.current
 
     async function fetchLinkToken() {
@@ -178,7 +211,7 @@ export function PlaidLinkProvider({ children }) {
     return () => {
       cancelled = true
     }
-  }, [isSignedIn, tokenRefreshKey])
+  }, [scriptReady, tokenRefreshKey])
 
   const { open, ready } = usePlaidLink({
     token: linkToken,
@@ -189,9 +222,9 @@ export function PlaidLinkProvider({ children }) {
     <PlaidLinkContext.Provider
       value={{
         open,
-        ready: ready && !!linkToken && !isExchanging && !linkTokenError,
+        ready: ready && scriptReady && !!linkToken && !isExchanging && !linkTokenError,
         isExchanging,
-        isFetchingLinkToken,
+        isFetchingLinkToken: isFetchingLinkToken || !scriptReady,
         linkTokenError,
         retryLinkToken,
       }}
@@ -199,6 +232,18 @@ export function PlaidLinkProvider({ children }) {
       {children}
     </PlaidLinkContext.Provider>
   )
+}
+
+export function PlaidLinkProvider({ children }) {
+  const { isSignedIn } = useAuth()
+
+  if (!isSignedIn) {
+    return (
+      <PlaidLinkContext.Provider value={SIGNED_OUT_VALUE}>{children}</PlaidLinkContext.Provider>
+    )
+  }
+
+  return <PlaidLinkSignedInProvider>{children}</PlaidLinkSignedInProvider>
 }
 
 export function usePlaidLinkContext() {

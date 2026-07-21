@@ -76,10 +76,16 @@ const { startSyncJob } = await import('./jobs/syncAllUsers.js')
 const { startWeeklyDigestJob } = await import('./jobs/weeklyDigest.js')
 const { startMonthConditionNotifyJob } = await import('./jobs/monthConditionNotify.js')
 const { GENERIC_ERROR_MESSAGE } = await import('./utils/apiErrors.js')
-const { globalRateLimiter, securityHeaders } = await import('./middleware/security.js')
+const {
+  globalRateLimiter,
+  securityHeaders,
+  webhookRateLimiter,
+} = await import('./middleware/security.js')
+const { areDevEndpointsEnabled } = await import('./utils/runtimeFlags.js')
 
 const app = express()
 const port = Number(process.env.PORT) || 5000
+const devEndpointsEnabled = areDevEndpointsEnabled()
 
 // Railway sits behind a reverse proxy — needed for rate limiting by client IP.
 app.set('trust proxy', 1)
@@ -98,8 +104,9 @@ function parseAllowedOrigins() {
     .map((s) => normalizeOrigin(s))
     .filter(Boolean)
 
-  // Local dev: always allow Vite defaults even if ALLOWED_ORIGINS is unset in server/.env
-  if (process.env.NODE_ENV !== 'production') {
+  // Localhost is opt-in via ENABLE_DEV_ENDPOINTS=1 — never auto-open just
+  // because NODE_ENV is unset (that would widen CORS on a misconfigured host).
+  if (devEndpointsEnabled) {
     return [
       ...new Set([
         ...fromEnv,
@@ -150,6 +157,7 @@ app.use(globalRateLimiter)
 // Webhooks must read the raw body (not JSON) so signatures can be verified.
 // That is why these routes come BEFORE express.json().
 // Mount Stripe under its own path first so it is not handled by the Clerk router.
+app.use('/webhooks', webhookRateLimiter)
 app.use('/webhooks/stripe', express.raw({ type: 'application/json' }), stripeWebhooksRouter)
 app.use('/webhooks/plaid', express.raw({ type: 'application/json' }), plaidWebhooksRouter)
 app.use('/webhooks', express.raw({ type: 'application/json' }), webhooksRouter)
@@ -221,8 +229,8 @@ if (process.env.SENTRY_DSN) {
   Sentry.setupExpressErrorHandler(app)
 }
 
-// Dev-only sanity checks — not registered in production (returns 404).
-if (process.env.NODE_ENV !== 'production') {
+// Dev-only sanity checks — opt-in with ENABLE_DEV_ENDPOINTS=1 (never NODE_ENV alone).
+if (devEndpointsEnabled) {
   app.get('/protected', requireAuth(), (req, res) => {
     res.json({
       message: 'You are authenticated',
@@ -255,9 +263,19 @@ app.use((err, req, res, next) => {
 
 const server = app.listen(port, '0.0.0.0', async () => {
   console.log(`CFO Agent API listening on port ${port}`)
+  console.info(
+    `[runtime] NODE_ENV=${process.env.NODE_ENV || '(unset)'} ` +
+      `RAILWAY_ENVIRONMENT=${process.env.RAILWAY_ENVIRONMENT || '(unset)'}`
+  )
+  if (devEndpointsEnabled) {
+    console.warn('[security] ENABLE_DEV_ENDPOINTS=1 — /test-db and /sentry-test are live')
+  }
 
   const { logIntegrationConfigStatus } = await import('./utils/integrationConfig.js')
   logIntegrationConfigStatus()
+
+  const { alertIfPlaintextPlaidTokensRemain } = await import('./utils/tokenCrypto.js')
+  await alertIfPlaintextPlaidTokensRemain(db)
 
   startSyncJob()
   console.log('Auto-sync job scheduled (every 4 hours)')

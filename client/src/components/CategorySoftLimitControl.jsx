@@ -7,7 +7,7 @@
 
 import { useState } from 'react'
 import HowCalculatedDisclosure from './HowCalculatedDisclosure.jsx'
-import { formatCurrency } from './expenseAnalyzer/ExpenseAnalyzerDisplay.jsx'
+import { formatCurrency } from '../lib/formatCurrency.js'
 import { DEFAULT_SPENDING_CAP_WARNING_PERCENT } from '../lib/spendingAlertThresholds.js'
 
 export const MAX_CATEGORY_SOFT_LIMITS = 5

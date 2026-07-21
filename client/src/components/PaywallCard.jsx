@@ -9,17 +9,11 @@
  * not an arbitrary "go pro!" pitch.
  */
 
+import { formatCurrency } from '../lib/formatCurrency.js'
 import {
   FREE_HISTORY_DAYS,
   PRO_MONTHLY_PRICE,
 } from '@shared/usageLimits.js'
-
-function formatCurrency(amount) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount)
-}
 
 function PaywallCard({ spent, onUpgrade }) {
   const monthlyPrice = PRO_MONTHLY_PRICE

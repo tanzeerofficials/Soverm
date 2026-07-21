@@ -5,6 +5,7 @@
  * bills load, buffer, vs last month, and a plan for next month.
  */
 
+import { formatCurrency } from '../lib/formatCurrency.js'
 import { useAuth } from '@clerk/clerk-react'
 import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -20,16 +21,6 @@ import { buildCancelKeepWatchPrompt, buildMonthLetterSuggestedPrompts } from '..
 import { markActivationStep } from '../lib/activationChecklist.js'
 import { trackMonthLetterView } from '../lib/analytics.js'
 import { useAskSoverm } from '../context/AskSovermContext.jsx'
-
-function formatCurrency(amount) {
-  if (amount == null) {
-    return '—'
-  }
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount)
-}
 
 function gradeTone(grade) {
   // Calm surfaces — inform without a red “alarm” card.

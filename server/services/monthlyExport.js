@@ -10,6 +10,7 @@ import { buildTrackerSnapshotWithFallback } from '../services/trackerSnapshot.js
 import { loadExpenseAnalyzerData } from '../utils/expenseAnalyzerData.js'
 import db from '../db/index.js'
 import { calculateTotalBalance, getDisplayBalance } from '../utils/balanceHelpers.js'
+import { csvEscape } from '../utils/csvEscape.js'
 
 function roundCurrency(amount) {
   return Math.round(Number(amount) * 100) / 100
@@ -152,12 +153,4 @@ export function monthlySnapshotToCsv(snapshot) {
   }
 
   return `${lines.join('\n')}\n`
-}
-
-function csvEscape(value) {
-  const text = String(value ?? '')
-  if (/[",\n]/.test(text)) {
-    return `"${text.replace(/"/g, '""')}"`
-  }
-  return text
 }

@@ -42,6 +42,18 @@ try {
   })
   assert(down.includes('quieter'), 'down copy is encouraging')
 
+  const isNew = buildTopMoverHeadline({
+    category: 'Rent',
+    direction: 'up',
+    isNewCategory: true,
+    absoluteChange: 800,
+    currentTotal: 800,
+    priorTotal: 0,
+  })
+  assert(isNew.includes('new this period'), 'new category copy says new this period')
+  assert(isNew.includes('$800'), 'new category copy includes amount')
+  assert(!isNew.includes('21×'), 'new category copy avoids scare multipliers')
+
   assert(topMoverHeadlineStyles('up').badgeVariant === 'heads_up', 'up uses heads_up badge')
   assert(topMoverHeadlineStyles('down').badgeVariant === 'improvement', 'down uses improvement')
 

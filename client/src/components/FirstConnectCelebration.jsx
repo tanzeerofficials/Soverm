@@ -5,6 +5,7 @@
  * celebrate → confirm payday → optional buffer goal → first what's left.
  */
 
+import { formatCurrency } from '../lib/formatCurrency.js'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { createTracker, fetchTrackers } from '../lib/fetchTrackers.js'
@@ -12,18 +13,9 @@ import { fetchPayday, savePayday } from '../lib/fetchPayday.js'
 import { formatPayCadence } from '../lib/payCadenceLabels.js'
 import { PAY_CADENCE_OPTIONS } from '../lib/payCadenceLabels.js'
 import { useFocusTrap } from '../hooks/useFocusTrap.js'
+import { toUserFacingErrorMessage } from '../lib/userFacingError.js'
 
 const CADENCE_OPTIONS = PAY_CADENCE_OPTIONS
-
-function formatCurrency(amount) {
-  if (amount == null) {
-    return '—'
-  }
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount)
-}
 
 function FirstConnectCelebration({
   isOpen,
@@ -139,7 +131,7 @@ function FirstConnectCelebration({
       await refreshWhatsLeft()
       setStep(isPro ? 'goal' : 'whatsLeft')
     } catch (err) {
-      setError(err.message || 'Couldn’t save payday')
+      setError(toUserFacingErrorMessage(err, 'Couldn’t save payday'))
     } finally {
       setSaving(false)
     }
@@ -171,7 +163,7 @@ function FirstConnectCelebration({
       await refreshWhatsLeft()
       setStep('whatsLeft')
     } catch (err) {
-      setError(err.message || 'Couldn’t create that buffer goal')
+      setError(toUserFacingErrorMessage(err, 'Couldn’t create that buffer goal'))
     } finally {
       setSaving(false)
     }

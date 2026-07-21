@@ -7,6 +7,7 @@ import { isSpendingCapWarningActive } from '../lib/spendingAlertThresholds.js'
 import CashFlowSummary from './CashFlowSummary.jsx'
 import SpendingSparkline from './SpendingSparkline.jsx'
 import HowCalculatedDisclosure from './HowCalculatedDisclosure.jsx'
+import { formatCurrency } from '../lib/formatCurrency.js'
 
 const RANGE_OPTIONS = [
   { value: 'mtd', label: 'Month' },
@@ -30,13 +31,6 @@ const WHATS_LEFT_HELP = [
   'No extra buffer is reserved yet (buffer = $0). A spending cap “safe to spend” is separate if you set one.',
   'Confirm or edit payday anytime in Profile.',
 ]
-
-function formatCurrency(amount) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount)
-}
 
 function DashboardHero({
   hasAccounts,

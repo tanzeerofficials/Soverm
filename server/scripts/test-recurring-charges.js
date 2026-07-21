@@ -17,6 +17,7 @@ import {
 import {
   buildComparisonFromTransactions,
   buildExpenseAnalyzerPayload,
+  dedupeCrossAccountTransactions,
   detectRecurringChargesFromTransactions,
 } from '../utils/expenseAnalyzerData.js'
 
@@ -354,6 +355,31 @@ try {
   console.log('  pass: non-keyword merchants require identical amounts')
   passed++
 
+  const variableUtility = detectRecurringChargesFromTransactions([
+    tx('ConEd', 42.1, '2026-01-05', 'Rent And Utilities'),
+    tx('ConEd', 43.85, '2026-02-04', 'Rent And Utilities'),
+    tx('ConEd', 41.9, '2026-03-06', 'Rent And Utilities'),
+  ])
+  assert(variableUtility.length === 1, 'Variable utility bill within 5% should be detected')
+  assert(
+    variableUtility[0].firstAmount === 42.1 && variableUtility[0].lastAmount === 41.9,
+    'Utility first/last amounts preserved from unclustered chain'
+  )
+  console.log('  pass: variable-amount utility bill detected via tolerance retry')
+  passed++
+
+  const spotifyPriceChange = detectRecurringChargesFromTransactions([
+    tx('SPOTIFY USA', 10.99, '2026-01-05', 'Subscriptions'),
+    tx('SPOTIFY', 11.99, '2026-02-04', 'Subscriptions'),
+  ])
+  assert(spotifyPriceChange.length === 1, 'Keyword merchant with 2 slightly different amounts')
+  assert(
+    spotifyPriceChange[0].firstAmount === 10.99 && spotifyPriceChange[0].lastAmount === 11.99,
+    'Spotify price change first/last preserved'
+  )
+  console.log('  pass: keyword merchant price change detected without identical cents')
+  passed++
+
   const multiAccount = detectRecurringChargesFromTransactions([
     tx('SPOTIFY', 10.99, '2026-04-10', 'Subscriptions', false, {
       id: 'acct-checking',
@@ -373,6 +399,37 @@ try {
   )
   assert(multiAccount[0].accounts?.length === 1, 'Single account attached to recurring charge')
   console.log('  pass: recurring charges include account attribution')
+  passed++
+
+  const checking = { id: 'acct-checking', name: 'Checking', bankName: 'Chase' }
+  const savings = { id: 'acct-savings', name: 'Savings', bankName: 'Chase' }
+
+  const crossAccountDeduped = dedupeCrossAccountTransactions([
+    tx('NETFLIX.COM', 15.99, '2026-06-01', 'Subscriptions', false, checking),
+    tx('NETFLIX.COM', 15.99, '2026-06-02', 'Subscriptions', false, savings),
+  ])
+  assert(crossAccountDeduped.length === 1, 'Cross-account near-duplicates collapse')
+  assert(crossAccountDeduped[0].accounts?.length === 2, 'Merged accounts retained')
+  console.log('  pass: cross-account dedupe collapses mirrors')
+  passed++
+
+  const sameAccountTwins = dedupeCrossAccountTransactions([
+    tx('NETFLIX.COM', 15.99, '2026-06-01', 'Subscriptions', false, checking),
+    tx('NETFLIX.COM', 15.99, '2026-06-03', 'Subscriptions', false, checking),
+  ])
+  assert(
+    sameAccountTwins.length === 2,
+    'Same-account twins within 3 days must not collapse'
+  )
+  console.log('  pass: same-account twins stay separate')
+  passed++
+
+  const sameDayDupes = dedupeCrossAccountTransactions([
+    tx('NETFLIX.COM', 15.99, '2026-06-01', 'Subscriptions', false, checking),
+    tx('NETFLIX.COM', 15.99, '2026-06-01', 'Subscriptions', false, checking),
+  ])
+  assert(sameDayDupes.length === 1, 'Same-day sync duplicates still collapse')
+  console.log('  pass: same-day duplicates still collapse')
   passed++
 
   console.log(`\n${passed}/${passed} tests passed`)

@@ -43,14 +43,10 @@ import {
 } from './billDefense.js'
 import {
   buildRecentCashFlowActivity,
-  isCashFlowIncomeRow,
   isCashFlowSpendingRow,
 } from './transactionFilters.js'
-import {
-  getAppTodayIso,
-  isWithinAppDaysAgo,
-  isWithinAppPriorPeriod,
-} from './calendarMonth.js'
+import { getAppTodayIso } from './calendarMonth.js'
+import { buildComparisonFromTransactions } from './rollingComparison.js'
 
 export const NON_PENDING_FILTER = 'AND (pending IS NOT TRUE)'
 const RECURRING_LOOKBACK_INTERVAL = '3 months'
@@ -206,16 +202,31 @@ function dedupeCrossAccountTransactions(transactions) {
   for (const row of sorted) {
     const merchantKey = normalizeMerchantName(row.name)
     const amount = Number(row.amount)
+    const rowAccountKey = accountSnapshotKey(resolveAccountSnapshot(row))
     const duplicate = kept.find((existing) => {
       const sameMerchant = normalizeMerchantName(existing.name) === merchantKey
-      const sameAmount = Math.abs(Number(existing.amount) - amount) <= amount * RECURRING_AMOUNT_TOLERANCE
+      const sameAmount =
+        Math.abs(Number(existing.amount) - amount) <= amount * RECURRING_AMOUNT_TOLERANCE
+      if (!sameMerchant || !sameAmount) {
+        return false
+      }
+
       const sameCalendarDay =
         formatDateOnly(parseDateOnly(existing.date)) === formatDateOnly(parseDateOnly(row.date))
-      const closeDates =
-        sameCalendarDay ||
-        Math.abs(daysBetween(existing.date, row.date)) <= CROSS_ACCOUNT_DEDUPE_DAYS
+      // Same-day identical rows are sync/pending duplicates — collapse even on one account.
+      if (sameCalendarDay) {
+        return true
+      }
 
-      return sameMerchant && sameAmount && closeDates
+      const existingAccountKey = accountSnapshotKey(resolveAccountSnapshot(existing))
+      // Multi-day collapse is only for true cross-account mirrors (same charge on
+      // checking + card). Same-account twins within a few days stay separate so
+      // family profiles / re-bills still form recurring chains.
+      if (!rowAccountKey || !existingAccountKey || rowAccountKey === existingAccountKey) {
+        return false
+      }
+
+      return Math.abs(daysBetween(existing.date, row.date)) <= CROSS_ACCOUNT_DEDUPE_DAYS
     })
 
     if (duplicate) {
@@ -231,6 +242,8 @@ function dedupeCrossAccountTransactions(transactions) {
 
   return kept
 }
+
+export { dedupeCrossAccountTransactions }
 
 function resolveCategoryFromChain(chain) {
   const counts = new Map()
@@ -418,7 +431,7 @@ function monthlyEquivalentAmount(averageAmount, cadence) {
   }
 }
 
-function buildRecurringChargeFromMatch({ chain, rule }) {
+function buildRecurringChargeFromMatch({ chain, rule, merchantGroup = chain }) {
   const amounts = chain.map((row) => Number(row.amount))
   const averageAmount =
     Math.round((amounts.reduce((sum, amount) => sum + amount, 0) / amounts.length) * 100) /
@@ -456,13 +469,25 @@ function buildRecurringChargeFromMatch({ chain, rule }) {
         ? 'high'
         : 'medium'
 
+  /*
+   * Amount endpoints come from the full merchant group (chronological), not only
+   * the accepted identical-cent cluster. Otherwise a price hike (15.49 → 22.99)
+   * never surfaces for bill defense because the hike exceeds the 5% chain tolerance.
+   */
+  const groupSorted = [...merchantGroup].sort(
+    (left, right) => parseDateOnly(left.date) - parseDateOnly(right.date)
+  )
+  const firstAmount = Math.round(Number(groupSorted[0].amount) * 100) / 100
+  const lastAmount =
+    Math.round(Number(groupSorted[groupSorted.length - 1].amount) * 100) / 100
+
   return {
     merchant: resolveMerchantLabel(chain) || 'Unknown merchant',
     category,
     averageAmount,
-    firstAmount: Math.round(amounts[0] * 100) / 100,
-    lastAmount: Math.round(amounts[amounts.length - 1] * 100) / 100,
-    amountDelta: Math.round((amounts[amounts.length - 1] - amounts[0]) * 100) / 100,
+    firstAmount,
+    lastAmount,
+    amountDelta: Math.round((lastAmount - firstAmount) * 100) / 100,
     cadence: rule.cadence,
     lastChargedDate: formatDateOnly(parseDateOnly(lastChargedDate)),
     nextExpectedDate: addDays(lastChargedDate, gapDays || rule.averageGapDays),
@@ -514,6 +539,7 @@ function isHighConfidenceKeywordChain({ chain, rule, hasKeyword, amounts }) {
 function findBestRecurringMatchForTransactionGroup(group) {
   let bestMatch = null
 
+  // Prefer identical-amount clusters (tightest signal).
   for (const amountCluster of clusterTransactionsByIdenticalAmount(group)) {
     for (const rule of CADENCE_RULES) {
       const match = findBestAcceptedChainForCadence(amountCluster, rule)
@@ -524,6 +550,27 @@ function findBestRecurringMatchForTransactionGroup(group) {
       if (!bestMatch || match.chain.length > bestMatch.chain.length) {
         bestMatch = match
       }
+    }
+  }
+
+  if (bestMatch) {
+    return bestMatch
+  }
+
+  /*
+   * Variable-amount bills (utilities, taxed subs, price changes): identical-cent
+   * clustering yields length-1 clusters, so tolerance rules never ran. Retry on
+   * the full merchant group. Coincidental merchants (McDonald's, Uber) still fail
+   * shouldAcceptRecurringChain.
+   */
+  for (const rule of CADENCE_RULES) {
+    const match = findBestAcceptedChainForCadence(group, rule)
+    if (!match) {
+      continue
+    }
+
+    if (!bestMatch || match.chain.length > bestMatch.chain.length) {
+      bestMatch = match
     }
   }
 
@@ -551,7 +598,12 @@ export function detectRecurringChargesFromTransactions(transactions) {
     const bestMatch = findBestRecurringMatchForTransactionGroup(group)
 
     if (bestMatch) {
-      recurring.push(buildRecurringChargeFromMatch(bestMatch))
+      recurring.push(
+        buildRecurringChargeFromMatch({
+          ...bestMatch,
+          merchantGroup: group,
+        })
+      )
     }
   }
 
@@ -633,8 +685,19 @@ export function detectBorderlineRecurringCandidates(transactions, acceptedMercha
       continue
     }
 
-    const match = findBestChainForCadence(group, monthlyRule)
-    if (!match || match.chain.length !== 2) {
+    let match = null
+    for (const amountCluster of clusterTransactionsByIdenticalAmount(group)) {
+      const candidate = findBestChainForCadence(amountCluster, monthlyRule)
+      if (candidate && (!match || candidate.chain.length > match.chain.length)) {
+        match = candidate
+      }
+    }
+    if (!match) {
+      match = findBestChainForCadence(group, monthlyRule)
+    }
+
+    // 3+ variable-amount hits is stronger evidence than exactly 2 — do not reject.
+    if (!match || match.chain.length < 2) {
       continue
     }
 
@@ -682,74 +745,10 @@ export function detectBorderlineRecurringCandidates(transactions, acceptedMercha
   return candidates.sort((left, right) => right.monthlyEquivalent - left.monthlyEquivalent)
 }
 
-function isWithinDaysAgo(dateInput, days) {
-  return isWithinAppDaysAgo(dateInput, days)
-}
-
-function isWithinPriorPeriod(dateInput) {
-  return isWithinAppPriorPeriod(dateInput, 30, 60)
-}
-
-function buildCategoryTotals(rows) {
-  const byCategory = {}
-
-  for (const row of rows) {
-    const category = resolveSpendingCategoryLabel(row)
-    byCategory[category] = (byCategory[category] ?? 0) + Number(row.amount)
-  }
-
-  return byCategory
-}
-
-export function buildComparisonFromTransactions(transactions) {
-  const currentSpendingRows = transactions.filter(
-    (row) => isPostedSpendingRow(row) && isWithinDaysAgo(row.date, 30)
-  )
-  const priorSpendingRows = transactions.filter(
-    (row) => isPostedSpendingRow(row) && isWithinPriorPeriod(row.date)
-  )
-  const currentIncomeRows = transactions.filter(
-    (row) => isCashFlowIncomeRow(row) && isWithinDaysAgo(row.date, 30)
-  )
-  const priorIncomeRows = transactions.filter(
-    (row) => isCashFlowIncomeRow(row) && isWithinPriorPeriod(row.date)
-  )
-  const priorAnyRows = transactions.filter((row) => isWithinPriorPeriod(row.date))
-
-  const currentByCategory = buildCategoryTotals(currentSpendingRows)
-  const priorByCategory = buildCategoryTotals(priorSpendingRows)
-
-  return {
-    hasComparisonData: priorAnyRows.length > 0,
-    currentPeriod: {
-      spending: {
-        total: currentSpendingRows.reduce((sum, row) => sum + Number(row.amount), 0),
-        byCategory: currentByCategory,
-      },
-      income: {
-        total: currentIncomeRows.reduce(
-          (sum, row) => sum + Math.abs(Number(row.amount)),
-          0
-        ),
-      },
-    },
-    priorPeriod: {
-      spending: {
-        total: priorSpendingRows.reduce((sum, row) => sum + Number(row.amount), 0),
-        byCategory: priorByCategory,
-      },
-      income: {
-        total: priorIncomeRows.reduce(
-          (sum, row) => sum + Math.abs(Number(row.amount)),
-          0
-        ),
-      },
-    },
-  }
-}
+export { buildComparisonFromTransactions }
 
 function toPublicCategoryDelta(spendingDelta) {
-  if (!spendingDelta || spendingDelta.isNewCategory) {
+  if (!spendingDelta) {
     return null
   }
 
@@ -758,6 +757,7 @@ function toPublicCategoryDelta(spendingDelta) {
     percent: spendingDelta.percent,
     times: spendingDelta.times ?? null,
     absoluteChange: spendingDelta.absoluteChange ?? null,
+    isNewCategory: spendingDelta.isNewCategory === true,
   }
 }
 
@@ -775,6 +775,7 @@ function deriveTopMover(categoryBreakdown) {
     percent: topEntry.delta.percent,
     times: topEntry.delta.times ?? null,
     absoluteChange: topEntry.delta.absoluteChange ?? null,
+    isNewCategory: topEntry.delta.isNewCategory === true,
     currentTotal: topEntry.currentTotal,
     priorTotal: topEntry.priorTotal,
   }
@@ -829,21 +830,25 @@ export function buildTemplateNarrative({
     }
   }
 
-  if (isSignificantCategoryDelta(topMover) && topMover.percent != null) {
+  if (isSignificantCategoryDelta(topMover)) {
     const currentLabel =
       topMover.currentTotal != null ? `$${Number(topMover.currentTotal).toFixed(2)}` : null
     const priorLabel =
       topMover.priorTotal != null ? `$${Number(topMover.priorTotal).toFixed(2)}` : null
 
-    if (topMover.direction === 'up' && currentLabel && priorLabel) {
+    if (topMover.isNewCategory && currentLabel) {
+      parts.push(
+        `Worth a quick look: ${topMover.category} is new this period at ${currentLabel} (nothing in the prior period). Open that category when you have a minute.`
+      )
+    } else if (topMover.percent != null && topMover.direction === 'up' && currentLabel && priorLabel) {
       parts.push(
         `Worth a quick look: ${topMover.category} is at ${currentLabel} this period (was ${priorLabel} before). A short review of that category can help when you have a minute.`
       )
-    } else if (topMover.direction === 'down' && currentLabel && priorLabel) {
+    } else if (topMover.percent != null && topMover.direction === 'down' && currentLabel && priorLabel) {
       parts.push(
         `${topMover.category} is quieter this period — ${currentLabel}, down from ${priorLabel} before.`
       )
-    } else {
+    } else if (topMover.percent != null) {
       parts.push(
         `${topMover.category} changed vs the prior 30 days — ${formatComparisonPhrase(
           topMover.currentTotal,

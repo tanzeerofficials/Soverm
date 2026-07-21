@@ -5,15 +5,9 @@
  * Expense Analyzer.
  */
 
+import { formatCurrency } from '../lib/formatCurrency.js'
 import { Link } from 'react-router-dom'
 import Skeleton from './Skeleton.jsx'
-
-function formatCurrency(amount) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount)
-}
 
 function DashboardSpendingSnapshot({ summary, isLoading }) {
   if (isLoading) {

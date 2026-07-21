@@ -3,7 +3,11 @@
  *
  * What this does: keeps React in sync with data-theme on <html>.
  * Why: navbar / Settings toggles can flip light↔dark without a full reload.
- * On `/` (marketing landing), force dark without overwriting the stored preference.
+ *
+ * Deliberate branding: `/` (marketing landing) always renders dark without
+ * overwriting the stored preference. Light-mode app users who click the logo
+ * will see a dark landing — that is intentional for the marketing path, not a
+ * broken theme toggle. App routes restore their stored theme on navigate away.
  */
 
 import { createContext, useContext, useEffect, useState } from 'react'

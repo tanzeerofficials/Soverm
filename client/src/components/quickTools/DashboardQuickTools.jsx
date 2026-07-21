@@ -4,6 +4,7 @@
  * Tabbed shortcuts — recent transactions, account health, and monthly tracker.
  */
 
+import { formatCurrency } from '../../lib/formatCurrency.js'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import Skeleton from '../Skeleton.jsx'
@@ -17,13 +18,6 @@ import {
   formatRelativeSync,
   QUICK_TOOL_TABS,
 } from '../../lib/quickTools.js'
-
-function formatCurrency(amount) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount)
-}
 
 /*
  * Tab switcher for Quick tools.

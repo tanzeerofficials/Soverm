@@ -2,7 +2,7 @@
 
 **Soverm** is an AI personal CFO: connect bank accounts via Plaid, sync transactions, generate Claude-powered financial insights, analyze expenses, track spending caps and savings goals, project cash flow, and follow up in chat. Auth is handled by Clerk; data is stored in PostgreSQL.
 
-The product name is **Soverm** (see `client/index.html` and the landing page at `/`).
+The product name is **Soverm** (see `client/index.html` and the landing page at `/`). Spell it **Soverm** in all user-facing copy — not Sovrm or Sovrn. Set the Clerk Dashboard application name to **Soverm** so sign-in modals match.
 
 Production: [soverm.vercel.app](https://soverm.vercel.app) (client) + Railway (API).
 

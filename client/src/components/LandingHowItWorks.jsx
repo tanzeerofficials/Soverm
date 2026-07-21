@@ -27,7 +27,7 @@ function LandingHowItWorks() {
   return (
     <section
       id="how-it-works"
-      className="mx-auto max-w-5xl"
+      className="mx-auto max-w-5xl scroll-mt-20"
       aria-labelledby="how-it-works-heading"
     >
       <div className="text-center">

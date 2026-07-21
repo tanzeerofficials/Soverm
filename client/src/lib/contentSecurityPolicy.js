@@ -51,10 +51,13 @@ export const CSP_CONNECT_SRC = [
 export const CSP_SCRIPT_SRC = [
   "'self'",
   /*
-   * Clerk injects inline bootstrap/helpers at runtime. Until Clerk supports
-   * nonces on those scripts, 'unsafe-inline' stays required for auth to work.
-   * First-party code (theme-boot.js, Vite bundles) loads from 'self' only —
-   * no inline <script> blocks in index.html.
+   * Clerk still injects runtime bootstrap helpers that need an inline path.
+   * Clerk's React SDK can take a nonce, but that requires *per-request* CSP
+   * headers. This SPA ships a static policy via Vercel vercel.json, so we
+   * cannot mint a fresh nonce on each document load without Edge Middleware
+   * + wiring nonce through ClerkProvider. Until that exists, 'unsafe-inline'
+   * stays required for auth; first-party code loads from 'self' only
+   * (theme-boot.js + Vite bundles — no inline <script> in index.html).
    */
   "'unsafe-inline'",
   'https://*.clerk.accounts.dev',

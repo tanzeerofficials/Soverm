@@ -46,7 +46,7 @@ const FAQ_ITEMS = [
 
 function SecurityFaq() {
   return (
-    <section className="mx-auto mt-24 max-w-2xl" id="faq" aria-labelledby="faq-heading">
+    <section className="mx-auto mt-24 max-w-2xl scroll-mt-20" id="faq" aria-labelledby="faq-heading">
       <div className="text-center">
         <p className="text-sm font-medium uppercase tracking-wide text-brand">FAQ</p>
         <h2 id="faq-heading" className="mt-2 text-2xl font-bold text-fg sm:text-3xl">

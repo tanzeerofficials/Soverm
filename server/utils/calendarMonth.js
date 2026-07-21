@@ -231,6 +231,19 @@ export function daysBetweenIsoDates(laterIso, earlierIso) {
   )
 }
 
+/**
+ * Add (or subtract) whole calendar days to a YYYY-MM-DD string.
+ */
+export function addCalendarDaysToIso(isoDate, deltaDays) {
+  const [year, month, day] = String(isoDate).slice(0, 10).split('-').map(Number)
+  const utc = new Date(Date.UTC(year, month - 1, day + deltaDays))
+  return formatIsoDateParts({
+    year: utc.getUTCFullYear(),
+    month: utc.getUTCMonth() + 1,
+    day: utc.getUTCDate(),
+  })
+}
+
 function toIsoDateInput(dateInput) {
   if (typeof dateInput === 'string') {
     return dateInput.slice(0, 10)
@@ -238,29 +251,74 @@ function toIsoDateInput(dateInput) {
   return formatIsoDateInAppTz(dateInput instanceof Date ? dateInput : new Date(dateInput))
 }
 
+/** Length of the rolling "current" and "prior" comparison windows (civil days). */
+export const ROLLING_COMPARISON_DAYS = 30
+
 /**
- * True when dateInput falls in [today − days, today] in the app timezone.
- * Why: Analyzer / drill-down windows must not use host-local or UTC "today"
- * (Railway is often UTC; users live in APP_TIMEZONE).
+ * Symmetric rolling windows in the app timezone (civil dates).
+ *
+ * Current: today and the previous 29 days → diff ∈ [0, 29] (30 days).
+ * Prior: the 30 days before that → diff ∈ [30, 59].
+ * Future-dated rows (diff < 0) are excluded from both.
+ *
+ * SQL: date >= currentStartIso AND date < tomorrowIso (current)
+ *      date >= priorStartIso AND date < currentStartIso (prior)
+ */
+export function getRollingComparisonWindow(
+  referenceDate = new Date(),
+  timeZone = getAppTimezone()
+) {
+  const { todayIso, tomorrowIso } = getAppDayBounds(referenceDate, timeZone)
+  const currentStartIso = addCalendarDaysToIso(
+    todayIso,
+    -(ROLLING_COMPARISON_DAYS - 1)
+  )
+  const priorStartIso = addCalendarDaysToIso(
+    todayIso,
+    -(ROLLING_COMPARISON_DAYS * 2 - 1)
+  )
+
+  return {
+    todayIso,
+    tomorrowIso,
+    currentStartIso,
+    priorStartIso,
+    priorEndExclusiveIso: currentStartIso,
+    timeZone,
+    days: ROLLING_COMPARISON_DAYS,
+  }
+}
+
+export function getRollingComparisonSqlParams(
+  referenceDate = new Date(),
+  timeZone = getAppTimezone()
+) {
+  return getRollingComparisonWindow(referenceDate, timeZone)
+}
+
+/**
+ * True when dateInput falls in the current rolling window [today − (days−1), today].
+ * For days=30 that is diff ∈ [0, 29] — not [0, 30] (which was a 31-day window).
  */
 export function isWithinAppDaysAgo(dateInput, days, referenceDate = new Date()) {
   const todayIso = getAppTodayIso(referenceDate)
   const targetIso = toIsoDateInput(dateInput)
   const diff = daysBetweenIsoDates(todayIso, targetIso)
-  return diff >= 0 && diff <= days
+  return diff >= 0 && diff < days
 }
 
 /**
- * True when dateInput falls in the prior window (e.g. 31–60 days ago) in app TZ.
+ * True when dateInput falls in the prior rolling window.
+ * Default: diff ∈ [30, 60) for a 30-day prior period (symmetric with current).
  */
 export function isWithinAppPriorPeriod(
   dateInput,
-  recentDays = 30,
-  lookbackDays = 60,
+  recentDays = ROLLING_COMPARISON_DAYS,
+  lookbackDays = ROLLING_COMPARISON_DAYS * 2,
   referenceDate = new Date()
 ) {
   const todayIso = getAppTodayIso(referenceDate)
   const targetIso = toIsoDateInput(dateInput)
   const diff = daysBetweenIsoDates(todayIso, targetIso)
-  return diff > recentDays && diff <= lookbackDays
+  return diff >= recentDays && diff < lookbackDays
 }

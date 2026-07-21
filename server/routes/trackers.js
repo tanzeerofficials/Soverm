@@ -27,7 +27,7 @@ import {
   assertTrackerDeleteAllowed,
   assertTrackerUpdateAllowed,
 } from '../utils/usage.js'
-import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
+import { GENERIC_ERROR_MESSAGE, TEMPORARILY_UNAVAILABLE_MESSAGE } from '../utils/apiErrors.js'
 import { reportServerError } from '../utils/sentry.js'
 import { validateUuidParam } from '../utils/validation.js'
 
@@ -66,12 +66,11 @@ function handleTrackerRouteError(res, err, { userId, req, label }) {
 
   if (
     err.statusCode === 503 ||
-    err.message.includes('migration 013') ||
-    err.message.includes('migration 014') ||
-    err.message.includes('migration 016') ||
-    err.message.includes('migration 017')
+    /migration 01[3467]/i.test(err.message)
   ) {
-    return res.status(503).json({ error: err.message })
+    // Log the real cause for ops; clients only see a generic unavailable message.
+    console.warn(`[trackers] temporarily unavailable: ${err.message}`)
+    return res.status(503).json({ error: TEMPORARILY_UNAVAILABLE_MESSAGE })
   }
 
   reportServerError(label, err, { userId, req })

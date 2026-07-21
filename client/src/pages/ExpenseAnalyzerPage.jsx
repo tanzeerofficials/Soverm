@@ -34,8 +34,8 @@ import {
   AccountSourceLine,
   CategoryMetaBadges,
   CategoryRecurringLine,
-  formatCurrency,
 } from '../components/expenseAnalyzer/ExpenseAnalyzerDisplay.jsx'
+import { formatCurrency } from '../lib/formatCurrency.js'
 import { formatCategoryDisplayName, getCategoryExamples } from '../lib/categoryDisplayNames.js'
 import {
   formatCategoryAccountSources,
@@ -54,6 +54,7 @@ import {
   buildRecurringReviewPrompt,
 } from '../lib/chatSuggestedPrompts.js'
 import BillDefenseSection from '../components/BillDefenseSection.jsx'
+import { toUserFacingErrorMessage } from '../lib/userFacingError.js'
 
 function formatChargeDate(dateString) {
   if (!dateString) {
@@ -224,11 +225,22 @@ function confidenceBadgeStyles(confidence) {
 }
 
 function formatOverallSpendingLine(overallSpending) {
-  if (!overallSpending?.hasComparisonData || !overallSpending.delta) {
+  if (!overallSpending) {
     return null
   }
 
-  const { currentTotal, priorTotal, delta } = overallSpending
+  const { currentTotal, priorTotal, delta, hasComparisonData } = overallSpending
+
+  /*
+   * Short Plaid history can make a partial prior window look like a real MoM drop.
+   * When the coverage gate fails, show current spend only plus calm empty-state copy.
+   */
+  if (!hasComparisonData || !delta) {
+    if (currentTotal == null) {
+      return null
+    }
+    return `You spent ${formatCurrency(currentTotal)} in the last 30 days. Not enough history yet for a prior-period comparison.`
+  }
 
   if (delta.direction === 'flat') {
     return `You spent ${formatCurrency(currentTotal)} in the last 30 days — flat vs the prior 30 days (${formatCurrency(priorTotal)}).`
@@ -300,7 +312,7 @@ function ExpenseAnalyzerPage() {
         queryClient.invalidateQueries({ queryKey: categoryLimitsQueryKey }),
       ])
     } catch (err) {
-      showToast(err.message || 'Couldn’t save category limit', 'error')
+      showToast(toUserFacingErrorMessage(err, 'Couldn’t save category limit'), 'error')
       throw err
     } finally {
       setLimitSaving(false)
@@ -317,7 +329,7 @@ function ExpenseAnalyzerPage() {
         queryClient.invalidateQueries({ queryKey: categoryLimitsQueryKey }),
       ])
     } catch (err) {
-      showToast(err.message || 'Couldn’t remove category limit', 'error')
+      showToast(toUserFacingErrorMessage(err, 'Couldn’t remove category limit'), 'error')
       throw err
     } finally {
       setLimitSaving(false)
@@ -413,7 +425,14 @@ function ExpenseAnalyzerPage() {
       />
 
       <main className="mx-auto max-w-3xl px-4 pb-16 pt-24 sm:px-6 sm:pt-28">
-        <PageHeader title="Expense Analyzer" description="Where your money actually goes — compared to the prior 30 days.">
+        <PageHeader
+          title="Expense Analyzer"
+          description={
+            overallSpending?.hasComparisonData
+              ? 'Where your money actually goes — compared to the prior 30 days.'
+              : 'Where your money actually goes.'
+          }
+        >
           {overallSpendingLine && (
             <p className="mt-3 text-sm leading-relaxed text-fg-muted">{overallSpendingLine}</p>
           )}

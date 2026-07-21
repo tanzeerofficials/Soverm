@@ -5,6 +5,7 @@
  * and recent income/spending patterns.
  */
 
+import { formatCurrency } from '../../lib/formatCurrency.js'
 import { Link } from 'react-router-dom'
 import Skeleton from '../Skeleton.jsx'
 import HowCalculatedDisclosure from '../HowCalculatedDisclosure.jsx'
@@ -15,14 +16,6 @@ import {
   toneStyles,
 } from '../../lib/cashFlowForecast.js'
 import { buildBillCalendarDays } from '../../lib/billCalendar.js'
-
-function formatCurrency(amount) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(amount ?? 0)
-}
 
 function formatRiskDetail(risk) {
   if (!risk?.detail) {
@@ -39,9 +32,9 @@ function formatRiskDetail(risk) {
 function ForecastSparkline({ points, tone, endingBalance, lowestBalance, lowestBalanceDate }) {
   const { path, areaPath } = buildForecastSparkline(points)
   const styles = toneStyles(tone)
-  const ariaLabel = `Projected balance ends near ${formatCurrency(endingBalance)}${
+  const ariaLabel = `Projected balance ends near ${formatCurrency(endingBalance, { maximumFractionDigits: 0 })}${
     lowestBalance < endingBalance
-      ? `, with a low around ${formatCurrency(lowestBalance)} on ${formatForecastDate(lowestBalanceDate)}`
+      ? `, with a low around ${formatCurrency(lowestBalance, { maximumFractionDigits: 0 })} on ${formatForecastDate(lowestBalanceDate)}`
       : ''
   }`
 
@@ -128,12 +121,12 @@ function ForecastToolPanel({ forecast, isLoading, loadError, onRetryLoad }) {
               Projected balance · {FORECAST_HORIZON_DAYS} days
             </p>
             <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-fg">
-              {formatCurrency(forecast.endingBalance)}
+              {formatCurrency(forecast.endingBalance, { maximumFractionDigits: 0 })}
             </p>
             <p className="mt-1 text-xs text-fg-muted">
-              Today {formatCurrency(forecast.startingBalance)}
+              Today {formatCurrency(forecast.startingBalance, { maximumFractionDigits: 0 })}
               {forecast.lowestBalance < forecast.startingBalance
-                ? ` · Low around ${formatForecastDate(forecast.lowestBalanceDate)} (${formatCurrency(forecast.lowestBalance)})`
+                ? ` · Low around ${formatForecastDate(forecast.lowestBalanceDate)} (${formatCurrency(forecast.lowestBalance, { maximumFractionDigits: 0 })})`
                 : ''}
             </p>
           </div>
@@ -173,7 +166,7 @@ function ForecastToolPanel({ forecast, isLoading, loadError, onRetryLoad }) {
                     {day.relativeLabel}
                   </p>
                   <p className="font-mono text-sm font-semibold tabular-nums text-fg">
-                    {formatCurrency(day.total)}
+                    {formatCurrency(day.total, { maximumFractionDigits: 0 })}
                   </p>
                 </div>
                 <ul className="mt-1.5 divide-y divide-border-default/60">
@@ -184,7 +177,7 @@ function ForecastToolPanel({ forecast, isLoading, loadError, onRetryLoad }) {
                     >
                       <p className="truncate text-sm text-fg">{event.merchant}</p>
                       <span className="font-mono text-sm tabular-nums text-fg-muted">
-                        {formatCurrency(event.amount)}
+                        {formatCurrency(event.amount, { maximumFractionDigits: 0 })}
                       </span>
                     </li>
                   ))}
@@ -208,9 +201,9 @@ function ForecastToolPanel({ forecast, isLoading, loadError, onRetryLoad }) {
       <HowCalculatedDisclosure
         title="How this forecast works"
         items={[
-          `Starts from your connected account balances (${formatCurrency(forecast.startingBalance)}).`,
-          `Adds ~${formatCurrency(forecast.assumptions?.dailyIncome)}/day income based on the last 30 days (transfers excluded).`,
-          `Subtracts ~${formatCurrency(forecast.assumptions?.dailyDiscretionary)}/day discretionary spend plus confirmed recurring charges on their expected dates.`,
+          `Starts from your connected account balances (${formatCurrency(forecast.startingBalance, { maximumFractionDigits: 0 })}).`,
+          `Adds ~${formatCurrency(forecast.assumptions?.dailyIncome, { maximumFractionDigits: 0 })}/day income based on the last 30 days (transfers excluded).`,
+          `Subtracts ~${formatCurrency(forecast.assumptions?.dailyDiscretionary, { maximumFractionDigits: 0 })}/day discretionary spend plus confirmed recurring charges on their expected dates.`,
           'This is an estimate — paycheck timing and one-off purchases can shift the real outcome.',
         ]}
       />

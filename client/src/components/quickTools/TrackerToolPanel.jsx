@@ -5,6 +5,7 @@
  * target, and see calendar-month progress with status alerts.
  */
 
+import { formatCurrency } from '../../lib/formatCurrency.js'
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import Skeleton from '../Skeleton.jsx'
@@ -17,17 +18,11 @@ import {
   describeSpendingAlertThresholds,
   isSpendingCapWarningActive,
 } from '../../lib/spendingAlertThresholds.js'
+import { toUserFacingErrorMessage } from '../../lib/userFacingError.js'
 
 const TRACK_MODES = {
   SPENDING: 'spending',
   SAVING: 'saving',
-}
-
-function formatCurrency(amount) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount)
 }
 
 function statusLabel(status, trackType) {
@@ -513,7 +508,8 @@ function SpendingTrackerCard({
       setIsEditing(false)
       setEditError(null)
     },
-    onError: (error) => setEditError(error.message),
+    onError: (error) =>
+      setEditError(toUserFacingErrorMessage(error, 'Couldn’t update that spending cap')),
   })
 
   return (
@@ -623,7 +619,8 @@ function SavingTrackerCard({ tracker, periodLabel, getToken, onRemove, isRemovin
       setIsEditing(false)
       setEditError(null)
     },
-    onError: (error) => setEditError(error.message),
+    onError: (error) =>
+      setEditError(toUserFacingErrorMessage(error, 'Couldn’t update that savings goal')),
   })
 
   return (
@@ -750,13 +747,18 @@ function SavingsDetectionsPanel({ detections, savingTrackers, getToken }) {
         setPendingForce({
           detectionId: variables.detectionId,
           trackerId: variables.trackerId,
-          message: error.message,
+          message: toUserFacingErrorMessage(
+            error,
+            'That deposit might already be logged — confirm to apply it anyway.'
+          ),
         })
         setApplyError(null)
         return
       }
 
-      setApplyError(error.message)
+      setApplyError(
+        toUserFacingErrorMessage(error, 'Couldn’t apply that deposit — please try again')
+      )
     },
   })
 
@@ -891,7 +893,8 @@ function TrackerToolPanel({
       setShowCreate(false)
       setCreateError(null)
     },
-    onError: (error) => setCreateError(error.message),
+    onError: (error) =>
+      setCreateError(toUserFacingErrorMessage(error, 'Couldn’t create that tracker')),
   })
 
   const deleteMutation = useMutation({

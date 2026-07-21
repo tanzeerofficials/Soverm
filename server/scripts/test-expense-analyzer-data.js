@@ -109,9 +109,16 @@ try {
 
   const flatTransactions = [
     tx('Coffee Shop', 50, daysAgo(5), 'Uncategorized'),
-    tx('Coffee Shop', 50, daysAgo(40), 'Uncategorized'),
+    tx('Coffee Shop', 50, daysAgo(12), 'Uncategorized'),
+    tx('Coffee Shop', 50, daysAgo(18), 'Uncategorized'),
+    tx('Coffee Shop', 50, daysAgo(25), 'Uncategorized'),
+    tx('Coffee Shop', 50, daysAgo(35), 'Uncategorized'),
+    tx('Coffee Shop', 50, daysAgo(42), 'Uncategorized'),
+    tx('Coffee Shop', 50, daysAgo(48), 'Uncategorized'),
+    tx('Coffee Shop', 50, daysAgo(56), 'Uncategorized'),
   ]
   const flatComparison = buildComparisonFromTransactions(flatTransactions)
+  assert(flatComparison.hasComparisonData === true, 'flat fixture has enough history for comparison')
   const flatPayload = buildExpenseAnalyzerPayload(flatComparison, flatTransactions)
 
   assert(flatPayload.topMover === null, 'Flat categories should not produce a top mover')

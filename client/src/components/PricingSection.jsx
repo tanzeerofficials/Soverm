@@ -4,6 +4,7 @@
  * Free tier delivers the weekly loop; Pro gates depth (insights volume, history).
  */
 
+import { formatCurrency } from '../lib/formatCurrency.js'
 import { SignUpButton, useAuth } from '@clerk/clerk-react'
 import { useState } from 'react'
 import {
@@ -19,15 +20,6 @@ import {
   checkoutErrorToastMessage,
   startProCheckout,
 } from '../lib/startProCheckout.js'
-
-function formatCurrency(amount) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount)
-}
 
 const FEATURE_ROWS = [
   {
@@ -113,7 +105,7 @@ function PricingSection() {
   }
 
   return (
-    <section className="mx-auto mt-24 max-w-4xl" id="pricing" aria-labelledby="pricing-heading">
+    <section className="mx-auto mt-24 max-w-4xl scroll-mt-20" id="pricing" aria-labelledby="pricing-heading">
       <div className="text-center">
         <p className="text-sm font-medium uppercase tracking-wide text-brand">Pricing</p>
         <h2 id="pricing-heading" className="mt-2 text-2xl font-bold text-fg sm:text-3xl">

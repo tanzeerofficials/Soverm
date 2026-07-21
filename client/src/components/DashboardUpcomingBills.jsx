@@ -5,6 +5,7 @@
  * Data comes from the same cash-flow forecast scheduledOutflows list.
  */
 
+import { formatCurrency } from '../lib/formatCurrency.js'
 import { Link } from 'react-router-dom'
 import Skeleton from './Skeleton.jsx'
 import {
@@ -13,13 +14,6 @@ import {
   summarizeBillCalendar,
 } from '../lib/billCalendar.js'
 import { formatForecastDate } from '../lib/cashFlowForecast.js'
-
-function formatCurrency(amount) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount ?? 0)
-}
 
 function DashboardUpcomingBills({
   forecast,

@@ -37,8 +37,13 @@ const TRIAL_HINT =
  * Detect a meaningful price increase along a recurring chain.
  */
 export function detectPriceIncrease(charge, { minDelta = 1, minPercent = 8 } = {}) {
-  const first = Number(charge.firstAmount ?? charge.averageAmount)
-  const last = Number(charge.lastAmount ?? charge.averageAmount)
+  // Require real endpoints — do not fall back to average for both (delta 0 forever).
+  if (charge.firstAmount == null || charge.lastAmount == null) {
+    return null
+  }
+
+  const first = Number(charge.firstAmount)
+  const last = Number(charge.lastAmount)
   if (!Number.isFinite(first) || !Number.isFinite(last) || first <= 0) {
     return null
   }

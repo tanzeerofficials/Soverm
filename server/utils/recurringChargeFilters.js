@@ -17,6 +17,7 @@ const EXCLUDED_NAME_PATTERNS = [
 
 const HARD_EXCLUDED_NAME_FRAGMENTS = [
   'CREDIT CARD',
+  // Real Plaid / bank descriptor (docs example: "CREDIT CARD 3333 PAYMENT *//")
   'PAYMENT *//',
   'AUTOPAY',
   'AUTO PAY',
@@ -126,6 +127,15 @@ const SUBSCRIPTION_LIKELY_CATEGORY_KEYWORDS = [
   'gyms and fitness',
   'health',
   'personal care',
+  // Variable monthly bills — need tolerance chains, not identical-cent clusters
+  'utilities',
+  'utility',
+  'electric',
+  'gas and electric',
+  'internet',
+  'telecom',
+  'phone',
+  'rent and utilities',
 ]
 
 export function normalizeCategoryLabel(category) {

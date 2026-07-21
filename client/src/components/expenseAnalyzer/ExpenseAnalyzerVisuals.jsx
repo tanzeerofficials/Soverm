@@ -6,7 +6,7 @@
 import { useState } from 'react'
 import DonutChart from './DonutChart.jsx'
 import StatDeltaBadge from '../StatDeltaBadge.jsx'
-import { formatCurrency } from './ExpenseAnalyzerDisplay.jsx'
+import { formatCurrency } from '../../lib/formatCurrency.js'
 import {
   formatPercent,
   prepareDonutSlices,
@@ -168,7 +168,7 @@ function ExpenseAnalyzerVisuals({
             <p className="mt-1 text-sm text-fg-muted">Last 30 days · by category</p>
           </div>
 
-          {overallSpending?.delta && (
+          {overallSpending?.hasComparisonData && overallSpending?.delta && (
             <StatDeltaBadge delta={overallSpending.delta} statType="spending" inline />
           )}
         </div>

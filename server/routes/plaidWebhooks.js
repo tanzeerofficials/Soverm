@@ -20,15 +20,33 @@ import { reportServerError } from '../utils/sentry.js'
 
 const router = Router()
 const keyCache = new Map()
+const MAX_CACHED_WEBHOOK_KEYS = 32
+/** Plaid kids are opaque ids — reject junk before calling their API. */
+const PLAID_KID_RE = /^[A-Za-z0-9_-]{8,128}$/
 
 async function getPlaidWebhookKey(keyId) {
+  if (typeof keyId !== 'string' || !PLAID_KID_RE.test(keyId)) {
+    throw new Error('invalid_webhook_kid')
+  }
+
   if (keyCache.has(keyId)) {
     return keyCache.get(keyId)
   }
 
   const response = await plaidClient.webhookVerificationKeyGet({ key_id: keyId })
-  const jwk = response.data.key
+  const jwk = response.data?.key
+  if (!jwk) {
+    throw new Error('missing_webhook_jwk')
+  }
+
+  // Only cache keys Plaid actually returned (never cache failed lookups).
   const key = await importJWK(jwk, 'ES256')
+
+  if (keyCache.size >= MAX_CACHED_WEBHOOK_KEYS) {
+    const oldestKid = keyCache.keys().next().value
+    keyCache.delete(oldestKid)
+  }
+
   keyCache.set(keyId, key)
   return key
 }
@@ -38,22 +56,39 @@ async function verifyPlaidWebhook(rawBody, verificationHeader) {
     return { ok: false }
   }
 
-  const header = decodeProtectedHeader(verificationHeader)
+  let header
+  try {
+    header = decodeProtectedHeader(verificationHeader)
+  } catch {
+    return { ok: false }
+  }
+
   if (!header.kid) {
     return { ok: false }
   }
 
-  const key = await getPlaidWebhookKey(header.kid)
-  const { payload } = await jwtVerify(verificationHeader, key, {
-    algorithms: ['ES256'],
-  })
-
-  const bodyHash = createHash('sha256').update(rawBody).digest('hex')
-  if (payload.request_body_sha256 !== bodyHash) {
+  let key
+  try {
+    key = await getPlaidWebhookKey(header.kid)
+  } catch {
+    // Invalid kid shape, Plaid miss, or network error — do not grow the cache.
     return { ok: false }
   }
 
-  return { ok: true, claims: payload, bodyHash }
+  try {
+    const { payload } = await jwtVerify(verificationHeader, key, {
+      algorithms: ['ES256'],
+    })
+
+    const bodyHash = createHash('sha256').update(rawBody).digest('hex')
+    if (payload.request_body_sha256 !== bodyHash) {
+      return { ok: false }
+    }
+
+    return { ok: true, claims: payload, bodyHash }
+  } catch {
+    return { ok: false }
+  }
 }
 
 function buildWebhookEventId({ itemId, webhookType, webhookCode, bodyHash, claims }) {

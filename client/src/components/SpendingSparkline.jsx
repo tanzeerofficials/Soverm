@@ -1,19 +1,13 @@
 import { useId } from 'react'
 import { buildSparklineGeometry, formatSparklineTotal } from '../lib/spendingSparkline.js'
-
-function formatCurrency(amount) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(amount)
-}
+import { formatCurrency } from '../lib/formatCurrency.js'
 
 function SpendingSparkline({ series = [], className = '' }) {
   const gradientId = useId()
   const values = series.map((point) => point.amount)
   const geometry = buildSparklineGeometry(values)
   const total = formatSparklineTotal(values)
+  const totalLabel = formatCurrency(total, { maximumFractionDigits: 0 })
 
   if (!geometry || values.every((value) => value === 0)) {
     return (
@@ -28,13 +22,13 @@ function SpendingSparkline({ series = [], className = '' }) {
   return (
     <div
       className={`rounded-xl border border-border-default/80 bg-app/40 px-4 py-3 ${className}`}
-      aria-label={`Daily spending trend, ${formatCurrency(total)} total in this period`}
+      aria-label={`Daily spending trend, ${totalLabel} total in this period`}
     >
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="text-[10px] font-semibold uppercase tracking-wide text-fg-subtle">
           Daily spending
         </p>
-        <p className="font-mono text-xs tabular-nums text-fg-muted">{formatCurrency(total)} total</p>
+        <p className="font-mono text-xs tabular-nums text-fg-muted">{totalLabel} total</p>
       </div>
 
       <svg

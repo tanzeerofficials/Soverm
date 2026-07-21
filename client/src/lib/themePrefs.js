@@ -2,8 +2,13 @@
  * THEME PREFERENCE
  *
  * What this does: resolves and applies light/dark on <html data-theme>.
- * Why: light is a second app theme; dark stays the marketing + default OS-dark path.
+ * Why: light is a second *app* theme; the marketing landing (`/`) deliberately
+ * stays dark (see ThemeContext forceDarkMarketing) so brand photography and
+ * hero wash stay consistent. Stored light preference is preserved — landing
+ * applies dark with persist:false, then restores when you leave `/`.
  * Order: explicit localStorage → prefers-color-scheme → dark.
+ *
+ * Canonical product name: **Soverm** (wordmark SOVERM). Not Sovrm / Sovrn.
  */
 
 export const THEME_STORAGE_KEY = 'soverm:theme'

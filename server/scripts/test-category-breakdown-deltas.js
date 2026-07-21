@@ -9,6 +9,7 @@ import {
   buildCategoryBreakdownFromComparison,
   computeSpendingDelta,
   getCategoryBreakdownWithDeltas,
+  isSignificantCategoryDelta,
 } from '../utils/financialContext.js'
 
 function assert(condition, message) {
@@ -55,10 +56,14 @@ try {
       category,
       currentTotal,
       priorTotal,
-      delta:
-        !spendingDelta || spendingDelta.isNewCategory
-          ? null
-          : { direction: spendingDelta.direction, percent: spendingDelta.percent },
+      delta: spendingDelta
+        ? {
+            direction: spendingDelta.direction,
+            percent: spendingDelta.percent,
+            absoluteChange: spendingDelta.absoluteChange,
+            isNewCategory: spendingDelta.isNewCategory === true,
+          }
+        : null,
     })
   )
 
@@ -75,8 +80,12 @@ try {
   passed++
 
   const subscriptions = publicBreakdown.find((row) => row.category === 'Subscriptions')
-  assert(subscriptions.delta === null, 'No prior category spend → delta null')
-  console.log('  pass: category with no prior spend → delta null')
+  assert(subscriptions.delta?.isNewCategory === true, 'No prior spend → isNewCategory')
+  assert(
+    !isSignificantCategoryDelta(subscriptions.delta),
+    'Sub-$50 new category is not a significant top mover'
+  )
+  console.log('  pass: small new category flagged but not significant')
   passed++
 
   assert(
@@ -85,9 +94,41 @@ try {
   )
   assert(
     publicBreakdown.at(-1).category === 'Subscriptions',
-    'New category with null delta should sort after percent movers'
+    'Sub-threshold new category should sort after percent movers'
   )
   console.log('  pass: sorted by absolute percent change descending')
+  passed++
+
+  const withLargeNew = buildCategoryBreakdownFromComparison({
+    hasComparisonData: true,
+    currentPeriod: {
+      spending: {
+        total: 1000,
+        byCategory: {
+          Dining: 120,
+          Rent: 800,
+        },
+      },
+      income: { total: 0 },
+    },
+    priorPeriod: {
+      spending: {
+        total: 100,
+        byCategory: {
+          Dining: 100,
+        },
+      },
+      income: { total: 0 },
+    },
+  })
+
+  assert(withLargeNew[0].category === 'Rent', 'Large new category sorts first')
+  assert(withLargeNew[0].spendingDelta?.isNewCategory === true, 'Rent is new')
+  assert(
+    isSignificantCategoryDelta(withLargeNew[0].spendingDelta),
+    'New $800 category is significant'
+  )
+  console.log('  pass: large new category can be top mover')
   passed++
 
   const noPrior = buildCategoryBreakdownFromComparison({

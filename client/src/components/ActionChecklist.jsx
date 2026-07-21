@@ -14,6 +14,7 @@ import { useToastContext } from '../context/ToastContext.jsx'
 import { parseSavingsActionSuggestion } from '../lib/parseSavingsAction.js'
 import { updateActionLifecycle } from '../lib/fetchActions.js'
 import { createTracker } from '../lib/fetchTrackers.js'
+import { toUserFacingErrorMessage } from '../lib/userFacingError.js'
 
 function normalizeActions(actions) {
   return (actions ?? []).map((action, index) => {
@@ -70,7 +71,10 @@ function ActionChecklist({ actions, onUpdate, id = 'dashboard-insight-actions', 
       await queryClient.invalidateQueries({ queryKey: dashboardQueryKey })
     } catch (err) {
       console.error('Failed to create savings goal from action:', err.message)
-      showToast?.(err.message || 'Couldn’t create that savings goal', 'error')
+      showToast?.(
+        toUserFacingErrorMessage(err, 'Couldn’t create that savings goal'),
+        'error'
+      )
     }
   }
 

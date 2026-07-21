@@ -86,7 +86,7 @@ function IconBadge({ children }) {
 
 function SecurityTrustSection() {
   return (
-    <section className="mx-auto mt-24 max-w-4xl" id="security" aria-labelledby="security-trust-heading">
+    <section className="mx-auto mt-24 max-w-4xl scroll-mt-20" id="security" aria-labelledby="security-trust-heading">
       <div className="text-center">
         <p className="text-sm font-medium uppercase tracking-wide text-brand">
           Security

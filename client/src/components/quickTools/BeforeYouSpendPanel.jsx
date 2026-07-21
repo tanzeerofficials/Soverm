@@ -5,19 +5,11 @@
  * blows soft limit / risks rent or payday.
  */
 
+import { formatCurrency } from '../../lib/formatCurrency.js'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { checkBeforeYouSpend } from '../../lib/fetchBeforeYouSpend.js'
-
-function formatCurrency(amount) {
-  if (amount == null) {
-    return '—'
-  }
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount)
-}
+import { toUserFacingErrorMessage } from '../../lib/userFacingError.js'
 
 function verdictClasses(verdict) {
   if (verdict === 'risks_payday' || verdict === 'risks_rent') {
@@ -58,7 +50,7 @@ function BeforeYouSpendPanel({ getToken, softLimits = [], paydayConfigured = fal
       setResult(data)
     } catch (err) {
       setResult(null)
-      setError(err.message || 'Couldn’t check that purchase')
+      setError(toUserFacingErrorMessage(err, 'Couldn’t check that purchase'))
     } finally {
       setLoading(false)
     }

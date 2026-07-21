@@ -253,7 +253,11 @@ export function buildExpenseAnalyzerPromptBlock(expenseAnalyzerContext) {
     lines.push(`Overall spending: ${phrase}`)
   }
 
-  if (topMover?.percent != null && topMover.direction !== 'flat' && topMover.percent >= 5) {
+  if (topMover?.isNewCategory && topMover.currentTotal != null) {
+    lines.push(
+      `Category note (new this period): ${topMover.category} — ${formatMoneyAmount(topMover.currentTotal)} now, $0 in the prior period`
+    )
+  } else if (topMover?.percent != null && topMover.direction !== 'flat' && topMover.percent >= 5) {
     const moneyBit =
       topMover.currentTotal != null && topMover.priorTotal != null
         ? ` — ${formatMoneyAmount(topMover.currentTotal)} this period vs ${formatMoneyAmount(topMover.priorTotal)} prior`
@@ -740,7 +744,7 @@ function buildMonthOverMonthPromptContext(monthOverMonthComparison) {
     return {
       block: `
 
-No month-over-month comparison is available for this user. Do not reference any month-over-month or prior-period comparison in the headline, stats, or fullSummary. Set "delta": null on every stat object.`,
+Not enough history yet for a month-over-month comparison. Do not reference any month-over-month, prior-period, or "down/up X%" comparison in the headline, stats, or fullSummary. Set "delta": null on every stat object.`,
       instruction: '',
     }
   }

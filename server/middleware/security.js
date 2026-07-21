@@ -39,6 +39,18 @@ export const globalRateLimiter = rateLimit({
 })
 
 /**
+ * Modest IP limit for webhook ingress (Plaid/Stripe/Clerk).
+ * Global limiter skips /webhooks so signature verification can run; this
+ * still bounds forged-JWT floods that burn outbound Plaid key fetches.
+ */
+export const webhookRateLimiter = rateLimit({
+  ...rateLimitDefaults,
+  windowMs: 60 * 1000,
+  max: process.env.NODE_ENV === 'production' ? 120 : 1000,
+  keyGenerator: (req) => ipKeyGenerator(req.ip),
+})
+
+/**
  * Per-user (or per-IP when anonymous) limits for expensive endpoints.
  * windowMs + max are intentionally not echoed in JSON responses.
  */

@@ -133,7 +133,7 @@ try {
   })
 
   assert(
-    legacyPrompt.includes('No month-over-month comparison is available'),
+    legacyPrompt.includes('Not enough history yet for a month-over-month comparison'),
     'legacy insights without MoM snapshot must degrade gracefully'
   )
   console.log('  pass: legacy insights without MoM snapshot handled')

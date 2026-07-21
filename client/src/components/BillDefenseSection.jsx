@@ -14,6 +14,7 @@ import { useAuth } from '@clerk/clerk-react'
 import { createClosedLoopAction } from '../lib/fetchActions.js'
 import { useToastContext } from '../context/ToastContext.jsx'
 import { markActivationStep } from '../lib/activationChecklist.js'
+import { toUserFacingErrorMessage } from '../lib/userFacingError.js'
 
 function toneClasses(tone) {
   if (tone === 'warning') {
@@ -116,7 +117,7 @@ function BillDefenseSection({
       )
     },
     onError: (err) => {
-      showToast(err.message || 'Couldn’t save that decision', 'error')
+      showToast(toUserFacingErrorMessage(err, 'Couldn’t save that decision'), 'error')
     },
   })
 
