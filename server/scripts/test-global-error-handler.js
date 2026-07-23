@@ -2,22 +2,21 @@
  * Verifies global error middleware catches Clerk getAuth() throws
  * when a route runs without clerkMiddleware having authenticated the request.
  *
- * Usage:
- *   node scripts/test-global-error-handler.js before
- *   node scripts/test-global-error-handler.js after
- *
  * Why a minimal route (not insightsRouter): insights now uses requireAuth(),
  * which redirects unauthenticated requests instead of throwing — that would
  * never reach the error handler. getAuth() still throws without middleware.
+ *
+ * Historically this ran as `node scripts/test-global-error-handler.js before|after`
+ * to compare pre/post-fix behavior; now that the fix is permanent, it always
+ * exercises the current ("after") behavior as a regression test under node:test.
  */
 
 import 'dotenv/config'
+import assert from 'node:assert/strict'
+import { test } from 'node:test'
 import express from 'express'
 import { clerkMiddleware, getAuth } from '@clerk/express'
 import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
-
-const mode = process.argv[2] || 'before'
-const withErrorHandler = mode === 'after'
 
 function buildApp() {
   const app = express()
@@ -36,43 +35,43 @@ function buildApp() {
     })
   )
 
-  if (withErrorHandler) {
-    app.use((err, req, res, next) => {
-      console.error('Unhandled error:', err.message)
-      if (res.headersSent) {
-        return next(err)
-      }
-      res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
-    })
-  }
+  app.use((err, req, res, next) => {
+    console.error('Unhandled error:', err.message)
+    if (res.headersSent) {
+      return next(err)
+    }
+    res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
+  })
 
   return app
 }
 
-const app = buildApp()
-const server = app.listen(0, async () => {
-  const port = server.address().port
-  const res = await fetch(`http://127.0.0.1:${port}/api/insights/usage`)
-  const raw = await res.text()
-  const isHtml = raw.trimStart().startsWith('<!DOCTYPE') || raw.includes('<html')
-  const isGenericJson =
-    res.headers.get('content-type')?.includes('application/json') &&
-    raw.includes(GENERIC_ERROR_MESSAGE) &&
-    !raw.includes('clerkMiddleware') &&
-    !raw.includes('getAuth')
+test('global error handler returns generic JSON, not a stack trace', async () => {
+  const app = buildApp()
 
-  console.log(`Mode: ${mode} (error handler ${withErrorHandler ? 'ON' : 'OFF'})`)
-  console.log('GET /api/insights/usage (route mounted before clerkMiddleware)')
-  console.log('HTTP status:', res.status)
-  console.log('Content-Type:', res.headers.get('content-type'))
-  console.log('Body preview:', raw.slice(0, 200).replace(/\n/g, ' '))
-  console.log('Is HTML error page:', isHtml)
-  console.log('Is generic JSON:', isGenericJson)
+  const server = await new Promise((resolve, reject) => {
+    const s = app.listen(0)
+    s.once('listening', () => resolve(s))
+    s.once('error', reject)
+  })
 
-  server.close()
+  try {
+    const port = server.address().port
+    const res = await fetch(`http://127.0.0.1:${port}/api/insights/usage`)
+    const raw = await res.text()
 
-  if (mode === 'before') {
-    process.exit(isHtml ? 0 : 1)
+    const isHtml = raw.trimStart().startsWith('<!DOCTYPE') || raw.includes('<html')
+    const isGenericJson =
+      res.headers.get('content-type')?.includes('application/json') &&
+      raw.includes(GENERIC_ERROR_MESSAGE) &&
+      !raw.includes('clerkMiddleware') &&
+      !raw.includes('getAuth')
+
+    assert.ok(
+      isGenericJson && !isHtml,
+      `Expected a generic JSON error body, got: ${raw.slice(0, 200)}`
+    )
+  } finally {
+    await new Promise((resolve) => server.close(resolve))
   }
-  process.exit(isGenericJson && !isHtml ? 0 : 1)
 })

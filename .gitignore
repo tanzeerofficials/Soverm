@@ -6,3 +6,5 @@ dist/
 .env
 client/.env
 server/.env
+client/.env.local
+server/.env.local

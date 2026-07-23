@@ -94,22 +94,25 @@ assert(suggested === 'goal-1', 'defaults to first goal when no name match')
 import { readFileSync } from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { test } from 'node:test'
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const applySource = readFileSync(
-  path.join(__dirname, '../services/savingsTransferDetection.js'),
-  'utf8'
-)
+test('savings transfer detection', () => {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url))
+  const applySource = readFileSync(
+    path.join(__dirname, '../services/savingsTransferDetection.js'),
+    'utf8'
+  )
 
-assert(applySource.includes('FOR UPDATE'), 'apply must lock detection row')
-assert(
-  applySource.includes("AND status = 'pending'"),
-  'apply must claim pending rows only'
-)
-assert(applySource.includes("error.statusCode = 409"), 'apply must guard possible duplicates')
-assert(applySource.includes('force'), 'apply must support force confirm for duplicates')
-assert(applySource.includes('BEGIN'), 'apply must run in a transaction')
+  assert(applySource.includes('FOR UPDATE'), 'apply must lock detection row')
+  assert(
+    applySource.includes("AND status = 'pending'"),
+    'apply must claim pending rows only'
+  )
+  assert(applySource.includes("error.statusCode = 409"), 'apply must guard possible duplicates')
+  assert(applySource.includes('force'), 'apply must support force confirm for duplicates')
+  assert(applySource.includes('BEGIN'), 'apply must run in a transaction')
 
-console.log('  pass: apply path uses transaction + pending claim + duplicate guard')
+  console.log('  pass: apply path uses transaction + pending claim + duplicate guard')
 
-console.log('All savingsTransferDetection tests passed.')
+  console.log('All savingsTransferDetection tests passed.')
+})

@@ -7,6 +7,7 @@
 
 import 'dotenv/config'
 import { enforceStatDeltas } from '../services/claude.js'
+import { test } from 'node:test'
 
 const sampleComparison = {
   hasComparisonData: true,
@@ -70,7 +71,7 @@ function runCase(name, insight, comparison, expectations) {
 
 let passed = 0
 
-try {
+test('delta enforcement', () => {
   console.log('Delta enforcement tests\n')
 
   runCase(
@@ -223,7 +224,4 @@ try {
   passed++
 
   console.log(`\n${passed}/${passed} tests passed`)
-} catch (err) {
-  console.error(`\nFAIL: ${err.message}`)
-  process.exit(1)
-}
+})

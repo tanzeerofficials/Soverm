@@ -2,6 +2,8 @@
  * Download the monthly snapshot CSV from the API.
  */
 
+import { authHeaders } from './apiRequest.js'
+
 export async function downloadMonthlySnapshotCsv(getToken, { month } = {}) {
   const token = await getToken()
   const params = new URLSearchParams({ format: 'csv' })
@@ -12,7 +14,7 @@ export async function downloadMonthlySnapshotCsv(getToken, { month } = {}) {
   const response = await fetch(
     `${import.meta.env.VITE_API_URL}/api/export/monthly-snapshot?${params}`,
     {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: authHeaders(token),
     }
   )
 

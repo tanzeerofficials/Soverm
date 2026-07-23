@@ -11,6 +11,7 @@ import {
   isTransactionalEmailConfigured,
   logIntegrationConfigStatus,
 } from '../utils/integrationConfig.js'
+import { test } from 'node:test'
 
 const saved = {
   RESEND_API_KEY: process.env.RESEND_API_KEY,
@@ -30,6 +31,7 @@ function restore() {
   }
 }
 
+test('integration config', () => {
 try {
   console.log('integrationConfig tests\n')
 
@@ -67,3 +69,4 @@ try {
 } finally {
   restore()
 }
+})

@@ -17,6 +17,8 @@
  * not the success page alone.
  */
 
+import { authHeaders } from './apiRequest.js'
+
 async function postBillingSession(getToken, path, body = {}) {
   const token = await getToken()
   if (!token) {
@@ -27,10 +29,7 @@ async function postBillingSession(getToken, path, body = {}) {
 
   const res = await fetch(`${import.meta.env.VITE_API_URL}${path}`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
+    headers: authHeaders(token, { 'Content-Type': 'application/json' }),
     body: JSON.stringify(body),
   })
 
@@ -81,10 +80,7 @@ export async function reactivateProSubscription(getToken) {
 
   const res = await fetch(`${import.meta.env.VITE_API_URL}/api/billing/reactivate`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
+    headers: authHeaders(token, { 'Content-Type': 'application/json' }),
     body: '{}',
   })
 

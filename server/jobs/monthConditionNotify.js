@@ -1,11 +1,12 @@
 /*
  * MONTH-END CONDITION NOTIFY JOB
  *
- * Runs daily; only delivers on the 1st of the month (app timezone) so
- * yesterday’s closed month letter gets an email + in-app alert.
+ * Only delivers on the 1st of the month (app timezone) so yesterday's closed
+ * month letter gets an email + in-app alert. Scheduling lives in queue/index.js
+ * (pg-boss, daily 14:05 UTC) — this file is just the per-run logic, invoked
+ * by queue/handlers.js.
  */
 
-import cron from 'node-cron'
 import db from '../db/index.js'
 import {
   deliverMonthConditionNotifyForUser,
@@ -70,16 +71,4 @@ export async function runMonthConditionNotifyJob({ force = false } = {}) {
   } finally {
     jobRunning = false
   }
-}
-
-export function startMonthConditionNotifyJob() {
-  // Daily 14:05 UTC — only acts on day 1 in APP_TIMEZONE.
-  cron.schedule('5 14 * * *', () => {
-    runMonthConditionNotifyJob().catch((err) => {
-      captureServerError(err, { label: 'month_condition_notify_job' })
-      console.error('[month-condition-notify] job crashed:', err.message)
-    })
-  })
-
-  console.log('Month-end condition notify job scheduled (daily 14:05 UTC; acts on day 1)')
 }

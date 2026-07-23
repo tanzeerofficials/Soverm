@@ -72,9 +72,8 @@ const { default: weeklyReviewRouter } = await import('./routes/weeklyReview.js')
 const { default: monthConditionRouter } = await import('./routes/monthCondition.js')
 const { default: beforeYouSpendRouter } = await import('./routes/beforeYouSpend.js')
 const { default: plaidWebhooksRouter } = await import('./routes/plaidWebhooks.js')
-const { startSyncJob } = await import('./jobs/syncAllUsers.js')
-const { startWeeklyDigestJob } = await import('./jobs/weeklyDigest.js')
-const { startMonthConditionNotifyJob } = await import('./jobs/monthConditionNotify.js')
+const { startQueue } = await import('./queue/index.js')
+const { stopQueue } = await import('./queue/boss.js')
 const { GENERIC_ERROR_MESSAGE } = await import('./utils/apiErrors.js')
 const {
   globalRateLimiter,
@@ -82,10 +81,16 @@ const {
   webhookRateLimiter,
 } = await import('./middleware/security.js')
 const { areDevEndpointsEnabled } = await import('./utils/runtimeFlags.js')
+const { demoMode, isDemoModeEnabled, DEMO_USER_ID } = await import('./middleware/demoMode.js')
 
 const app = express()
 const port = Number(process.env.PORT) || 5000
 const devEndpointsEnabled = areDevEndpointsEnabled()
+// WORKER_MODE=1 runs this process as a pure queue worker — no HTTP listener.
+// Lets you scale queue capacity independently from web capacity across two
+// Railway services later. Default (unset) keeps today's single-service
+// deploy: one process serves HTTP AND runs queue workers.
+const isWorkerMode = process.env.WORKER_MODE === '1'
 
 // Railway sits behind a reverse proxy — needed for rate limiting by client IP.
 app.set('trust proxy', 1)
@@ -164,6 +169,13 @@ app.use('/webhooks', express.raw({ type: 'application/json' }), webhooksRouter)
 
 // express.json() turns incoming JSON text into req.body objects we can use.
 app.use(express.json({ limit: '100kb' }))
+
+// Read-only demo sessions (DEMO_MODE=1 + x-soverm-demo header). Must run
+// BEFORE clerkMiddleware so demo requests skip Clerk entirely.
+app.use(demoMode())
+if (isDemoModeEnabled()) {
+  console.log(`[demo] DEMO_MODE enabled — read-only demo sessions as ${DEMO_USER_ID}`)
+}
 
 // clerkMiddleware checks "is this person logged in?"
 // It can read login info from cookies OR from Authorization: Bearer headers.
@@ -261,32 +273,40 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: GENERIC_ERROR_MESSAGE })
 })
 
-const server = app.listen(port, '0.0.0.0', async () => {
-  console.log(`CFO Agent API listening on port ${port}`)
-  console.info(
-    `[runtime] NODE_ENV=${process.env.NODE_ENV || '(unset)'} ` +
-      `RAILWAY_ENVIRONMENT=${process.env.RAILWAY_ENVIRONMENT || '(unset)'}`
-  )
-  if (devEndpointsEnabled) {
-    console.warn('[security] ENABLE_DEV_ENDPOINTS=1 — /test-db and /sentry-test are live')
-  }
-
+async function runStartupChecks() {
   const { logIntegrationConfigStatus } = await import('./utils/integrationConfig.js')
   logIntegrationConfigStatus()
 
   const { alertIfPlaintextPlaidTokensRemain } = await import('./utils/tokenCrypto.js')
   await alertIfPlaintextPlaidTokensRemain(db)
+}
 
-  startSyncJob()
-  console.log('Auto-sync job scheduled (every 4 hours)')
-  startWeeklyDigestJob()
-  startMonthConditionNotifyJob()
-})
+let server = null
 
-server.on('error', (error) => {
-  console.error('Server failed to start:', error)
-  process.exit(1)
-})
+if (isWorkerMode) {
+  console.log('[worker] WORKER_MODE=1 — starting queue workers only (no HTTP listener)')
+  await runStartupChecks()
+  await startQueue()
+} else {
+  server = app.listen(port, '0.0.0.0', async () => {
+    console.log(`CFO Agent API listening on port ${port}`)
+    console.info(
+      `[runtime] NODE_ENV=${process.env.NODE_ENV || '(unset)'} ` +
+        `RAILWAY_ENVIRONMENT=${process.env.RAILWAY_ENVIRONMENT || '(unset)'}`
+    )
+    if (devEndpointsEnabled) {
+      console.warn('[security] ENABLE_DEV_ENDPOINTS=1 — /test-db and /sentry-test are live')
+    }
+
+    await runStartupChecks()
+    await startQueue()
+  })
+
+  server.on('error', (error) => {
+    console.error('Server failed to start:', error)
+    process.exit(1)
+  })
+}
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled rejection:', reason)
@@ -294,11 +314,17 @@ process.on('unhandledRejection', (reason) => {
   captureServerError(err, { label: 'unhandled_rejection' })
 })
 
-process.on('SIGINT', () => {
-  server.close(() => {
-    console.log('Server closed')
+process.on('SIGINT', async () => {
+  console.log('Shutting down...')
+  await stopQueue()
+  if (server) {
+    server.close(() => {
+      console.log('Server closed')
+      process.exit(0)
+    })
+  } else {
     process.exit(0)
-  })
+  }
 })
 
 export { app, db, server }

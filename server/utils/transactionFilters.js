@@ -24,26 +24,3 @@ export {
   KIND_BADGES,
 } from './cashFlowClassification.js'
 
-import { PEER_PAYMENT_NAME_PATTERN } from './cashFlowClassification.js'
-
-/** @deprecated Prefer EXCLUDE_INTERNAL_MOVES_FILTER. */
-export const EXCLUDE_TRANSFER_FILTER = `
-  AND (
-    COALESCE(t.name, '') ~* '${PEER_PAYMENT_NAME_PATTERN}'
-    OR (
-      COALESCE(t.category, '') !~* 'transfer'
-      AND COALESCE(t.name, '') !~* '\\btransfer\\b'
-    )
-  )
-`
-
-/** @deprecated Prefer EXCLUDE_INTERNAL_MOVES_FILTER. */
-export const EXCLUDE_PAYMENT_FILTER = `
-  AND (
-    COALESCE(t.name, '') ~* '${PEER_PAYMENT_NAME_PATTERN}'
-    OR (
-      COALESCE(t.category, '') !~* 'payment'
-      AND COALESCE(t.name, '') !~* '\\b(credit card|card payment|autopay|auto pay)\\b'
-    )
-  )
-`

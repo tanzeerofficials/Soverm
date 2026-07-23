@@ -1,10 +1,11 @@
 /**
  * Route integration tests for /api/trackers (requires Postgres + migrations 013–014).
- *
- * Usage: node scripts/test-trackers-routes.js
+ * Lives in test:integration (not test:all) — CI has no DATABASE_URL. Run with:
+ *   npm run test:integration
  */
 
 import 'dotenv/config'
+import { test } from 'node:test'
 import express from 'express'
 import db from '../db/index.js'
 import { createTrackersRouter } from '../routes/trackers.js'
@@ -102,25 +103,27 @@ function assertSnapshotShape(body) {
   assert('configured' in body, 'snapshot includes configured flag')
 }
 
-async function main() {
+test('tracker routes integration', async (t) => {
   if (!process.env.DATABASE_URL) {
-    console.log('SKIP: DATABASE_URL not set — tracker route integration tests need Postgres')
-    process.exit(0)
+    t.skip('DATABASE_URL not set — tracker route integration tests need Postgres')
+    return
   }
 
   resetMonthlyTrackersSchemaCache()
 
   if (!(await hasMonthlyTrackersTable())) {
-    console.log('SKIP: monthly_trackers table missing — run npm run migrate:013')
-    process.exit(0)
+    t.skip('monthly_trackers table missing — run npm run migrate')
+    return
   }
 
   if (!(await hasMonthlyProgressColumns())) {
-    console.log('SKIP: monthly_progress_amount missing — run npm run migrate:014')
-    process.exit(0)
+    t.skip('monthly_progress_amount missing — run npm run migrate')
+    return
   }
 
   console.log('Tracker route integration tests\n')
+
+  try {
 
   await cleanupTestUser()
   await ensureTestUser()
@@ -254,19 +257,9 @@ async function main() {
   console.log('  pass: DELETE saving tracker')
   passed++
 
-  await cleanupTestUser()
-  await db.end()
-
   console.log(`\n${passed}/${passed} tracker route integration tests passed.`)
-}
-
-main().catch(async (err) => {
-  console.error(`\nFAILED: ${err.message}`)
-  try {
+  } finally {
     await cleanupTestUser()
     await db.end()
-  } catch {
-    // ignore cleanup errors
   }
-  process.exit(1)
 })

@@ -5,6 +5,7 @@
  */
 
 import { fetchUsage } from './fetchUsage.js'
+import { authHeaders } from './apiRequest.js'
 
 export async function fetchBillingStatus(getToken) {
   const token = await getToken()
@@ -13,7 +14,7 @@ export async function fetchBillingStatus(getToken) {
   }
 
   const res = await fetch(`${import.meta.env.VITE_API_URL}/api/billing/status`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: authHeaders(token),
   })
 
   if (!res.ok) {

@@ -16,6 +16,8 @@
     "test:recurring-annual": "node scripts/test-recurring-annual.js",
     "test:spending-visual-utils": "node scripts/test-spending-visual-utils.js",
     "test:spending-sparkline": "node scripts/test-spending-sparkline.js",
+    "test:cash-flow-monthly-chart": "node scripts/test-cash-flow-monthly-chart.js",
+    "test:category-trend-chart": "node scripts/test-category-trend-chart.js",
     "test:cash-flow-summary": "node scripts/test-cash-flow-summary.js",
     "test:dashboard-attention": "node scripts/test-dashboard-attention.js",
     "test:bill-calendar": "node scripts/test-bill-calendar.js",
@@ -24,7 +26,7 @@
     "test:quick-tools": "node scripts/test-quick-tools.js",
     "test:badge-tone-logic": "node scripts/test-badge-tone-logic.js",
     "test:expense-teaser": "node scripts/test-expense-teaser.js",
-    "test:all": "npm run test:insight-display && npm run test:category-display-names && npm run test:expense-analyzer-charts && npm run test:recurring-annual && npm run test:spending-visual-utils && npm run test:spending-sparkline && npm run test:cash-flow-summary && npm run test:dashboard-attention && npm run test:bill-calendar && npm run test:notification-navigation && npm run test:quick-tools && npm run test:badge-tone-logic && npm run test:expense-teaser && npm run test:csp"
+    "test:all": "npm run test:insight-display && npm run test:category-display-names && npm run test:expense-analyzer-charts && npm run test:recurring-annual && npm run test:spending-visual-utils && npm run test:spending-sparkline && npm run test:cash-flow-monthly-chart && npm run test:category-trend-chart && npm run test:cash-flow-summary && npm run test:dashboard-attention && npm run test:bill-calendar && npm run test:notification-navigation && npm run test:quick-tools && npm run test:badge-tone-logic && npm run test:expense-teaser && npm run test:csp"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.61.8",

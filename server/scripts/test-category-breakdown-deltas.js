@@ -11,6 +11,7 @@ import {
   getCategoryBreakdownWithDeltas,
   isSignificantCategoryDelta,
 } from '../utils/financialContext.js'
+import { test } from 'node:test'
 
 function assert(condition, message) {
   if (!condition) {
@@ -20,7 +21,7 @@ function assert(condition, message) {
 
 let passed = 0
 
-try {
+test('category breakdown deltas', () => {
   console.log('Category breakdown delta tests\n')
 
   const comparison = {
@@ -161,7 +162,4 @@ try {
   passed++
 
   console.log(`\n${passed}/${passed} tests passed`)
-} catch (err) {
-  console.error(`\nFAIL: ${err.message}`)
-  process.exit(1)
-}
+})

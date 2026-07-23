@@ -1,5 +1,9 @@
 import { formatAccountLabel } from './accountLabel.js'
-import { isWithinAppDaysAgo } from './calendarMonth.js'
+import {
+  formatIsoDateInAppTz,
+  getLastNCalendarMonthWindows,
+  isWithinAppDaysAgo,
+} from './calendarMonth.js'
 import { normalizeMerchantName } from './merchantNormalize.js'
 import { resolveSpendingCategoryLabel } from './plaidCategory.js'
 import {
@@ -152,6 +156,58 @@ export function buildCategoryDrillDownMaps(transactions) {
       })
 
     result.set(category, { topMerchants, recentTransactions })
+  }
+
+  return result
+}
+
+const CATEGORY_TREND_MONTHS = 3
+
+function isoDateOf(dateValue) {
+  if (typeof dateValue === 'string') {
+    return dateValue.slice(0, 10)
+  }
+  return formatIsoDateInAppTz(dateValue)
+}
+
+/**
+ * Per-category spending for each of the last 3 calendar months (oldest
+ * first), zero-filled. Reuses the 3-month lookback rows already loaded for
+ * recurring-charge detection — no new query. Powers the Expense Analyzer
+ * category trend chart.
+ */
+export function buildCategoryMonthlyTrend(transactions, monthCount = CATEGORY_TREND_MONTHS) {
+  const monthWindows = getLastNCalendarMonthWindows(monthCount)
+  const spendingRows = transactions.filter(isPostedSpendingRow)
+  const byCategory = new Map()
+
+  for (const row of spendingRows) {
+    const iso = isoDateOf(row.date)
+    const windowIndex = monthWindows.findIndex(
+      (window) => iso >= window.periodStart && iso < window.endExclusiveIso
+    )
+
+    if (windowIndex === -1) {
+      continue
+    }
+
+    const category = resolveSpendingCategoryLabel(row)
+    const totals = byCategory.get(category) ?? new Array(monthWindows.length).fill(0)
+    totals[windowIndex] += Number(row.amount)
+    byCategory.set(category, totals)
+  }
+
+  const result = new Map()
+
+  for (const [category, totals] of byCategory) {
+    result.set(
+      category,
+      monthWindows.map((window, index) => ({
+        monthKey: window.monthKey,
+        monthLabel: window.monthLabel,
+        total: Math.round(totals[index] * 100) / 100,
+      }))
+    )
   }
 
   return result

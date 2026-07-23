@@ -129,8 +129,60 @@ export function buildBufferPosture({ netBalance = 0, spent = 0, dayOfMonth = 1 }
 }
 
 /**
- * M6 — vs prior month.
+ * M6 — vs prior month (overall headline + biggest category movers).
+ *
+ * Why movers: total spending/income alone hides where the month changed
+ * (Healthcare vs Dining vs Peer transfer). Floor keeps $2 noise out.
  */
+export const MONTH_OVER_MONTH_MOVER_FLOOR = 25
+export const MONTH_OVER_MONTH_MOVER_LIMIT = 5
+
+export function buildCategoryMovers(
+  currentByCategory = {},
+  priorByCategory = {},
+  { floor = MONTH_OVER_MONTH_MOVER_FLOOR, limit = MONTH_OVER_MONTH_MOVER_LIMIT } = {}
+) {
+  const keys = new Set([
+    ...Object.keys(currentByCategory ?? {}),
+    ...Object.keys(priorByCategory ?? {}),
+  ])
+
+  const movers = []
+  for (const category of keys) {
+    const current = roundCurrency(currentByCategory[category] ?? 0)
+    const prior = roundCurrency(priorByCategory[category] ?? 0)
+    const delta = roundCurrency(current - prior)
+    if (Math.abs(delta) < floor) {
+      continue
+    }
+
+    const isNew = prior <= 0 && current > 0
+    const direction = delta > 0 ? 'up' : 'down'
+    let detail
+    if (isNew) {
+      detail = `${category} ${formatMoney(current)} this month (new vs last month)`
+    } else if (direction === 'up') {
+      detail = `${category} up ${formatMoney(Math.abs(delta))} vs last month`
+    } else {
+      detail = `${category} down ${formatMoney(Math.abs(delta))} vs last month`
+    }
+
+    movers.push({
+      category,
+      current,
+      prior,
+      delta,
+      direction,
+      isNew,
+      detail,
+    })
+  }
+
+  return movers
+    .sort((left, right) => Math.abs(right.delta) - Math.abs(left.delta))
+    .slice(0, limit)
+}
+
 export function buildMonthOverMonth({
   spent = 0,
   priorSpent = 0,
@@ -138,6 +190,8 @@ export function buildMonthOverMonth({
   priorIncome = 0,
   netBalance = 0,
   priorNetApprox = null,
+  currentByCategory = {},
+  priorByCategory = {},
 } = {}) {
   const spendDelta = roundCurrency(spent - priorSpent)
   const incomeDelta = roundCurrency(income - priorIncome)
@@ -170,12 +224,15 @@ export function buildMonthOverMonth({
     }
   }
 
+  const movers = buildCategoryMovers(currentByCategory, priorByCategory)
+
   return {
     spendDelta,
     incomeDelta,
     spendTrend,
     incomeTrend,
     summary: parts.join(' ') || 'Not enough prior-month data for a clean comparison yet.',
+    movers,
     priorSpent: roundCurrency(priorSpent),
     priorIncome: roundCurrency(priorIncome),
     netBalance: roundCurrency(netBalance),
@@ -325,6 +382,8 @@ export function buildMonthConditionLetter({
   recurringMonthly = 0,
   priorIncome = 0,
   priorSpent = 0,
+  currentByCategory = {},
+  priorByCategory = {},
   dayOfMonth = 1,
   whatsLeftAmount = null,
   byKind = null,
@@ -353,6 +412,8 @@ export function buildMonthConditionLetter({
     income,
     priorIncome,
     netBalance,
+    currentByCategory,
+    priorByCategory,
   })
   const condition = gradeMonthCondition({ cashFlow, billsLoad, buffer })
   const nextMonthPlan = buildNextMonthPlan({

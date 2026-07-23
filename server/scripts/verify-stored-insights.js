@@ -1,21 +1,19 @@
 /*
- * Validates persisted insight rows in Postgres (optional live DB check).
- *
- * Usage: node scripts/verify-stored-insights.js
+ * Diagnostic report on persisted insight rows in Postgres — prints delta/MoM
+ * health for the most recent insights, no pass/fail assertions of its own.
+ * Lives in test:integration (not test:all) — CI has no DATABASE_URL. Run with:
+ *   npm run test:integration
  */
 
 import 'dotenv/config'
-import path from 'path'
-import { fileURLToPath } from 'url'
+import { test } from 'node:test'
 import pg from 'pg'
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const { Pool } = pg
 
-async function main() {
+test('stored insights diagnostic report', async (t) => {
   if (!process.env.DATABASE_URL) {
-    console.log('SKIP: DATABASE_URL not set — using integration tests only')
+    t.skip('DATABASE_URL not set — using integration tests only')
     return
   }
 
@@ -30,7 +28,7 @@ async function main() {
     )
 
     if (rows.length === 0) {
-      console.log('DB: no insights stored yet — generate one in the app to complete live verification')
+      t.skip('no insights stored yet — generate one in the app to complete live verification')
       return
     }
 
@@ -91,9 +89,4 @@ async function main() {
   } finally {
     await pool.end()
   }
-}
-
-main().catch((err) => {
-  console.error('DB verify failed:', err.message)
-  process.exit(1)
 })

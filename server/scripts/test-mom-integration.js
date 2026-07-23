@@ -11,6 +11,7 @@ import {
   enforceStatDeltas,
   inferStatType,
 } from '../services/claude.js'
+import { test } from 'node:test'
 
 function assert(condition, message) {
   if (!condition) {
@@ -45,7 +46,7 @@ function simulateHistoryReload(persistedContentJson) {
 
 let passed = 0
 
-try {
+test('mom integration', () => {
   console.log('MoM integration verification (all five fixes)\n')
 
   const monthOverMonthComparison = {
@@ -201,7 +202,4 @@ try {
   passed++
 
   console.log(`\n${passed}/${passed} integration checks passed`)
-} catch (err) {
-  console.error(`\nFAIL: ${err.message}`)
-  process.exit(1)
-}
+})

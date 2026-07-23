@@ -10,6 +10,7 @@ import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import { buildExpenseAnalyzerChatContextFromPayload } from '../utils/expenseAnalyzerChatContext.js'
 import { buildInsightChatSystemPrompt, buildLiveFinancialChatPromptBlock } from '../services/claude.js'
+import { test } from 'node:test'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const chatRouteSource = readFileSync(join(__dirname, '../routes/chat.js'), 'utf8')
@@ -200,7 +201,7 @@ const AUDIT_QUESTIONS = [
 
 let passed = 0
 
-try {
+test('chat context audit', () => {
   console.log('Chat context audit tests\n')
 
   assert(
@@ -310,7 +311,4 @@ try {
   passed++
 
   console.log(`\n${passed}/${passed} chat context audit tests passed.`)
-} catch (err) {
-  console.error(`\nFAILED: ${err.message}`)
-  process.exit(1)
-}
+})

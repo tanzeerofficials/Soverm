@@ -5,6 +5,8 @@
  * Used by the dashboard and settings page.
  */
 
+import { authHeaders } from './apiRequest.js'
+
 export function getDisconnectConfirmMessage(accountName) {
   return `This will stop syncing "${accountName}" and remove it from your Expense Analyzer and category breakdowns. Your past insights and transaction history are kept for future tracking.`
 }
@@ -15,9 +17,7 @@ export async function disconnectAccount(getToken, accountId) {
     `${import.meta.env.VITE_API_URL}/api/plaid/accounts/${accountId}`,
     {
       method: 'DELETE',
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: authHeaders(token),
     }
   )
 

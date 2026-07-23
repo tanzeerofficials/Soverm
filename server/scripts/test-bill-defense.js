@@ -141,6 +141,33 @@ describe('billDefense', () => {
     assert.equal(hikeFinding.lastAmount, 16.99)
   })
 
+  test('same-merchant one-off outlier does not fake a price hike', () => {
+    /*
+     * Regression: amount endpoints came from the raw merchant group, so a $4.99
+     * gift-card charge dated before a flat $16.99 subscription reported
+     * "Netflix got more expensive, 4.99 → 16.99 (+240%)".
+     */
+    const rows = [
+      tx('NETFLIX.COM GIFT', 4.99, '2025-12-27'),
+      tx('NETFLIX.COM', 16.99, '2026-01-05'),
+      tx('NETFLIX.COM', 16.99, '2026-02-04'),
+      tx('NETFLIX.COM', 16.99, '2026-03-06'),
+    ]
+    const payload = buildExpenseAnalyzerPayload(buildComparisonFromTransactions(rows), rows)
+
+    assert.ok(
+      !payload.billDefense.some((f) => f.type === 'price_increase'),
+      'outlier one-off must not register as a price increase'
+    )
+
+    const netflix = [...payload.recurringCharges, ...payload.reviewCharges].find((c) =>
+      c.merchant.toLowerCase().includes('netflix')
+    )
+    assert.ok(netflix, 'flat subscription still detected')
+    assert.equal(netflix.firstAmount, 16.99)
+    assert.equal(netflix.lastAmount, 16.99)
+  })
+
   test('Plaid-mapped streams can trigger price increase from history endpoints', () => {
     const plaidMapped = mapPlaidStreamToRecurringCharge(
       {

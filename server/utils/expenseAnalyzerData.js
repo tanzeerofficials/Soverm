@@ -18,6 +18,7 @@ import { resolveSpendingCategoryLabel } from './plaidCategory.js'
 import {
   buildCategoryAccountBreakdowns,
   buildCategoryDrillDownMaps,
+  buildCategoryMonthlyTrend,
 } from './categoryBreakdownEnhancements.js'
 import {
   computeRecurringVsOneTimeSplit,
@@ -53,6 +54,13 @@ const RECURRING_LOOKBACK_INTERVAL = '3 months'
 
 const RECURRING_AMOUNT_TOLERANCE = 0.05
 const KEYWORD_AMOUNT_TOLERANCE = 0.05
+/*
+ * Bill-defense amount endpoints: merchant-group rows deviating more than this
+ * from the accepted chain's average are treated as unrelated one-offs (gift
+ * cards, add-ons), not evidence of a price change. 60% keeps a real
+ * 15.49 → 22.99 hike (+48%) but drops a $4.99 side purchase on a $16.99 sub (-71%).
+ */
+const AMOUNT_ENDPOINT_OUTLIER_TOLERANCE = 0.6
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 const CROSS_ACCOUNT_DEDUPE_DAYS = 3
 const STRICT_MONTHLY_MIN_DAYS = 26
@@ -473,13 +481,24 @@ function buildRecurringChargeFromMatch({ chain, rule, merchantGroup = chain }) {
    * Amount endpoints come from the full merchant group (chronological), not only
    * the accepted identical-cent cluster. Otherwise a price hike (15.49 → 22.99)
    * never surfaces for bill defense because the hike exceeds the 5% chain tolerance.
+   *
+   * Rows far from the subscription's own average are excluded first: a $4.99
+   * gift-card or add-on at the same merchant dated before the first real charge
+   * would otherwise fake a "+240% price increase" alert.
    */
-  const groupSorted = [...merchantGroup].sort(
-    (left, right) => parseDateOnly(left.date) - parseDateOnly(right.date)
-  )
-  const firstAmount = Math.round(Number(groupSorted[0].amount) * 100) / 100
+  const groupSorted = [...merchantGroup]
+    .filter((row) => {
+      const amount = Number(row.amount)
+      return (
+        averageAmount > 0 &&
+        Math.abs(amount - averageAmount) / averageAmount <= AMOUNT_ENDPOINT_OUTLIER_TOLERANCE
+      )
+    })
+    .sort((left, right) => parseDateOnly(left.date) - parseDateOnly(right.date))
+  const endpointRows = groupSorted.length > 0 ? groupSorted : chain
+  const firstAmount = Math.round(Number(endpointRows[0].amount) * 100) / 100
   const lastAmount =
-    Math.round(Number(groupSorted[groupSorted.length - 1].amount) * 100) / 100
+    Math.round(Number(endpointRows[endpointRows.length - 1].amount) * 100) / 100
 
   return {
     merchant: resolveMerchantLabel(chain) || 'Unknown merchant',
@@ -908,6 +927,7 @@ export function buildExpenseAnalyzerPayload(comparison, recurringLookbackRows, o
   const recurringOneTimeSplit = computeRecurringVsOneTimeSplit(recurringLookbackRows, confirmed)
   const accountBreakdowns = buildCategoryAccountBreakdowns(recurringLookbackRows)
   const drillDowns = buildCategoryDrillDownMaps(recurringLookbackRows)
+  const monthlyTrends = buildCategoryMonthlyTrend(recurringLookbackRows)
   const currentSpendingTotal = comparison.currentPeriod.spending.total
   const priorSpendingTotal = comparison.priorPeriod.spending.total
   const overallDelta = comparison.hasComparisonData
@@ -937,6 +957,7 @@ export function buildExpenseAnalyzerPayload(comparison, recurringLookbackRows, o
         topMerchants: drillDown.topMerchants,
         recentTransactions: drillDown.recentTransactions,
         recurringCharges: recurringByCategory[category] ?? [],
+        monthlyTrend: monthlyTrends.get(category) ?? [],
       }
     }
   )

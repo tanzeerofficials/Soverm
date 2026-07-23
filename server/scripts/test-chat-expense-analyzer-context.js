@@ -17,6 +17,7 @@ import {
   buildInsightChatSystemPrompt,
   buildLiveFinancialChatPromptBlock,
 } from '../services/claude.js'
+import { test } from 'node:test'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const chatRouteSource = readFileSync(join(__dirname, '../routes/chat.js'), 'utf8')
@@ -29,7 +30,7 @@ function assert(condition, message) {
 
 let passed = 0
 
-try {
+test('chat expense analyzer context', () => {
   console.log('Chat expense analyzer context tests\n')
 
   assert(
@@ -162,7 +163,4 @@ try {
   passed++
 
   console.log(`\n${passed}/${passed} chat expense analyzer context tests passed.`)
-} catch (err) {
-  console.error(`\nFAILED: ${err.message}`)
-  process.exit(1)
-}
+})

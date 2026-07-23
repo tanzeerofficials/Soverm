@@ -13,6 +13,7 @@ import {
   buildPersistedInsightContent,
   resolveInsightGeneratedAt,
 } from '../services/claude.js'
+import { test } from 'node:test'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const chatRouteSource = readFileSync(join(__dirname, '../routes/chat.js'), 'utf8')
@@ -25,7 +26,7 @@ function assert(condition, message) {
 
 let passed = 0
 
-try {
+test('chat frozen context', () => {
   console.log('Chat frozen-context tests\n')
 
   assert(
@@ -140,7 +141,4 @@ try {
 
   passed = 3
   console.log(`\n${passed}/${passed} tests passed`)
-} catch (err) {
-  console.error(`\nFAIL: ${err.message}`)
-  process.exit(1)
-}
+})

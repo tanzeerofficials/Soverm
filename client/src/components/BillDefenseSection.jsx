@@ -15,6 +15,7 @@ import { createClosedLoopAction } from '../lib/fetchActions.js'
 import { useToastContext } from '../context/ToastContext.jsx'
 import { markActivationStep } from '../lib/activationChecklist.js'
 import { toUserFacingErrorMessage } from '../lib/userFacingError.js'
+import { isDemoSession } from '../lib/demoSession.js'
 
 function toneClasses(tone) {
   if (tone === 'warning') {
@@ -78,6 +79,7 @@ function BillDefenseSection({
   const queryClient = useQueryClient()
   const { showToast } = useToastContext()
   const [loggedByKey, setLoggedByKey] = useState({})
+  const demo = isDemoSession()
 
   const decisionMutation = useMutation({
     mutationFn: async ({ decision, finding }) =>
@@ -193,31 +195,34 @@ function BillDefenseSection({
                     <>
                       <button
                         type="button"
-                        disabled={decisionMutation.isPending}
+                        disabled={decisionMutation.isPending || demo}
+                        title={demo ? 'Sign up to save decisions on your own data' : undefined}
                         onClick={() =>
                           decisionMutation.mutate({ decision: 'keep', finding })
                         }
-                        className="rounded-md border border-border-default px-2.5 py-1.5 text-[11px] font-semibold text-fg-muted hover:text-fg disabled:opacity-60"
+                        className="rounded-md border border-border-default px-2.5 py-1.5 text-[11px] font-semibold text-fg-muted hover:text-fg disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         Keep
                       </button>
                       <button
                         type="button"
-                        disabled={decisionMutation.isPending}
+                        disabled={decisionMutation.isPending || demo}
+                        title={demo ? 'Sign up to save decisions on your own data' : undefined}
                         onClick={() =>
                           decisionMutation.mutate({ decision: 'cancel', finding })
                         }
-                        className="rounded-md bg-danger/15 px-2.5 py-1.5 text-[11px] font-semibold text-danger disabled:opacity-60"
+                        className="rounded-md bg-danger/15 px-2.5 py-1.5 text-[11px] font-semibold text-danger disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         Plan to cancel
                       </button>
                       <button
                         type="button"
-                        disabled={decisionMutation.isPending}
+                        disabled={decisionMutation.isPending || demo}
+                        title={demo ? 'Sign up to save decisions on your own data' : undefined}
                         onClick={() =>
                           decisionMutation.mutate({ decision: 'watch', finding })
                         }
-                        className="rounded-md bg-warning/15 px-2.5 py-1.5 text-[11px] font-semibold text-warning disabled:opacity-60"
+                        className="rounded-md bg-warning/15 px-2.5 py-1.5 text-[11px] font-semibold text-warning disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         Watch
                       </button>

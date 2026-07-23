@@ -16,6 +16,7 @@ import {
   LARGE_TRANSACTION_MIN_ABSOLUTE,
   SPENDING_SPIKE_PERCENT,
 } from '../utils/proactiveNotificationRules.js'
+import { test } from 'node:test'
 
 function assert(condition, message) {
   if (!condition) {
@@ -25,7 +26,7 @@ function assert(condition, message) {
 
 let passed = 0
 
-try {
+test('proactive notifications', () => {
   console.log('Proactive notification tests\n')
 
   const large = detectLargeTransactionTriggers({
@@ -194,7 +195,4 @@ try {
   passed++
 
   console.log(`\n${passed}/${passed} proactive notification tests passed.`)
-} catch (err) {
-  console.error(`\nFAILED: ${err.message}`)
-  process.exit(1)
-}
+})

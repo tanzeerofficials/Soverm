@@ -6,6 +6,7 @@
  */
 
 import { formatCurrency } from '../lib/formatCurrency.js'
+import { formatCategoryDisplayName } from '../lib/categoryDisplayNames.js'
 import { useAuth } from '@clerk/clerk-react'
 import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -329,7 +330,7 @@ function MonthConditionPage() {
               </p>
             </section>
 
-            {/* M6 MoM */}
+            {/* M6 MoM — overall headline + biggest category movers */}
             <section className="rounded-xl border border-border-default bg-surface px-5 py-5 text-left card-shadow">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-fg-subtle">
                 Vs last month
@@ -337,6 +338,30 @@ function MonthConditionPage() {
               <p className="mt-3 text-sm leading-relaxed text-fg-muted">
                 {data.vsLastMonth?.summary}
               </p>
+              {(data.vsLastMonth?.movers?.length ?? 0) > 0 && (
+                <ul className="mt-4 space-y-2">
+                  {data.vsLastMonth.movers.map((mover) => {
+                    const label = formatCategoryDisplayName(mover.category)
+                    const changeLine = mover.isNew
+                      ? `${formatCurrency(mover.current, { maximumFractionDigits: 0 })} this month (new)`
+                      : mover.direction === 'up'
+                        ? `up ${formatCurrency(Math.abs(mover.delta), { maximumFractionDigits: 0 })}`
+                        : `down ${formatCurrency(Math.abs(mover.delta), { maximumFractionDigits: 0 })}`
+
+                    return (
+                      <li
+                        key={mover.category}
+                        className="flex items-baseline justify-between gap-3 text-sm"
+                      >
+                        <span className="text-fg">{label}</span>
+                        <span className="shrink-0 font-mono tabular-nums text-fg-muted">
+                          {changeLine}
+                        </span>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
             </section>
 
             {/* M8 plan — calm surface + brand accents (actionable, not alarm/AI purple) */}

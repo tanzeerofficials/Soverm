@@ -13,6 +13,7 @@ import {
   COMPARISON_PERIOD_INTERVAL,
 } from '../utils/financialContext.js'
 import { ROLLING_COMPARISON_DAYS } from '../utils/calendarMonth.js'
+import { test } from 'node:test'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const source = readFileSync(path.join(__dirname, '../utils/financialContext.js'), 'utf8')
@@ -25,7 +26,7 @@ function assert(condition, message) {
 
 let passed = 0
 
-try {
+test('financial context window', () => {
   console.log('Financial context window tests\n')
 
   assert(
@@ -90,7 +91,4 @@ try {
   passed++
 
   console.log(`\n${passed}/${passed} tests passed`)
-} catch (err) {
-  console.error(`\nFAIL: ${err.message}`)
-  process.exit(1)
-}
+})

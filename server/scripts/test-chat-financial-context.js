@@ -15,6 +15,7 @@ import {
   CHAT_HISTORY_MESSAGE_LIMIT,
   CHAT_MAX_OUTPUT_TOKENS,
 } from '../services/claude.js'
+import { test } from 'node:test'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const chatRouteSource = readFileSync(join(__dirname, '../routes/chat.js'), 'utf8')
@@ -27,7 +28,7 @@ function assert(condition, message) {
 
 let passed = 0
 
-try {
+test('chat financial context', () => {
   console.log('Chat financial context tests\n')
 
   assert(
@@ -160,7 +161,4 @@ try {
   passed++
 
   console.log(`\n${passed}/${passed} chat financial context tests passed.`)
-} catch (err) {
-  console.error(`\nFAILED: ${err.message}`)
-  process.exit(1)
-}
+})

@@ -1,15 +1,13 @@
 /*
  * Simulates history.js parseInsightContent on real DB rows.
- *
- * Usage: node scripts/verify-history-reload.js
+ * Lives in test:integration (not test:all) — CI has no DATABASE_URL. Run with:
+ *   npm run test:integration
  */
 
 import 'dotenv/config'
-import path from 'path'
-import { fileURLToPath } from 'url'
+import assert from 'node:assert/strict'
+import { test } from 'node:test'
 import pg from 'pg'
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const { Pool } = pg
 
@@ -29,7 +27,12 @@ function parseInsightContent(row) {
   return { ...parsedContent, id: row.id, created_at: row.created_at }
 }
 
-async function main() {
+test('history reload preserves stored insight deltas', async (t) => {
+  if (!process.env.DATABASE_URL) {
+    t.skip('DATABASE_URL not set — history reload verification needs Postgres')
+    return
+  }
+
   const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 
   try {
@@ -60,11 +63,8 @@ async function main() {
     console.log(`  with stored deltas: ${withDelta}`)
     console.log(`  deltas lost on reload: ${lostOnReload}`)
 
-    if (lostOnReload === 0) {
-      console.log('  pass: history parse preserves all stored delta badges')
-    } else {
-      process.exit(1)
-    }
+    assert.equal(lostOnReload, 0, 'history parse must preserve all stored delta badges')
+    console.log('  pass: history parse preserves all stored delta badges')
 
     const noDeltaInsight = rows.find((row) => {
       const parsed = JSON.parse(row.content)
@@ -80,9 +80,4 @@ async function main() {
   } finally {
     await pool.end()
   }
-}
-
-main().catch((err) => {
-  console.error('FAIL:', err.message)
-  process.exit(1)
 })

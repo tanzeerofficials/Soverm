@@ -17,7 +17,25 @@ import {
 import { EXCLUDE_INTERNAL_MOVES_FILTER } from '../utils/transactionFilters.js'
 import { invalidateChatFinancialSnapshot } from '../utils/chatFinancialSnapshotCache.js'
 
-function mapProfile(row, referenceDate = new Date()) {
+/*
+ * pg returns DATE columns as JS Date objects (local midnight). Stringifying
+ * one yields "Sun Aug 02 2026 …", so slice(0, 10) produced "Sun Aug 02" and
+ * every downstream day calculation returned null. Use the Date's own civil
+ * Y/M/D — NOT formatIsoDateInAppTz, which would shift the date on UTC hosts.
+ */
+function toIsoDateOnly(value) {
+  if (!value) {
+    return null
+  }
+  if (value instanceof Date) {
+    const month = String(value.getMonth() + 1).padStart(2, '0')
+    const day = String(value.getDate()).padStart(2, '0')
+    return `${value.getFullYear()}-${month}-${day}`
+  }
+  return String(value).slice(0, 10)
+}
+
+export function mapProfile(row, referenceDate = new Date()) {
   if (!row) {
     return {
       configured: false,
@@ -30,9 +48,7 @@ function mapProfile(row, referenceDate = new Date()) {
   }
 
   const todayIso = formatIsoDateInAppTz(referenceDate)
-  let nextPaydayOn = row.next_payday_on
-    ? String(row.next_payday_on).slice(0, 10)
-    : null
+  let nextPaydayOn = toIsoDateOnly(row.next_payday_on)
   const payCadence = row.pay_cadence ?? null
 
   if (nextPaydayOn && payCadence) {

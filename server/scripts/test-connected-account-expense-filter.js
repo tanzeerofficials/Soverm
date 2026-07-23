@@ -8,6 +8,7 @@
 import 'dotenv/config'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { test } from 'node:test'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -44,7 +45,7 @@ function tx(name, amount, daysAgo, category, account) {
 
 let passed = 0
 
-try {
+test('connected account expense filter', async () => {
   console.log('Connected-account Expense Analyzer filter tests\n')
 
   const connectedAccount = {
@@ -147,9 +148,4 @@ try {
   }
 
   console.log(`\n${passed}/${passed} tests passed`)
-} catch (err) {
-  console.error(`\nFAIL: ${err.message}`)
-  process.exit(1)
-}
-
-process.exit(0)
+})

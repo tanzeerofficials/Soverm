@@ -1,7 +1,9 @@
+import { authHeaders } from './apiRequest.js'
+
 export async function fetchCashFlowForecast(getToken) {
   const token = await getToken()
   const res = await fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/forecast`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: authHeaders(token),
   })
 
   if (!res.ok) {

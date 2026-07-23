@@ -22,7 +22,7 @@ import { createClosedLoopAction, updateActionLifecycle } from '../lib/fetchActio
 import { fetchWeeklyReview } from '../lib/fetchWeeklyReview.js'
 import { buildCancelKeepWatchPrompt, buildWeeklyReviewSuggestedPrompts } from '../lib/chatSuggestedPrompts.js'
 import { markActivationStep } from '../lib/activationChecklist.js'
-import { trackWeeklyReviewView } from '../lib/analytics.js'
+import { trackFunnelWeeklyReviewViewed, trackWeeklyReviewView } from '../lib/analytics.js'
 import { formatActionStatus, formatPayCadence, PAY_CADENCE_OPTIONS } from '../lib/payCadenceLabels.js'
 import {
   paydayQueryKey,
@@ -76,6 +76,7 @@ function WeeklyReviewPage() {
     }
     markActivationStep(userId, 'weeklyReview')
     trackWeeklyReviewView()
+    trackFunnelWeeklyReviewViewed()
   }, [userId, isLoading, isError])
 
   const [payCadence, setPayCadence] = useState('biweekly')

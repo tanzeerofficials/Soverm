@@ -6,6 +6,7 @@
 
 import 'dotenv/config'
 import { resolvePlaidTransactionCategory, resolveSpendingCategoryLabel } from '../utils/plaidCategory.js'
+import { test } from 'node:test'
 
 function assert(condition, message) {
   if (!condition) {
@@ -15,7 +16,7 @@ function assert(condition, message) {
 
 let passed = 0
 
-try {
+test('plaid category', () => {
   console.log('Plaid category resolution tests\n')
 
   assert(
@@ -172,7 +173,4 @@ try {
   passed++
 
   console.log(`\n${passed}/${passed} tests passed`)
-} catch (err) {
-  console.error(`\nFAIL: ${err.message}`)
-  process.exit(1)
-}
+})

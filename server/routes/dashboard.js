@@ -24,7 +24,12 @@ import {
 import { GENERIC_ERROR_MESSAGE } from '../utils/apiErrors.js'
 import { reportServerError } from '../utils/sentry.js'
 import { buildCashFlowForecastForUser } from '../services/cashFlowForecast.js'
-import { calendarMonthSqlBounds, getAppTodayIso } from '../utils/calendarMonth.js'
+import {
+  calendarMonthSqlBounds,
+  formatIsoDateInAppTz,
+  getAppTodayIso,
+  getLastNCalendarMonthWindows,
+} from '../utils/calendarMonth.js'
 
 const router = Router()
 
@@ -70,6 +75,37 @@ function resolveRange(rangeParam) {
   return DEFAULT_RANGE
 }
 
+const CASH_FLOW_MONTHLY_COUNT = 3
+
+function isoDateOf(dateValue) {
+  if (typeof dateValue === 'string') {
+    return dateValue.slice(0, 10)
+  }
+  return formatIsoDateInAppTz(dateValue)
+}
+
+/**
+ * Buckets already-loaded posted transactions into calendar-month windows and
+ * reuses summarizeCashFlow per bucket — same classifier as the headline
+ * Money in / Money out figures, so the chart never disagrees with them.
+ */
+function buildCashFlowMonthly(rows, monthWindows) {
+  return monthWindows.map((window) => {
+    const monthRows = rows.filter((row) => {
+      const iso = isoDateOf(row.date)
+      return iso >= window.periodStart && iso < window.endExclusiveIso
+    })
+    const summary = summarizeCashFlow(monthRows, { activityLimit: 0 })
+
+    return {
+      monthKey: window.monthKey,
+      monthLabel: window.monthLabel,
+      moneyIn: summary.moneyIn,
+      moneyOut: summary.moneyOut,
+    }
+  })
+}
+
 /*
  * GET /api/dashboard/summary
  *
@@ -101,12 +137,20 @@ router.get('/summary', async (req, res) => {
       ? [userId, monthBounds.startIso, monthBounds.endExclusiveIso]
       : [userId, interval]
 
+    // Independent of ?range= — always the last 3 calendar months, so the
+    // chart stays stable while the user flips the range pills above it.
+    const cashFlowMonthlyWindows = getLastNCalendarMonthWindows(CASH_FLOW_MONTHLY_COUNT)
+    const cashFlowMonthlyStartIso = cashFlowMonthlyWindows[0].periodStart
+    const cashFlowMonthlyEndExclusiveIso =
+      cashFlowMonthlyWindows[cashFlowMonthlyWindows.length - 1].endExclusiveIso
+
     const [
       accountsResult,
       spendingSeriesResult,
       ledgerResult,
       insightResult,
       lastSyncedResult,
+      cashFlowMonthlyRowsResult,
     ] = await Promise.all([
       db.query(
         `SELECT id, bank_name, account_name, account_type,
@@ -156,6 +200,16 @@ router.get('/summary', async (req, res) => {
          WHERE last_synced_at IS NOT NULL`,
         [userId]
       ),
+      db.query(
+        `SELECT ${EXPENSE_ANALYZER_TRANSACTION_SELECT}
+         FROM transactions t
+         ${CONNECTED_ACCOUNT_TRANSACTION_JOINS}
+         WHERE t.user_id = $1
+           ${NON_PENDING_FILTER}
+           AND t.date >= $2::date AND t.date < $3::date
+         ORDER BY t.date ASC`,
+        [userId, cashFlowMonthlyStartIso, cashFlowMonthlyEndExclusiveIso]
+      ),
     ])
 
     const accounts = accountsResult.rows.map((account) => {
@@ -201,11 +255,16 @@ router.get('/summary', async (req, res) => {
     }
 
     const lastSyncedAt = lastSyncedResult.rows[0].last_synced ?? null
+    const cashFlowMonthly = buildCashFlowMonthly(
+      cashFlowMonthlyRowsResult.rows,
+      cashFlowMonthlyWindows
+    )
 
     res.json({
       totalBalance,
       income: cashFlow.moneyIn,
       spent: cashFlow.moneyOut,
+      cashFlowMonthly,
       cashFlow: {
         moneyIn: cashFlow.moneyIn,
         moneyOut: cashFlow.moneyOut,

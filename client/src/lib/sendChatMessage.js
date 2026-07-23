@@ -1,6 +1,7 @@
 import { chatQueryKey, chatLimitsQueryKey, GENERAL_CHAT_KEY } from './queryKeys.js'
 import { captureClientError } from './sentry.js'
 import { classifyChatNetworkError } from './chatWaitStatus.js'
+import { authHeaders } from './apiRequest.js'
 
 async function getAuthToken(getToken) {
   const token = await getToken()
@@ -25,7 +26,7 @@ function chatApiPath(threadId) {
 export async function fetchChatMessages(getToken, threadId) {
   const token = await getAuthToken(getToken)
   const response = await fetch(chatApiPath(threadId), {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: authHeaders(token),
   })
 
   if (!response.ok) {
@@ -98,11 +99,10 @@ export async function sendChatMessageStreaming(
   try {
     response = await fetch(`${chatApiPath(threadId)}?stream=1`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
+      headers: authHeaders(token, {
         'Content-Type': 'application/json',
         Accept: 'text/event-stream',
-      },
+      }),
       body: JSON.stringify({ message }),
       signal,
     })

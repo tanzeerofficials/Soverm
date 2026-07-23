@@ -19,6 +19,7 @@ import remarkGfm from 'remark-gfm'
 import ChatWithCfoButton from './ChatWithCfoButton.jsx'
 import SovermPlanCards from './SovermPlanCards.jsx'
 import { chatQueryKey, chatLimitsQueryKey, GENERAL_CHAT_KEY } from '../lib/queryKeys.js'
+import { trackFunnelChatMessageSent } from '../lib/analytics.js'
 import { fetchChatMessages, sendChatMessageAndRefresh } from '../lib/sendChatMessage.js'
 import { splitAssistantContent, copyTextToClipboard, formatAssistantShareText } from '../lib/parseSovermPlan.js'
 import {
@@ -558,6 +559,9 @@ function ChatPanel({
       if (abortRef.current === controller) {
         pendingRetryRef.current = null
       }
+      trackFunnelChatMessageSent(
+        resolvedThreadId === GENERAL_CHAT_KEY ? 'general' : 'insight'
+      )
     } catch (err) {
       console.error('Failed to send chat message:', err.message)
 

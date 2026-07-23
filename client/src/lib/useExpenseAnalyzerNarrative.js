@@ -1,6 +1,7 @@
 import { useAuth } from '@clerk/clerk-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { expenseAnalyzerNarrativeQueryKey } from '../lib/queryKeys.js'
+import { authHeaders } from './apiRequest.js'
 
 function formatGeneratedAt(value) {
   if (!value) {
@@ -18,7 +19,7 @@ function formatGeneratedAt(value) {
 async function fetchNarrativeCache(getToken) {
   const token = await getToken()
   const res = await fetch(`${import.meta.env.VITE_API_URL}/api/expense-analyzer/narrative`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: authHeaders(token),
   })
 
   if (!res.ok) {
@@ -32,7 +33,7 @@ async function generatePersonalNarrative(getToken) {
   const token = await getToken()
   const res = await fetch(`${import.meta.env.VITE_API_URL}/api/expense-analyzer/narrative`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
+    headers: authHeaders(token),
   })
 
   const data = await res.json().catch(() => ({}))

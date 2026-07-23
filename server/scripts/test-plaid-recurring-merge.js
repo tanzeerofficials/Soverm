@@ -7,6 +7,7 @@
 import 'dotenv/config'
 import { mergeRecurringCharges, mapPlaidStreamToRecurringCharge } from '../services/plaidRecurring.js'
 import { detectRecurringChargesFromTransactions } from '../utils/expenseAnalyzerData.js'
+import { test } from 'node:test'
 
 function assert(condition, message) {
   if (!condition) {
@@ -29,7 +30,7 @@ function tx(name, amount, daysAgo, category = 'Subscriptions') {
 
 let passed = 0
 
-try {
+test('plaid recurring merge', () => {
   console.log('Plaid recurring merge tests\n')
 
   const transactions = [
@@ -339,7 +340,4 @@ try {
   passed++
 
   console.log(`\n${passed}/${passed} plaid recurring merge tests passed.`)
-} catch (err) {
-  console.error(`\nFAILED: ${err.message}`)
-  process.exit(1)
-}
+})

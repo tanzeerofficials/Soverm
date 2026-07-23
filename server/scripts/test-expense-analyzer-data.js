@@ -13,6 +13,7 @@ import {
   buildTemplateNarrative,
   detectRecurringChargesFromTransactions,
 } from '../utils/expenseAnalyzerData.js'
+import { test } from 'node:test'
 
 function assert(condition, message) {
   if (!condition) {
@@ -41,7 +42,7 @@ function daysAgo(days) {
 
 let passed = 0
 
-try {
+test('expense analyzer data', () => {
   console.log('Expense analyzer data tests\n')
 
   const transactions = [
@@ -134,7 +135,4 @@ try {
   passed++
 
   console.log(`\n${passed}/${passed} tests passed`)
-} catch (err) {
-  console.error(`\nFAIL: ${err.message}`)
-  process.exit(1)
-}
+})

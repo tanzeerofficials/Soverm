@@ -15,6 +15,7 @@ import Footer from './components/Footer.jsx'
 import AnalyticsPageView from './components/AnalyticsPageView.jsx'
 import PageTransitionLayout from './components/PageTransitionLayout.jsx'
 import { AskSovermProvider } from './context/AskSovermContext.jsx'
+import { isDemoSession } from './lib/demoSession.js'
 import SettingsPage from './pages/SettingsPage.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
 import HistoryPage from './pages/HistoryPage.jsx'
@@ -27,6 +28,16 @@ import PrivacyPage from './pages/PrivacyPage.jsx'
 import TermsPage from './pages/TermsPage.jsx'
 
 function PrivateRoutes() {
+  // Read-only demo sessions browse the app without a Clerk account.
+  // The server enforces the actual policy (middleware/demoMode.js).
+  if (isDemoSession()) {
+    return (
+      <AskSovermProvider>
+        <Outlet />
+      </AskSovermProvider>
+    )
+  }
+
   return (
     <>
       <SignedIn>

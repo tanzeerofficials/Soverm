@@ -5,6 +5,9 @@
  * The application name shown in Clerk modals (“Sign in to …”) comes from the
  * Clerk Dashboard → Configure → Application → Application name. Set that to
  * “Soverm” so it matches the site (not “Sovrm” / “Sovrn”).
+ *
+ * Social OAuth buttons use full “Continue with …” labels via clerkLocalization.js
+ * so Google / Apple never look like icon-only or name-only chips.
  */
 
 import { dark } from '@clerk/themes'
@@ -26,7 +29,9 @@ export const clerkAppearance = {
     headerTitle: 'text-[#EEF0F4]',
     headerSubtitle: 'text-[#9CA3AF]',
     socialButtonsBlockButton:
-      'border border-[#1e2d45] bg-[#1a2236] text-[#EEF0F4] hover:bg-[#243049]',
+      'border border-[#1e2d45] bg-[#1a2236] text-[#EEF0F4] hover:bg-[#243049] justify-center gap-3 px-4 py-3 text-sm font-medium',
+    socialButtonsBlockButtonText: 'text-[#EEF0F4] font-medium',
+    socialButtonsProviderIcon: 'h-5 w-5',
     formButtonPrimary: 'bg-[#10b981] hover:bg-[#34d399] text-[#0A0F1C]',
     footerActionLink: 'text-[#10b981] hover:text-[#34d399]',
   },

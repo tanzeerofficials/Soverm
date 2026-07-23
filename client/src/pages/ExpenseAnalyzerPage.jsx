@@ -55,6 +55,7 @@ import {
 } from '../lib/chatSuggestedPrompts.js'
 import BillDefenseSection from '../components/BillDefenseSection.jsx'
 import { toUserFacingErrorMessage } from '../lib/userFacingError.js'
+import CategoryTrendChart from '../components/CategoryTrendChart.jsx'
 
 function formatChargeDate(dateString) {
   if (!dateString) {
@@ -648,6 +649,8 @@ function ExpenseAnalyzerPage() {
                               id={categoryDetailsId}
                               className="mt-2 space-y-4 rounded-xl border border-border-default/70 bg-app/40 px-4 py-4"
                             >
+                              <CategoryTrendChart months={entry.monthlyTrend ?? []} />
+
                               {recentTransactions.length > 0 && (
                                 <div>
                                   <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-fg-subtle">

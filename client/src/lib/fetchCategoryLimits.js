@@ -1,7 +1,9 @@
+import { authHeaders } from './apiRequest.js'
+
 export async function fetchCategoryLimits(getToken) {
   const token = await getToken()
   const res = await fetch(`${import.meta.env.VITE_API_URL}/api/category-limits`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: authHeaders(token),
   })
 
   if (!res.ok) {
@@ -16,10 +18,7 @@ export async function upsertCategoryLimit(getToken, payload) {
   const token = await getToken()
   const res = await fetch(`${import.meta.env.VITE_API_URL}/api/category-limits`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
+    headers: authHeaders(token, { 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload),
   })
 
@@ -35,7 +34,7 @@ export async function deleteCategoryLimit(getToken, limitId) {
   const token = await getToken()
   const res = await fetch(`${import.meta.env.VITE_API_URL}/api/category-limits/${limitId}`, {
     method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
+    headers: authHeaders(token),
   })
 
   if (!res.ok) {

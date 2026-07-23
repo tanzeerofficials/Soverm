@@ -11,6 +11,7 @@ import {
   normalizeMerchantName,
   stripBankDescriptor,
 } from '../utils/merchantNormalize.js'
+import { test } from 'node:test'
 
 function assert(condition, message) {
   if (!condition) {
@@ -20,7 +21,7 @@ function assert(condition, message) {
 
 let passed = 0
 
-try {
+test('merchant normalize', () => {
   console.log('Merchant normalization tests\n')
 
   assert(normalizeMerchantName('SPOTIFY USA') === 'spotify', 'Spotify variant')
@@ -96,7 +97,4 @@ try {
   passed++
 
   console.log(`\n${passed}/${passed} tests passed`)
-} catch (err) {
-  console.error(`\nFAIL: ${err.message}`)
-  process.exit(1)
-}
+})

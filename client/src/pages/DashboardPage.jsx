@@ -93,6 +93,7 @@ import {
 } from '../lib/dashboardUiPrefs.js'
 import { useAskSoverm } from '../context/AskSovermContext.jsx'
 import { buildActivationChecklist } from '../lib/activationChecklist.js'
+import { authHeaders } from '../lib/apiRequest.js'
 
 const AUTO_SYNC_STALE_MINUTES = 5
 const AUTO_SYNC_RETRY_MS = AUTO_SYNC_STALE_MINUTES * 60 * 1000
@@ -176,7 +177,7 @@ function DashboardPage() {
       const res = await fetch(
         `${import.meta.env.VITE_API_URL}/api/dashboard/summary?range=${selectedRange}`,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: authHeaders(token),
         }
       )
       if (!res.ok) {
@@ -702,6 +703,7 @@ function DashboardPage() {
                 spent={dashboardData?.spent ?? 0}
                 cashFlow={dashboardData?.cashFlow ?? null}
                 spendingSeries={dashboardData?.spendingSeries ?? []}
+                cashFlowMonthly={dashboardData?.cashFlowMonthly ?? []}
                 periodStart={dashboardData?.periodStart ?? null}
                 todayIso={dashboardData?.todayIso ?? null}
                 trackerSnapshot={trackerData}

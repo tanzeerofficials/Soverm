@@ -1,65 +1,20 @@
 /*
- * SCHEDULED SYNC JOB
+ * SYNCABLE USERS
  *
- * Periodically syncs Plaid transactions for every user
- * who has connected a bank account.
+ * Which users the sync-fanout job should enqueue a sync-user job for.
+ * Scheduling + per-user dispatch now live in queue/index.js + queue/handlers.js
+ * (pg-boss) — this file is just the "who" query, kept separate so it stays
+ * unit-testable without pulling in the queue.
  */
 
-import cron from 'node-cron'
 import db from '../db/index.js'
-import { syncAllAccountsForUser } from '../services/plaid.js'
-import { evaluateAndCreateProactiveNotifications } from '../services/proactiveNotifications.js'
-import { scanAndStoreSavingsTransferDetections } from '../services/savingsTransferDetection.js'
+import { DEMO_USER_ID } from '../middleware/demoMode.js'
 
-let syncRunning = false
-
-export function startSyncJob() {
-  // Every 4 hours. Skip if a previous run is still in progress.
-  cron.schedule('0 */4 * * *', async () => {
-    if (syncRunning) {
-      console.warn('Scheduled sync skipped — previous run still in progress')
-      return
-    }
-
-    syncRunning = true
-    console.log('Starting scheduled sync for all users...')
-
-    try {
-      const usersResult = await db.query('SELECT DISTINCT user_id FROM accounts')
-      const userIds = usersResult.rows.map((row) => row.user_id)
-
-      for (const userId of userIds) {
-        try {
-          const { added, modified, removed, partial } = await syncAllAccountsForUser(userId)
-          console.log(
-            `Synced for user ${userId}: ${added} added, ${modified} modified, ${removed} removed${
-              partial ? ' (partial)' : ''
-            }`
-          )
-
-          const notificationResult = await evaluateAndCreateProactiveNotifications(userId)
-          if (notificationResult.created > 0) {
-            console.log(
-              `Created ${notificationResult.created} proactive notification(s) for user ${userId}`
-            )
-          }
-
-          const savingsResult = await scanAndStoreSavingsTransferDetections(userId)
-          if (savingsResult.created > 0) {
-            console.log(
-              `Detected ${savingsResult.created} savings transfer(s) for user ${userId}`
-            )
-          }
-        } catch (userErr) {
-          console.error(`Scheduled sync failed for user ${userId}:`, userErr.message)
-        }
-      }
-
-      console.log('Scheduled sync complete')
-    } catch (err) {
-      console.error('Scheduled sync failed:', err.message)
-    } finally {
-      syncRunning = false
-    }
-  })
+export async function getSyncableUserIds() {
+  // Demo user's Plaid item is fake (seed-demo-user.js) — never sync it.
+  const result = await db.query(
+    'SELECT DISTINCT user_id FROM accounts WHERE user_id <> $1',
+    [DEMO_USER_ID]
+  )
+  return result.rows.map((row) => row.user_id)
 }

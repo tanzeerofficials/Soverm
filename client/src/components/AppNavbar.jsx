@@ -1,8 +1,9 @@
 import { useEffect, useId, useState } from 'react'
-import { SignOutButton, useUser } from '@clerk/clerk-react'
-import { Link, useLocation } from 'react-router-dom'
+import { SignOutButton, SignUpButton, useUser } from '@clerk/clerk-react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import NotificationBell from './NotificationBell.jsx'
 import BrandMark from './BrandMark.jsx'
+import { exitDemoSession, isDemoSession } from '../lib/demoSession.js'
 
 const PRIMARY_NAV = [
   {
@@ -192,14 +193,48 @@ function NavPill({ to, label, shortLabel, icon, active, onNavigate }) {
   )
 }
 
+function DemoModeBanner({ onExit }) {
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-3">
+      <div className="flex items-center gap-3 rounded-full border border-brand/40 bg-surface/95 px-4 py-2 text-sm shadow-xl backdrop-blur-md">
+        <span className="text-fg-muted">
+          <span className="font-semibold text-brand-soft">Demo mode</span> — fictional data
+        </span>
+        <SignUpButton mode="modal">
+          <button
+            type="button"
+            className="rounded-full bg-brand px-3.5 py-1.5 text-xs font-semibold text-brand-fg transition hover:bg-brand-soft"
+          >
+            Start free
+          </button>
+        </SignUpButton>
+        <button
+          type="button"
+          onClick={onExit}
+          className="text-xs font-medium text-fg-subtle transition hover:text-fg"
+        >
+          Exit demo
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function AppNavbar({ leftContent, backTo, backLabel, children }) {
   const menuId = useId()
   const location = useLocation()
+  const navigate = useNavigate()
   const { user } = useUser()
   const [menuOpen, setMenuOpen] = useState(false)
+  const demo = isDemoSession()
 
-  const firstName = user?.firstName ?? 'there'
+  const firstName = demo ? 'Demo' : (user?.firstName ?? 'there')
   const mobileBackNav = Boolean(backTo && backLabel)
+
+  function handleExitDemo() {
+    exitDemoSession()
+    navigate('/', { replace: true })
+  }
 
   useEffect(() => {
     setMenuOpen(false)
@@ -231,6 +266,7 @@ function AppNavbar({ leftContent, backTo, backLabel, children }) {
   }
 
   return (
+    <>
     <header className="fixed inset-x-0 top-0 z-50 border-b border-border-default/70 bg-app/88 shadow-lg backdrop-blur-xl">
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-brand/35 to-transparent" />
 
@@ -319,14 +355,24 @@ function AppNavbar({ leftContent, backTo, backLabel, children }) {
             </span>
           </Link>
 
-          <SignOutButton>
+          {demo ? (
             <button
               type="button"
+              onClick={handleExitDemo}
               className="rounded-full border border-border-default bg-surface/80 px-4 py-2 text-sm font-medium text-fg-muted transition hover:border-border-default hover:bg-surface-elevated hover:text-fg"
             >
-              Sign out
+              Exit demo
             </button>
-          </SignOutButton>
+          ) : (
+            <SignOutButton>
+              <button
+                type="button"
+                className="rounded-full border border-border-default bg-surface/80 px-4 py-2 text-sm font-medium text-fg-muted transition hover:border-border-default hover:bg-surface-elevated hover:text-fg"
+              >
+                Sign out
+              </button>
+            </SignOutButton>
+          )}
         </div>
 
         {/* Mobile actions */}
@@ -369,7 +415,9 @@ function AppNavbar({ leftContent, backTo, backLabel, children }) {
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-fg">{firstName}</p>
-                  <p className="truncate text-xs text-fg-muted">Signed in to Soverm</p>
+                  <p className="truncate text-xs text-fg-muted">
+                    {demo ? 'Demo mode — fictional data' : 'Signed in to Soverm'}
+                  </p>
                 </div>
               </div>
             </div>
@@ -440,19 +488,33 @@ function AppNavbar({ leftContent, backTo, backLabel, children }) {
             </div>
 
             <div className="border-t border-border-default p-2">
-              <SignOutButton>
+              {demo ? (
                 <button
                   type="button"
+                  onClick={handleExitDemo}
                   className="flex w-full items-center rounded-xl px-3 py-3 text-left text-sm font-medium text-danger transition hover:bg-danger/10"
                 >
-                  Sign out
+                  Exit demo
                 </button>
-              </SignOutButton>
+              ) : (
+                <SignOutButton>
+                  <button
+                    type="button"
+                    className="flex w-full items-center rounded-xl px-3 py-3 text-left text-sm font-medium text-danger transition hover:bg-danger/10"
+                  >
+                    Sign out
+                  </button>
+                </SignOutButton>
+              )}
             </div>
           </nav>
         </>
       )}
     </header>
+
+    {/* Sibling of the fixed header — backdrop-blur ancestors hijack position:fixed. */}
+    {demo && <DemoModeBanner onExit={handleExitDemo} />}
+    </>
   )
 }
 

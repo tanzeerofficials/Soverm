@@ -23,6 +23,8 @@ import { getCachedAccountCount, markFirstConnectCelebration } from '../lib/first
 import { ensurePlaidLinkScript } from '../lib/ensurePlaidLinkScript.js'
 import { useToastContext } from './ToastContext.jsx'
 import { captureClientError } from '../lib/sentry.js'
+import { trackFunnelBankLinked } from '../lib/analytics.js'
+import { authHeaders } from '../lib/apiRequest.js'
 
 const PlaidLinkContext = createContext(null)
 
@@ -103,10 +105,7 @@ function PlaidLinkSignedInProvider({ children }) {
         const token = await getTokenRef.current()
         const response = await fetch(`${import.meta.env.VITE_API_URL}/api/plaid/exchange-public-token`, {
           method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
+          headers: authHeaders(token, { 'Content-Type': 'application/json' }),
           body: JSON.stringify({ public_token }),
         })
         const data = await response.json()
@@ -122,6 +121,8 @@ function PlaidLinkSignedInProvider({ children }) {
             `Connected ${count} account${count === 1 ? '' : 's'}${syncDetail}`,
             'success'
           )
+
+          trackFunnelBankLinked({ accountsConnected: count })
 
           if (priorAccountCount === 0 && count > 0) {
             markFirstConnectCelebration({
@@ -162,9 +163,7 @@ function PlaidLinkSignedInProvider({ children }) {
         const token = await getTokenRef.current()
         const response = await fetch(`${import.meta.env.VITE_API_URL}/api/plaid/create-link-token`, {
           method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: authHeaders(token),
         })
 
         const data = await response.json().catch(() => ({}))

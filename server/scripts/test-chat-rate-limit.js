@@ -11,6 +11,7 @@ import {
   CHAT_HOURLY_LIMIT,
   FREE_DAILY_CHAT_LIMIT,
 } from '../shared/usageLimits.js'
+import { test } from 'node:test'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const rateLimitSource = readFileSync(join(__dirname, '../utils/rateLimit.js'), 'utf8')
@@ -21,7 +22,7 @@ function assert(condition, message) {
   }
 }
 
-try {
+test('chat rate limit', () => {
   console.log('Chat rate limit tests\n')
 
   assert(FREE_DAILY_CHAT_LIMIT === 5, 'Free tier chat cap should be 5 messages/day')
@@ -41,7 +42,4 @@ try {
 
   console.log('  pass: shared limits and tier-aware rateLimit wiring')
   console.log('\nAll chat rate limit checks passed')
-} catch (err) {
-  console.error(`\nFAIL: ${err.message}`)
-  process.exit(1)
-}
+})

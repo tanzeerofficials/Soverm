@@ -1,3 +1,5 @@
+import { authHeaders } from './apiRequest.js'
+
 async function getAuthToken(getToken) {
   const token = await getToken()
   if (!token) {
@@ -12,7 +14,7 @@ export async function fetchNotifications(getToken, { unreadOnly = false } = {}) 
   const response = await fetch(
     `${import.meta.env.VITE_API_URL}/api/notifications${params}`,
     {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: authHeaders(token),
     }
   )
 
@@ -29,7 +31,7 @@ export async function markNotificationRead(getToken, notificationId) {
     `${import.meta.env.VITE_API_URL}/api/notifications/${notificationId}/read`,
     {
       method: 'PATCH',
-      headers: { Authorization: `Bearer ${token}` },
+      headers: authHeaders(token),
     }
   )
 
@@ -46,7 +48,7 @@ export async function markAllNotificationsRead(getToken) {
     `${import.meta.env.VITE_API_URL}/api/notifications/read-all`,
     {
       method: 'PATCH',
-      headers: { Authorization: `Bearer ${token}` },
+      headers: authHeaders(token),
     }
   )
 
@@ -63,10 +65,7 @@ export async function updateNotificationPreferences(getToken, { proactiveEnabled
     `${import.meta.env.VITE_API_URL}/api/notifications/preferences`,
     {
       method: 'PATCH',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
+      headers: authHeaders(token, { 'Content-Type': 'application/json' }),
       body: JSON.stringify({ proactiveEnabled }),
     }
   )

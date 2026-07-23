@@ -1,11 +1,12 @@
 /*
  * WEEKLY DIGEST JOB
  *
- * Runs once a week. For each opted-in user, builds an email-ready digest
- * and delivers it (or dry-runs to the server log until Resend is configured).
+ * For each opted-in user, builds an email-ready digest and delivers it (or
+ * dry-runs to the server log until Resend is configured). Scheduling lives
+ * in queue/index.js (pg-boss, Sundays 14:00 UTC) — this file is just the
+ * per-run logic, invoked by queue/handlers.js.
  */
 
-import cron from 'node-cron'
 import db from '../db/index.js'
 import { deliverWeeklyDigestForUser } from '../services/weeklyDigest.js'
 import { captureServerError } from '../utils/sentry.js'
@@ -62,16 +63,4 @@ export async function runWeeklyDigestJob() {
   } finally {
     jobRunning = false
   }
-}
-
-export function startWeeklyDigestJob() {
-  // Sundays at 14:00 UTC — a calm mid-afternoon slot in US timezones.
-  cron.schedule('0 14 * * 0', () => {
-    runWeeklyDigestJob().catch((err) => {
-      captureServerError(err, { label: 'weekly_digest_job' })
-      console.error('[weekly-digest] job crashed:', err.message)
-    })
-  })
-
-  console.log('Weekly digest job scheduled (Sundays 14:00 UTC)')
 }

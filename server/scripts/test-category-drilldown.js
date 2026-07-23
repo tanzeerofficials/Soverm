@@ -10,6 +10,7 @@ import {
   buildCategoryDrillDownMaps,
 } from '../utils/categoryBreakdownEnhancements.js'
 import { buildComparisonFromTransactions, buildExpenseAnalyzerPayload } from '../utils/expenseAnalyzerData.js'
+import { test } from 'node:test'
 
 function assert(condition, message) {
   if (!condition) {
@@ -35,7 +36,7 @@ function tx(name, amount, daysAgo, category, account) {
 
 let passed = 0
 
-try {
+test('category drilldown', () => {
   console.log('Category drill-down tests\n')
 
   const chase = { id: 'acc-1', name: 'Checking', bankName: 'Chase' }
@@ -78,7 +79,4 @@ try {
   passed++
 
   console.log(`\n${passed}/${passed} category drill-down tests passed.`)
-} catch (err) {
-  console.error(`\nFAILED: ${err.message}`)
-  process.exit(1)
-}
+})

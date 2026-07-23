@@ -252,3 +252,26 @@ CREATE TABLE plaid_webhook_events (
 
 CREATE INDEX plaid_webhook_events_status_created_idx
   ON plaid_webhook_events (status, created_at DESC);
+
+-- Stripe webhook event idempotency (see db/migrations/029_stripe_webhook_events.sql)
+CREATE TABLE stripe_webhook_events (
+  id TEXT PRIMARY KEY,
+  event_type TEXT,
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'processed', 'failed')),
+  error_message TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  processed_at TIMESTAMPTZ
+);
+
+CREATE INDEX stripe_webhook_events_created_idx
+  ON stripe_webhook_events (created_at DESC);
+
+-- Distributed rate limiting (see db/migrations/031_rate_limit_hits.sql)
+CREATE TABLE rate_limit_hits (
+  key TEXT PRIMARY KEY,
+  hits INTEGER NOT NULL DEFAULT 1,
+  reset_time TIMESTAMPTZ NOT NULL
+);
+
+CREATE INDEX rate_limit_hits_reset_time_idx ON rate_limit_hits (reset_time);

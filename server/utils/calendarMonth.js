@@ -149,6 +149,42 @@ export function formatMonthKey(periodStartIso) {
 }
 
 /**
+ * The last `count` calendar month windows (oldest first), ending with the
+ * current calendar month. Single source of truth for "last N months" charts
+ * (Dashboard cash flow, Expense Analyzer category trend) so they can never
+ * drift into disagreeing about which days belong to which month.
+ *
+ * monthLabel is year-qualified ("Jul '26") so a window spanning a year
+ * boundary (Nov/Dec/Jan) is never ambiguous.
+ */
+export function getLastNCalendarMonthWindows(
+  count,
+  referenceDate = new Date(),
+  timeZone = getAppTimezone()
+) {
+  const current = getCalendarMonthWindow(referenceDate, timeZone)
+  const keys = [formatMonthKey(current.periodStart)]
+  let cursorPeriodStart = current.periodStart
+
+  for (let i = 1; i < count; i++) {
+    const priorKey = getPriorMonthKey(cursorPeriodStart)
+    keys.unshift(priorKey)
+    cursorPeriodStart = `${priorKey}-01`
+  }
+
+  return keys.map((monthKey) => {
+    const window = getCalendarMonthWindowForMonthKey(monthKey, timeZone)
+    const [year] = monthKey.split('-')
+    return {
+      monthKey,
+      periodStart: window.periodStart,
+      endExclusiveIso: window.endExclusiveIso,
+      monthLabel: `${window.monthLabel} '${year.slice(2)}`,
+    }
+  })
+}
+
+/**
  * Convenience: { startIso, endExclusiveIso } for parameterized SQL filters.
  */
 export function calendarMonthSqlBounds(referenceDate = new Date(), timeZone = getAppTimezone()) {

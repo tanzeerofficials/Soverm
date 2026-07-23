@@ -24,6 +24,7 @@ import {
   startProCheckout,
 } from '../lib/startProCheckout.js'
 import { downloadMonthlySnapshotCsv } from '../lib/downloadMonthlySnapshot.js'
+import { authHeaders } from '../lib/apiRequest.js'
 
 function HistoryMetaChip({ children }) {
   return (
@@ -118,7 +119,7 @@ function HistoryPage() {
     queryFn: async () => {
       const token = await getToken()
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/history`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders(token),
       })
       if (!res.ok) {
         throw new Error(`History fetch failed: ${res.status}`)

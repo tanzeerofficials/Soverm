@@ -5,10 +5,12 @@
  * so the dashboard can show the countdown badge and gate the paywall.
  */
 
+import { authHeaders } from './apiRequest.js'
+
 export async function fetchUsage(getToken) {
   const token = await getToken()
   const res = await fetch(`${import.meta.env.VITE_API_URL}/api/insights/usage`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: authHeaders(token),
   })
 
   if (!res.ok) {

@@ -49,22 +49,50 @@ function stripBankDescriptorTokens(name) {
   return tokenizeMerchantName(name).filter((token) => !isStrippedNoiseToken(token))
 }
 
+/*
+ * Merchants whose raw bank descriptors are too inconsistent for the generic
+ * tokenizer to group reliably (see normalizeMerchantName below), so they get
+ * an explicit match rule instead. To add one: append an entry here — no
+ * other code in this file needs to change. `match` runs against the
+ * lowercased raw name; entries are checked in order, first match wins.
+ */
+const MERCHANT_ALIASES = [
+  {
+    match: (lower) => lower.includes('replit'),
+    canonicalKey: 'replit inc replit com',
+    displayLabel: 'Replit',
+  },
+  {
+    // Anthropic bills two products under overlapping descriptors: the
+    // Claude.ai subscription and pay-as-you-go API usage. Only the
+    // subscription (flagged by "subscription" or a standalone "sub") should
+    // group under this key — API usage falls through to the next rule below.
+    match: (lower) =>
+      lower.includes('claude') && (lower.includes('subscription') || /\bsub\b/.test(lower)),
+    canonicalKey: 'claude ai subscription anthropic',
+    displayLabel: 'Claude.ai Subscription',
+  },
+  {
+    // Anthropic API usage: "anthropic" without "claude" or "subscription" —
+    // deliberately excludes the Claude.ai subscription rule above so the
+    // two Anthropic products never merge into one recurring charge.
+    match: (lower) =>
+      lower.includes('anthropic') && !lower.includes('claude') && !lower.includes('subscription'),
+    canonicalKey: 'anthropic anthropic comca',
+    displayLabel: 'Anthropic',
+  },
+]
+
+function findMerchantAlias(lower) {
+  return MERCHANT_ALIASES.find((alias) => alias.match(lower))
+}
+
 function canonicalizeGroupingKey(tokens, rawName) {
   const lower = rawName.toLowerCase()
 
-  if (lower.includes('replit')) {
-    return 'replit inc replit com'
-  }
-
-  if (
-    lower.includes('claude') &&
-    (lower.includes('subscription') || /\bsub\b/.test(lower))
-  ) {
-    return 'claude ai subscription anthropic'
-  }
-
-  if (lower.includes('anthropic') && !lower.includes('claude') && !lower.includes('subscription')) {
-    return 'anthropic anthropic comca'
+  const alias = findMerchantAlias(lower)
+  if (alias) {
+    return alias.canonicalKey
   }
 
   const brand = resolveSubscriptionMerchantKeyword(rawName)
@@ -75,11 +103,11 @@ function canonicalizeGroupingKey(tokens, rawName) {
   return tokens.join(' ') || 'unknown'
 }
 
-const GROUPING_DISPLAY_LABELS = {
-  'replit inc replit com': 'Replit',
-  'claude ai subscription anthropic': 'Claude.ai Subscription',
-  'anthropic anthropic comca': 'Anthropic',
-}
+// Derived from MERCHANT_ALIASES so the canonical key can never drift out of
+// sync between the matcher above and the label shown here.
+const GROUPING_DISPLAY_LABELS = Object.fromEntries(
+  MERCHANT_ALIASES.map((alias) => [alias.canonicalKey, alias.displayLabel])
+)
 
 /**
  * Strips bank-descriptor noise and returns a stable grouping key for recurring detection.

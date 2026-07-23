@@ -1,7 +1,9 @@
+import { authHeaders } from './apiRequest.js'
+
 export async function fetchExpenseAnalyzer(getToken) {
   const token = await getToken()
   const res = await fetch(`${import.meta.env.VITE_API_URL}/api/expense-analyzer`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: authHeaders(token),
   })
 
   if (!res.ok) {
@@ -14,7 +16,7 @@ export async function fetchExpenseAnalyzer(getToken) {
 export async function fetchExpenseAnalyzerSummary(getToken) {
   const token = await getToken()
   const res = await fetch(`${import.meta.env.VITE_API_URL}/api/expense-analyzer/summary`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: authHeaders(token),
   })
 
   if (!res.ok) {

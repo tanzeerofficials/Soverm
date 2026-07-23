@@ -6,6 +6,7 @@
 
 import 'dotenv/config'
 import { enforceStatDeltas, inferStatType } from '../services/claude.js'
+import { test } from 'node:test'
 
 const sampleComparison = {
   hasComparisonData: true,
@@ -33,7 +34,7 @@ function assertEqual(actual, expected, message) {
 
 let passed = 0
 
-try {
+test('stat type', () => {
   console.log('Stat type tests\n')
 
   assertEqual(inferStatType({ label: 'Monthly Income', value: '$4,200' }), 'income', 'income label')
@@ -75,7 +76,4 @@ try {
   console.log('  pass: enforce overwrites wrong statType on spending stat')
 
   console.log(`\n${passed}/${passed} tests passed`)
-} catch (err) {
-  console.error(`\nFAIL: ${err.message}`)
-  process.exit(1)
-}
+})

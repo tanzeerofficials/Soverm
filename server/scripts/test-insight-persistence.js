@@ -6,6 +6,7 @@
 
 import 'dotenv/config'
 import { buildPersistedInsightContent } from '../services/claude.js'
+import { test } from 'node:test'
 
 const sampleComparison = {
   hasComparisonData: true,
@@ -50,7 +51,7 @@ function assert(condition, message) {
 
 let passed = 0
 
-try {
+test('insight persistence', () => {
   console.log('Insight persistence tests\n')
 
   const persisted = buildPersistedInsightContent(sampleInsight, sampleComparison, {
@@ -98,7 +99,4 @@ try {
 
   passed = 5
   console.log(`\n${passed}/${passed} tests passed`)
-} catch (err) {
-  console.error(`\nFAIL: ${err.message}`)
-  process.exit(1)
-}
+})

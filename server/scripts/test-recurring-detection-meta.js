@@ -13,6 +13,7 @@ import {
 } from '../utils/expenseAnalyzerData.js'
 import { mergeRecurringCharges } from '../services/plaidRecurring.js'
 import { partitionRecurringCharges } from '../utils/recurringDetectionMeta.js'
+import { test } from 'node:test'
 
 function assert(condition, message) {
   if (!condition) {
@@ -35,7 +36,7 @@ function tx(name, amount, daysAgo, category = 'Subscriptions') {
 
 let passed = 0
 
-try {
+test('recurring detection meta', () => {
   console.log('Recurring detection meta tests\n')
 
   const confirmedTx = [
@@ -122,7 +123,4 @@ try {
   passed++
 
   console.log(`\n${passed}/${passed} recurring detection meta tests passed.`)
-} catch (err) {
-  console.error(`\nFAILED: ${err.message}`)
-  process.exit(1)
-}
+})

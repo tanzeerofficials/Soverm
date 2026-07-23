@@ -4,13 +4,13 @@
  * Permanently deletes the signed-in user's Soverm data and Clerk account.
  */
 
+import { authHeaders } from './apiRequest.js'
+
 export async function deleteAccount(getToken) {
   const token = await getToken()
   const response = await fetch(`${import.meta.env.VITE_API_URL}/api/user`, {
     method: 'DELETE',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: authHeaders(token),
   })
 
   if (!response.ok) {

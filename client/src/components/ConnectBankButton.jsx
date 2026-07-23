@@ -10,6 +10,7 @@
 
 import { usePlaidLinkContext } from '../context/PlaidLinkContext.jsx'
 import { trackConnectBankClick } from '../lib/analytics.js'
+import { isDemoSession } from '../lib/demoSession.js'
 
 function ConnectBankButton({
   className = '',
@@ -30,6 +31,26 @@ function ConnectBankButton({
     linkTokenError,
     retryLinkToken,
   } = usePlaidLinkContext()
+
+  // Demo sessions can't link banks (server 403s anyway) — say so plainly
+  // instead of showing a dead disabled button.
+  if (isDemoSession()) {
+    return (
+      <div className={`flex w-full max-w-full flex-col items-center ${className}`}>
+        <button
+          type="button"
+          disabled
+          title="Bank connections are disabled in the demo"
+          className="min-h-11 w-full cursor-not-allowed rounded-lg border border-border-default bg-surface/80 px-4 py-3 text-sm font-semibold text-fg-subtle"
+        >
+          Connect Your Bank
+        </button>
+        <p className="mt-2 max-w-[280px] text-center text-[11px] leading-snug text-fg-muted sm:text-xs">
+          Disabled in demo — sign up to connect your own bank.
+        </p>
+      </div>
+    )
+  }
 
   const defaultLabel = isExchanging
     ? 'Connecting & syncing…'

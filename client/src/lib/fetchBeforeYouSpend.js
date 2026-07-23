@@ -1,11 +1,10 @@
+import { authHeaders } from './apiRequest.js'
+
 export async function checkBeforeYouSpend(getToken, { amount, category }) {
   const token = await getToken()
   const res = await fetch(`${import.meta.env.VITE_API_URL}/api/before-you-spend`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
+    headers: authHeaders(token, { 'Content-Type': 'application/json' }),
     body: JSON.stringify({
       amount,
       category: category || undefined,

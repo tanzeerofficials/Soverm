@@ -1,7 +1,9 @@
+import { authHeaders } from './apiRequest.js'
+
 export async function fetchTrackers(getToken) {
   const token = await getToken()
   const res = await fetch(`${import.meta.env.VITE_API_URL}/api/trackers`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: authHeaders(token),
   })
 
   if (!res.ok) {
@@ -16,10 +18,7 @@ export async function createTracker(getToken, payload) {
   const token = await getToken()
   const res = await fetch(`${import.meta.env.VITE_API_URL}/api/trackers`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
+    headers: authHeaders(token, { 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload),
   })
 
@@ -35,10 +34,7 @@ export async function updateTracker(getToken, trackerId, payload) {
   const token = await getToken()
   const res = await fetch(`${import.meta.env.VITE_API_URL}/api/trackers/${trackerId}`, {
     method: 'PATCH',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
+    headers: authHeaders(token, { 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload),
   })
 
@@ -54,7 +50,7 @@ export async function deleteTracker(getToken, trackerId) {
   const token = await getToken()
   const res = await fetch(`${import.meta.env.VITE_API_URL}/api/trackers/${trackerId}`, {
     method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
+    headers: authHeaders(token),
   })
 
   if (!res.ok) {
@@ -71,10 +67,7 @@ export async function applySavingsDetection(getToken, detectionId, trackerId, { 
     `${import.meta.env.VITE_API_URL}/api/trackers/savings-detections/${detectionId}/apply`,
     {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
+      headers: authHeaders(token, { 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         ...(trackerId ? { trackerId } : {}),
         ...(force ? { force: true } : {}),
@@ -99,7 +92,7 @@ export async function dismissSavingsDetection(getToken, detectionId) {
     `${import.meta.env.VITE_API_URL}/api/trackers/savings-detections/${detectionId}/dismiss`,
     {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
+      headers: authHeaders(token),
     }
   )
 

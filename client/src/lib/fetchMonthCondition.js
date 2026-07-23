@@ -1,3 +1,5 @@
+import { authHeaders } from './apiRequest.js'
+
 export async function fetchMonthCondition(getToken, monthKey = null) {
   const token = await getToken()
   const params = new URLSearchParams()
@@ -8,7 +10,7 @@ export async function fetchMonthCondition(getToken, monthKey = null) {
   const res = await fetch(
     `${import.meta.env.VITE_API_URL}/api/month-condition${query ? `?${query}` : ''}`,
     {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: authHeaders(token),
     }
   )
 

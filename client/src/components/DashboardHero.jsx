@@ -5,6 +5,7 @@ import { useAnimatedNumber } from '../hooks/useAnimatedNumber.js'
 import { fillSpendingSeries } from '../lib/spendingSparkline.js'
 import { isSpendingCapWarningActive } from '../lib/spendingAlertThresholds.js'
 import CashFlowSummary from './CashFlowSummary.jsx'
+import CashFlowMonthlyChart from './CashFlowMonthlyChart.jsx'
 import SpendingSparkline from './SpendingSparkline.jsx'
 import HowCalculatedDisclosure from './HowCalculatedDisclosure.jsx'
 import { formatCurrency } from '../lib/formatCurrency.js'
@@ -42,6 +43,7 @@ function DashboardHero({
   spent = 0,
   cashFlow = null,
   spendingSeries = [],
+  cashFlowMonthly = [],
   periodStart = null,
   todayIso = null,
   trackerSnapshot = null,
@@ -334,6 +336,10 @@ function DashboardHero({
 
               <div className="mx-auto mt-6 max-w-sm">
                 <SpendingSparkline series={filledSpendingSeries} />
+              </div>
+
+              <div className="mx-auto mt-4 max-w-sm">
+                <CashFlowMonthlyChart months={cashFlowMonthly} />
               </div>
 
               <CashFlowSummary

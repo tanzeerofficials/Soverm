@@ -11,167 +11,170 @@ import {
   subscriptionAccessFromStripe,
   tierFromSubscriptionStatus,
 } from '../services/stripeBilling.js'
+import { test } from 'node:test'
 
-let passed = 0
+test('stripe billing', async () => {
+  let passed = 0
 
-function pass(label) {
-  console.log(`  pass: ${label}`)
-  passed += 1
-}
-
-console.log('Stripe billing tests\n')
-
-// 1) Configured requires all three env vars
-{
-  const prev = {
-    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
-    STRIPE_PRICE_ID: process.env.STRIPE_PRICE_ID,
-    STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+  function pass(label) {
+    console.log(`  pass: ${label}`)
+    passed += 1
   }
 
-  delete process.env.STRIPE_SECRET_KEY
-  delete process.env.STRIPE_PRICE_ID
-  delete process.env.STRIPE_WEBHOOK_SECRET
-  assert.equal(isStripeBillingConfigured(), false, 'empty env → not configured')
+  console.log('Stripe billing tests\n')
 
-  process.env.STRIPE_SECRET_KEY = 'sk_test_x'
-  process.env.STRIPE_PRICE_ID = 'price_x'
-  process.env.STRIPE_WEBHOOK_SECRET = 'whsec_x'
-  assert.equal(isStripeBillingConfigured(), true, 'all three set → configured')
-
-  for (const [key, value] of Object.entries(prev)) {
-    if (value === undefined) {
-      delete process.env[key]
-    } else {
-      process.env[key] = value
+  // 1) Configured requires all three env vars
+  {
+    const prev = {
+      STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+      STRIPE_PRICE_ID: process.env.STRIPE_PRICE_ID,
+      STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
     }
+
+    delete process.env.STRIPE_SECRET_KEY
+    delete process.env.STRIPE_PRICE_ID
+    delete process.env.STRIPE_WEBHOOK_SECRET
+    assert.equal(isStripeBillingConfigured(), false, 'empty env → not configured')
+
+    process.env.STRIPE_SECRET_KEY = 'sk_test_x'
+    process.env.STRIPE_PRICE_ID = 'price_x'
+    process.env.STRIPE_WEBHOOK_SECRET = 'whsec_x'
+    assert.equal(isStripeBillingConfigured(), true, 'all three set → configured')
+
+    for (const [key, value] of Object.entries(prev)) {
+      if (value === undefined) {
+        delete process.env[key]
+      } else {
+        process.env[key] = value
+      }
+    }
+
+    pass('isStripeBillingConfigured env guards')
   }
 
-  pass('isStripeBillingConfigured env guards')
-}
-
-// 2) Subscription status → tier mapping
-{
-  assert.equal(tierFromSubscriptionStatus('active'), 'pro')
-  assert.equal(tierFromSubscriptionStatus('trialing'), 'pro')
-  assert.equal(tierFromSubscriptionStatus('canceled'), 'free')
-  assert.equal(tierFromSubscriptionStatus('unpaid'), 'free')
-  assert.equal(tierFromSubscriptionStatus('incomplete_expired'), 'free')
-  assert.equal(tierFromSubscriptionStatus('past_due'), null)
-  assert.equal(tierFromSubscriptionStatus('incomplete'), null)
-  pass('tierFromSubscriptionStatus mapping')
-}
-
-// 2b) Cancel-at-period-end access window
-{
-  const active = subscriptionAccessFromStripe({
-    cancel_at_period_end: true,
-    current_period_end: 1_800_000_000,
-    status: 'active',
-  })
-  assert.equal(active.cancelAtPeriodEnd, true)
-  assert.equal(active.currentPeriodEnd, new Date(1_800_000_000 * 1000).toISOString())
-
-  const renewing = subscriptionAccessFromStripe({
-    cancel_at_period_end: false,
-    current_period_end: 1_800_000_000,
-    status: 'active',
-  })
-  assert.equal(renewing.cancelAtPeriodEnd, false)
-  assert.ok(renewing.currentPeriodEnd)
-
-  const itemPeriodOnly = subscriptionAccessFromStripe({
-    cancel_at_period_end: true,
-    status: 'active',
-    items: { data: [{ current_period_end: 1_800_000_100 }] },
-  })
-  assert.equal(itemPeriodOnly.cancelAtPeriodEnd, true)
-  assert.equal(itemPeriodOnly.currentPeriodEnd, new Date(1_800_000_100 * 1000).toISOString())
-
-  const cancelAtOnly = subscriptionAccessFromStripe({
-    cancel_at_period_end: false,
-    cancel_at: 1_800_000_200,
-    status: 'active',
-  })
-  assert.equal(cancelAtOnly.cancelAtPeriodEnd, true)
-  assert.equal(cancelAtOnly.currentPeriodEnd, new Date(1_800_000_200 * 1000).toISOString())
-
-  const empty = subscriptionAccessFromStripe(null)
-  assert.equal(empty.cancelAtPeriodEnd, false)
-  assert.equal(empty.currentPeriodEnd, null)
-  pass('subscriptionAccessFromStripe cancel window')
-}
-
-// 3) cancel helper skips when stripe is null
-{
-  const skipped = await cancelStripeSubscriptionsForUser('user_1', { stripe: null })
-  assert.equal(skipped.skipped, true)
-  assert.equal(skipped.canceled, 0)
-  pass('cancelStripeSubscriptionsForUser skips when stripe null')
-}
-
-// 4) cancel helper cancels DB subscription id + active listed subs
-{
-  const canceledIds = []
-  const fakeDb = {
-    query: async () => ({
-      rows: [
-        {
-          stripe_customer_id: 'cus_1',
-          stripe_subscription_id: 'sub_from_db',
-        },
-      ],
-    }),
+  // 2) Subscription status → tier mapping
+  {
+    assert.equal(tierFromSubscriptionStatus('active'), 'pro')
+    assert.equal(tierFromSubscriptionStatus('trialing'), 'pro')
+    assert.equal(tierFromSubscriptionStatus('canceled'), 'free')
+    assert.equal(tierFromSubscriptionStatus('unpaid'), 'free')
+    assert.equal(tierFromSubscriptionStatus('incomplete_expired'), 'free')
+    assert.equal(tierFromSubscriptionStatus('past_due'), null)
+    assert.equal(tierFromSubscriptionStatus('incomplete'), null)
+    pass('tierFromSubscriptionStatus mapping')
   }
-  const fakeStripe = {
-    subscriptions: {
-      list: async () => ({
-        data: [
-          { id: 'sub_listed', status: 'active' },
-          { id: 'sub_old', status: 'canceled' },
+
+  // 2b) Cancel-at-period-end access window
+  {
+    const active = subscriptionAccessFromStripe({
+      cancel_at_period_end: true,
+      current_period_end: 1_800_000_000,
+      status: 'active',
+    })
+    assert.equal(active.cancelAtPeriodEnd, true)
+    assert.equal(active.currentPeriodEnd, new Date(1_800_000_000 * 1000).toISOString())
+
+    const renewing = subscriptionAccessFromStripe({
+      cancel_at_period_end: false,
+      current_period_end: 1_800_000_000,
+      status: 'active',
+    })
+    assert.equal(renewing.cancelAtPeriodEnd, false)
+    assert.ok(renewing.currentPeriodEnd)
+
+    const itemPeriodOnly = subscriptionAccessFromStripe({
+      cancel_at_period_end: true,
+      status: 'active',
+      items: { data: [{ current_period_end: 1_800_000_100 }] },
+    })
+    assert.equal(itemPeriodOnly.cancelAtPeriodEnd, true)
+    assert.equal(itemPeriodOnly.currentPeriodEnd, new Date(1_800_000_100 * 1000).toISOString())
+
+    const cancelAtOnly = subscriptionAccessFromStripe({
+      cancel_at_period_end: false,
+      cancel_at: 1_800_000_200,
+      status: 'active',
+    })
+    assert.equal(cancelAtOnly.cancelAtPeriodEnd, true)
+    assert.equal(cancelAtOnly.currentPeriodEnd, new Date(1_800_000_200 * 1000).toISOString())
+
+    const empty = subscriptionAccessFromStripe(null)
+    assert.equal(empty.cancelAtPeriodEnd, false)
+    assert.equal(empty.currentPeriodEnd, null)
+    pass('subscriptionAccessFromStripe cancel window')
+  }
+
+  // 3) cancel helper skips when stripe is null
+  {
+    const skipped = await cancelStripeSubscriptionsForUser('user_1', { stripe: null })
+    assert.equal(skipped.skipped, true)
+    assert.equal(skipped.canceled, 0)
+    pass('cancelStripeSubscriptionsForUser skips when stripe null')
+  }
+
+  // 4) cancel helper cancels DB subscription id + active listed subs
+  {
+    const canceledIds = []
+    const fakeDb = {
+      query: async () => ({
+        rows: [
+          {
+            stripe_customer_id: 'cus_1',
+            stripe_subscription_id: 'sub_from_db',
+          },
         ],
       }),
-      cancel: async (id) => {
-        canceledIds.push(id)
-        return { id, status: 'canceled' }
+    }
+    const fakeStripe = {
+      subscriptions: {
+        list: async () => ({
+          data: [
+            { id: 'sub_listed', status: 'active' },
+            { id: 'sub_old', status: 'canceled' },
+          ],
+        }),
+        cancel: async (id) => {
+          canceledIds.push(id)
+          return { id, status: 'canceled' }
+        },
       },
-    },
+    }
+
+    const result = await cancelStripeSubscriptionsForUser('user_1', {
+      stripe: fakeStripe,
+      db: fakeDb,
+    })
+
+    assert.equal(result.skipped, false)
+    assert.equal(result.canceled, 2)
+    assert.deepEqual(canceledIds.sort(), ['sub_from_db', 'sub_listed'].sort())
+    pass('cancelStripeSubscriptionsForUser cancels DB + active listed subs')
   }
 
-  const result = await cancelStripeSubscriptionsForUser('user_1', {
-    stripe: fakeStripe,
-    db: fakeDb,
-  })
-
-  assert.equal(result.skipped, false)
-  assert.equal(result.canceled, 2)
-  assert.deepEqual(canceledIds.sort(), ['sub_from_db', 'sub_listed'].sort())
-  pass('cancelStripeSubscriptionsForUser cancels DB + active listed subs')
-}
-
-// 5) Stripe cancel failures do not throw
-{
-  const fakeDb = {
-    query: async () => ({
-      rows: [{ stripe_customer_id: null, stripe_subscription_id: 'sub_bad' }],
-    }),
-  }
-  const fakeStripe = {
-    subscriptions: {
-      list: async () => ({ data: [] }),
-      cancel: async () => {
-        throw new Error('Stripe down')
+  // 5) Stripe cancel failures do not throw
+  {
+    const fakeDb = {
+      query: async () => ({
+        rows: [{ stripe_customer_id: null, stripe_subscription_id: 'sub_bad' }],
+      }),
+    }
+    const fakeStripe = {
+      subscriptions: {
+        list: async () => ({ data: [] }),
+        cancel: async () => {
+          throw new Error('Stripe down')
+        },
       },
-    },
+    }
+
+    const result = await cancelStripeSubscriptionsForUser('user_1', {
+      stripe: fakeStripe,
+      db: fakeDb,
+    })
+    assert.equal(result.canceled, 0)
+    assert.equal(result.skipped, false)
+    pass('cancelStripeSubscriptionsForUser swallows Stripe cancel errors')
   }
 
-  const result = await cancelStripeSubscriptionsForUser('user_1', {
-    stripe: fakeStripe,
-    db: fakeDb,
-  })
-  assert.equal(result.canceled, 0)
-  assert.equal(result.skipped, false)
-  pass('cancelStripeSubscriptionsForUser swallows Stripe cancel errors')
-}
-
-console.log(`\n${passed}/${passed} stripe billing tests passed.`)
+  console.log(`\n${passed}/${passed} stripe billing tests passed.`)
+})

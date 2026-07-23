@@ -33,6 +33,7 @@ import {
 import AccountBalanceDisplay from '../components/AccountBalanceDisplay.jsx'
 import { trackUpgradeProClick } from '../lib/analytics.js'
 import { useTheme, THEME_DARK, THEME_LIGHT } from '../context/ThemeContext.jsx'
+import { authHeaders } from '../lib/apiRequest.js'
 import {
   checkoutErrorToastMessage,
   openBillingPortal,
@@ -204,7 +205,7 @@ function SettingsPage() {
     queryFn: async () => {
       const token = await getToken()
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/summary?range=30d`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders(token),
       })
       if (!res.ok) {
         throw new Error(`Dashboard fetch failed: ${res.status}`)

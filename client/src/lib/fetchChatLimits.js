@@ -1,4 +1,5 @@
 import { chatLimitsQueryKey } from './queryKeys.js'
+import { authHeaders } from './apiRequest.js'
 
 /*
  * What this does: loads how many Ask Soverm messages the user has left
@@ -11,7 +12,7 @@ export async function fetchChatLimits(getToken) {
   }
 
   const response = await fetch(`${import.meta.env.VITE_API_URL}/api/chat/limits`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: authHeaders(token),
   })
 
   if (!response.ok) {

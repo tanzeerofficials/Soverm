@@ -20,6 +20,7 @@ import {
   dedupeCrossAccountTransactions,
   detectRecurringChargesFromTransactions,
 } from '../utils/expenseAnalyzerData.js'
+import { test } from 'node:test'
 
 function assert(condition, message) {
   if (!condition) {
@@ -42,7 +43,7 @@ function tx(name, amount, date, category = null, pending = false, account = null
 
 let passed = 0
 
-try {
+test('recurring charges', () => {
   console.log('Recurring charge detection tests\n')
 
   assert(isHardExcludedPaymentName('CREDIT CARD 3333 PAYMENT *//'), 'Hard payment exclusion')
@@ -433,7 +434,4 @@ try {
   passed++
 
   console.log(`\n${passed}/${passed} tests passed`)
-} catch (err) {
-  console.error(`\nFAIL: ${err.message}`)
-  process.exit(1)
-}
+})

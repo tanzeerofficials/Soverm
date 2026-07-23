@@ -18,6 +18,7 @@ import {
   collectAllowedAmounts,
   validatePersonalNarrative,
 } from '../utils/expenseAnalyzerNarrativeValidation.js'
+import { test } from 'node:test'
 
 function assert(condition, message) {
   if (!condition) {
@@ -40,7 +41,7 @@ function tx(name, amount, daysAgo, category = 'Subscriptions') {
 
 let passed = 0
 
-try {
+test('expense analyzer narrative', () => {
   console.log('Expense analyzer narrative tests\n')
 
   const transactions = [
@@ -193,7 +194,4 @@ try {
   passed++
 
   console.log(`\n${passed}/${passed} expense analyzer narrative tests passed.`)
-} catch (err) {
-  console.error(`\nFAILED: ${err.message}`)
-  process.exit(1)
-}
+})

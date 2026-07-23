@@ -29,10 +29,14 @@ import {
 } from '../utils/transactionFilters.js'
 import {
   classifyCashFlowTransaction,
+  CASH_FLOW_KINDS,
   MONEY_OUT_KINDS,
 } from '../utils/cashFlowClassification.js'
 import { resolveSpendingCategoryLabel } from '../utils/plaidCategory.js'
 import { EXPENSE_ANALYZER_TRANSACTION_SELECT } from '../utils/connectedAccountTransactions.js'
+
+/** Peer sends get their own MoM bucket — not lumped into a vague Transfer category. */
+export const PEER_TRANSFER_CATEGORY = 'Peer transfer'
 
 async function loadMonthCashFlow(userId, startIso, endExclusiveIso) {
   const result = await db.query(
@@ -63,7 +67,11 @@ async function loadMonthCashFlow(userId, startIso, endExclusiveIso) {
   }
 }
 
-async function loadTopCategories(userId, startIso, endExclusiveIso, limit = 3) {
+/**
+ * Money-out totals keyed by display bucket for MoM category movers.
+ * peer_out → "Peer transfer"; everything else → Plaid spending category.
+ */
+export async function loadMoneyOutByCategory(userId, startIso, endExclusiveIso) {
   const result = await db.query(
     `SELECT ${EXPENSE_ANALYZER_TRANSACTION_SELECT}
      FROM transactions t
@@ -81,16 +89,25 @@ async function loadTopCategories(userId, startIso, endExclusiveIso, limit = 3) {
     if (!MONEY_OUT_KINDS.has(kind)) {
       continue
     }
-    const category = resolveSpendingCategoryLabel(row)
+    const category =
+      kind === CASH_FLOW_KINDS.PEER_OUT
+        ? PEER_TRANSFER_CATEGORY
+        : resolveSpendingCategoryLabel(row)
     byCategory.set(category, (byCategory.get(category) ?? 0) + Math.abs(Number(row.amount) || 0))
   }
 
-  const allRows = [...byCategory.entries()]
-    .map(([category, amount]) => ({ category, amount: roundCurrency(amount) }))
+  const totals = {}
+  for (const [category, amount] of byCategory) {
+    totals[category] = roundCurrency(amount)
+  }
+  return totals
+}
+
+function topCategoriesFromTotals(totals, limit = 3) {
+  const allRows = Object.entries(totals)
+    .map(([category, amount]) => ({ category, amount }))
     .sort((left, right) => right.amount - left.amount)
 
-  // Percent is share of ALL external spending this month — not of the top-N slice.
-  // Otherwise a top driver at $100 of $1000 spend can show as "100%" and confuse users.
   const totalSpend = allRows.reduce((sum, row) => sum + row.amount, 0)
   return allRows.slice(0, limit).map((row) => ({
     ...row,
@@ -137,11 +154,19 @@ export async function buildMonthConditionLetterForUser(
   const isCurrentMonth = resolvedKey === currentKey
   const isComplete = !isCurrentMonth || todayIso >= window.periodEnd
 
-  const [cashFlow, priorCashFlow, topCategories, accountsResult, expensePayload, snapshot] =
-    await Promise.all([
+  const [
+    cashFlow,
+    priorCashFlow,
+    currentByCategory,
+    priorByCategory,
+    accountsResult,
+    expensePayload,
+    snapshot,
+  ] = await Promise.all([
       loadMonthCashFlow(userId, window.periodStart, window.endExclusiveIso),
       loadMonthCashFlow(userId, priorWindow.periodStart, priorWindow.endExclusiveIso),
-      loadTopCategories(userId, window.periodStart, window.endExclusiveIso),
+      loadMoneyOutByCategory(userId, window.periodStart, window.endExclusiveIso),
+      loadMoneyOutByCategory(userId, priorWindow.periodStart, priorWindow.endExclusiveIso),
       db.query(
         `SELECT id, bank_name, account_name, account_type,
                 balance_current, balance_available, currency
@@ -157,6 +182,8 @@ export async function buildMonthConditionLetterForUser(
         whatsLeftUntilPayday: { configured: false },
       })),
     ])
+
+  const topCategories = topCategoriesFromTotals(currentByCategory, 3)
 
   const accounts = accountsResult.rows.map((account) => ({
     ...account,
@@ -184,6 +211,8 @@ export async function buildMonthConditionLetterForUser(
     recurringMonthly: expensePayload.totalRecurringMonthly ?? 0,
     priorIncome: priorCashFlow.income,
     priorSpent: priorCashFlow.spent,
+    currentByCategory,
+    priorByCategory,
     dayOfMonth,
     whatsLeftAmount: snapshot.whatsLeftUntilPayday?.amount ?? null,
   })

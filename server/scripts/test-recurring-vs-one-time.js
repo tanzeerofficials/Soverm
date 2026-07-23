@@ -10,6 +10,7 @@ import {
   buildExpenseAnalyzerPayload,
 } from '../utils/expenseAnalyzerData.js'
 import { computeRecurringVsOneTimeSplit } from '../utils/recurringVsOneTime.js'
+import { test } from 'node:test'
 
 function assert(condition, message) {
   if (!condition) {
@@ -32,7 +33,7 @@ function tx(name, amount, daysAgo, category = 'Subscriptions') {
 
 let passed = 0
 
-try {
+test('recurring vs one time', () => {
   console.log('Recurring vs one-time split tests\n')
 
   const transactions = [
@@ -74,7 +75,4 @@ try {
   passed++
 
   console.log(`\n${passed}/${passed} recurring vs one-time tests passed.`)
-} catch (err) {
-  console.error(`\nFAILED: ${err.message}`)
-  process.exit(1)
-}
+})

@@ -5,10 +5,21 @@
  */
 
 import { SignInButton, SignUpButton } from '@clerk/clerk-react'
+import { useNavigate } from 'react-router-dom'
+import { enterDemoSession, isDemoModeAvailable } from '../lib/demoSession.js'
+import { trackDemoModeEntered } from '../lib/analytics.js'
 
 const HERO_TRUST_CHIPS = ['Free weekly loop', 'Read-only Plaid', 'No credit card']
 
 function LandingHero() {
+  const navigate = useNavigate()
+
+  function handleViewDemo() {
+    enterDemoSession()
+    trackDemoModeEntered()
+    navigate('/dashboard')
+  }
+
   return (
     <section className="landing-hero-shell relative overflow-hidden pb-16 sm:pb-20">
       <div className="landing-hero-mesh pointer-events-none absolute inset-0" aria-hidden="true" />
@@ -63,6 +74,16 @@ function LandingHero() {
               </button>
             </SignInButton>
           </div>
+
+          {isDemoModeAvailable() && (
+            <button
+              type="button"
+              onClick={handleViewDemo}
+              className="mt-4 text-sm font-medium text-brand-soft underline-offset-4 transition hover:text-brand hover:underline"
+            >
+              View live demo — fictional data, no sign-up
+            </button>
+          )}
 
           <ul className="mt-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
             {HERO_TRUST_CHIPS.map((chip) => (

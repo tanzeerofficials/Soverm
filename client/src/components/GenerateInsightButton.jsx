@@ -10,11 +10,13 @@ import { useAuth } from '@clerk/clerk-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { dashboardQueryKey, historyQueryKey } from '../lib/queryKeys.js'
 import {
+  trackFunnelFirstInsightGenerated,
   trackGenerateInsightClick,
   trackGenerateInsightResult,
 } from '../lib/analytics.js'
 import { captureClientError } from '../lib/sentry.js'
 import { toUserFacingErrorMessage } from '../lib/userFacingError.js'
+import { authHeaders } from '../lib/apiRequest.js'
 
 function GenerateInsightButton({
   className = '',
@@ -28,7 +30,7 @@ function GenerateInsightButton({
   highlighted = false,
   isLoading: isLoadingProp = false,
 }) {
-  const { getToken } = useAuth()
+  const { getToken, userId } = useAuth()
   const queryClient = useQueryClient()
   const [internalLoading, setInternalLoading] = useState(false)
   const [insight, setInsight] = useState(null)
@@ -46,9 +48,7 @@ function GenerateInsightButton({
       const token = await getToken()
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/insights/generate`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: authHeaders(token),
       })
 
       const data = await response.json()
@@ -86,6 +86,7 @@ function GenerateInsightButton({
       onError?.(null)
       onUsageUpdated?.(data.usage)
       trackGenerateInsightResult('success')
+      trackFunnelFirstInsightGenerated(userId)
       showToast?.('Insight generated', 'success')
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: dashboardQueryKey }),

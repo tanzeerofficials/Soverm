@@ -109,14 +109,24 @@ cd ../client && npm install
 
 Create a local database and set `DATABASE_URL` in `server/.env`.
 
-**Fresh local database** — `schema.sql` includes the full current feature set (users, plaid, accounts, transactions, insights, actions, chat, notifications, expense analyzer narratives, monthly trackers, savings detections):
+**Fresh local database** — `schema.sql` includes the full current feature set (users, plaid, accounts, transactions, insights, actions, chat, notifications, expense analyzer narratives, monthly trackers, savings detections, Plaid + Stripe webhook idempotency):
 
 ```sh
 cd server
 psql "$DATABASE_URL" -f db/schema.sql
+npm run migrate
 ```
 
-**Upgrading an older database** — run incremental migrations in order (see table below), or use the verify/apply scripts.
+The `npm run migrate` afterward is what makes this bulletproof against schema.sql drifting behind the newest migrations over time — it backfills everything schema.sql already covers and applies anything it doesn't yet (verified end-to-end against a scratch database while building the migration runner).
+
+**Upgrading an older database** — run:
+
+```sh
+cd server
+npm run migrate
+```
+
+One command, safe to run repeatedly. It tracks applied migrations in a `schema_migrations` table; migrations already present (e.g. from a fresh `schema.sql` load, or a database migrated the old way) are detected and recorded without re-running their SQL. Add `-- --dry-run` to preview without writing anything. The old `migrate:0XX` per-migration scripts still work (each now prints a deprecation notice) but `npm run migrate` is the supported path going forward. The table below documents what each migration file does; use `verify:all-migrations` for a deploy-checklist-oriented check.
 
 | File | Purpose |
 |------|---------|
@@ -172,6 +182,21 @@ cd client && npm run test:all && npm run lint && npm run build
 
 CI runs the same suites on every PR (see `.github/workflows/ci.yml`).
 
+**Server test structure** — `server/scripts/test-*.js` all run under Node's built-in
+test runner (`node --test`), not a hand-rolled assert harness. `npm run test:all` runs
+every pure-unit test file in one invocation and prints a single aggregate summary
+(pass/fail/duration) instead of a `&&`-chained sequence that stops at the first failure.
+Each file also has its own `npm run test:<name>` for running it in isolation during dev.
+
+Three scripts need a live Postgres connection (`test-trackers-routes.js`,
+`verify-history-reload.js`, `verify-stored-insights.js`) and live in a separate
+`npm run test:integration` — CI has no `DATABASE_URL`, so these are excluded from the
+default `test:all` run. Run them locally against your dev database:
+
+```sh
+cd server && npm run test:integration
+```
+
 ## Deploy
 
 ### Client — Vercel
@@ -188,21 +213,83 @@ CI runs the same suites on every PR (see `.github/workflows/ci.yml`).
 3. Attach Postgres; set all server env vars
 4. List every frontend origin in `ALLOWED_ORIGINS` (production + preview URLs)
 
+### Background jobs (pg-boss)
+
+Plaid sync (every 4h + webhook-triggered), the weekly digest, and the month-condition
+notify email all run as durable Postgres-backed jobs via [pg-boss](https://github.com/timgit/pg-boss)
+(`queue/`), not in-process `node-cron`. Jobs survive a deploy/restart between being
+queued and running, and are retried on failure — a crash no longer silently drops a
+sync the way the old `setImmediate` webhook handler could.
+
+**Default deploy (single Railway service)** — nothing to configure. `npm start` runs
+one process that serves HTTP **and** processes the queue, same as today.
+
+**Optional: a dedicated worker service** — if web traffic and background job volume
+need to scale independently, add a second Railway service pointed at the same repo
+with:
+
+```
+Start command: npm run worker
+```
+
+`WORKER_MODE=1` (baked into that script) makes the process run queue workers only, no
+HTTP listener. Run any number of default-mode and worker-mode processes together —
+pg-boss's own locking (`FOR UPDATE SKIP LOCKED` dequeue + an `exclusive` queue policy
+keyed per user for Plaid syncs) guarantees a job is never processed twice, no matter
+how many processes are polling.
+
+**Verifying the queue** (e.g. after this change, or after adding a worker service):
+
+```sh
+cd server
+npm run dev              # terminal 1 — default mode
+npm run dev:worker       # terminal 2 — worker-only mode
+node scripts/enqueue-sync.js <a real userId>   # terminal 3
+```
+
+Exactly one of the two terminals should log `[sync-user] <userId>: N added, ...` —
+confirm via `SELECT state FROM pgboss.job ORDER BY created_on DESC LIMIT 1;` that the
+job reached `completed`.
+
+### Rate limiting (distributed)
+
+All five API rate limiters (`middleware/security.js`) share a Postgres-backed store
+(`rate_limit_hits`, see `middleware/postgresRateLimitStore.js`) instead of
+`express-rate-limit`'s default in-memory store. In-memory counts are per-process — run
+2+ Railway replicas (or a `WORKER_MODE=1` process) and each instance would enforce the
+full configured limit independently, so the real ceiling silently becomes
+`max × instance count`. Each limiter uses its own key prefix (`global`, `webhook`,
+`plaid`, `sync`, `narrative`) so the same userId/IP tracked by two different limiters
+never shares a counter.
+
+The chat/insight limits in `utils/rateLimit.js` are separate and already multi-instance-safe
+(DB-backed reservation under a row lock) — untouched by this.
+
+**Verifying the shared limit** — start two instances on different ports sharing the
+same `DATABASE_URL`, then send more combined requests than the configured max to an
+unauthenticated route (`/webhooks/plaid` works — the limiter runs before signature
+verification, so a 401 still counts as a hit):
+
+```sh
+cd server
+PORT=3101 npm start &
+PORT=3102 npm start &
+# hammer both ports with more requests combined than the dev max (1000/min) and tally
+# non-429 responses — the combined total across both ports should be ~1000, not ~2000.
+```
+
 ### Database migrations (manual — required on deploy)
 
 Migrations are **not** applied automatically. After deploying code that needs new tables/columns:
 
 ```sh
 cd server
-DATABASE_URL='<railway-postgres-url>' npm run verify:all-migrations
-DATABASE_URL='<railway-postgres-url>' npm run verify:all-migrations -- --apply
+DATABASE_URL='<railway-postgres-url>' npm run migrate
 ```
 
-Or apply a single migration, e.g.:
+Safe to run every deploy — already-applied migrations are detected and skipped, nothing re-runs. Add `-- --dry-run` first if you want to preview what would happen against production before writing.
 
-```sh
-DATABASE_URL='...' npm run migrate:019
-```
+`verify:all-migrations` (and its alias `verify:migrations`) remains available as a separate deploy-checklist tool — it covers migrations 006–025 specifically and refuses to run against localhost unless `ALLOW_LOCAL_DB=1`, which makes it a good pre-deploy sanity check in CI/CD. `npm run migrate` is the complete, general-purpose runner (all 31 migration files) for actually applying schema changes.
 
 **Schema feature caches** (trackers / savings detections) refresh about every **60 seconds**, so new columns/tables become visible without a hard restart. A process restart still clears caches immediately.
 
@@ -231,9 +318,8 @@ Complete **before** inviting next-week testers. Deploy **client + API together**
 
 ```sh
 # From server/ against Railway public DATABASE_URL
-DATABASE_URL='...' npm run migrate:019
-DATABASE_URL='...' npm run migrate:025
-# Expect: columns already exist, or migration applied once
+DATABASE_URL='...' npm run migrate
+# Expect: 019 and 025 report already-applied or apply once; everything else already tracked
 ```
 
 Migration **025** stores cancel-at-period-end so Profile can show when Pro access ends after a portal cancel.

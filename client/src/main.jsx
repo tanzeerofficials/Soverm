@@ -23,6 +23,7 @@ import { ThemeProvider } from './context/ThemeContext.jsx'
 import { ToastProvider } from './context/ToastContext.jsx'
 import { initAnalytics } from './lib/analytics.js'
 import { clerkAppearance } from './lib/clerkAppearance.js'
+import { clerkLocalization } from './lib/clerkLocalization.js'
 import { initSentry, Sentry, captureClientError } from './lib/sentry.js'
 import { applyTheme, resolveInitialTheme } from './lib/themePrefs.js'
 
@@ -70,7 +71,11 @@ createRoot(document.getElementById('root')).render(
         </div>
       }
     >
-      <ClerkProvider publishableKey={clerkPublishableKey} appearance={clerkAppearance}>
+      <ClerkProvider
+        publishableKey={clerkPublishableKey}
+        appearance={clerkAppearance}
+        localization={clerkLocalization}
+      >
       <ClerkLoading>
         <AppLoadingScreen />
       </ClerkLoading>

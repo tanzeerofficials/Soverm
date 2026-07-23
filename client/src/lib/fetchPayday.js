@@ -1,7 +1,9 @@
+import { authHeaders } from './apiRequest.js'
+
 export async function fetchPayday(getToken) {
   const token = await getToken()
   const res = await fetch(`${import.meta.env.VITE_API_URL}/api/payday`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: authHeaders(token),
   })
 
   if (!res.ok) {
@@ -16,10 +18,7 @@ export async function savePayday(getToken, payload) {
   const token = await getToken()
   const res = await fetch(`${import.meta.env.VITE_API_URL}/api/payday`, {
     method: 'PUT',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
+    headers: authHeaders(token, { 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload),
   })
 
